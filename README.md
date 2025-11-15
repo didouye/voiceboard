@@ -73,10 +73,12 @@ Each effect is processed in sequence for optimal sound quality:
 
 ### Prerequisites
 
-- Windows 10/11 (64-bit)
+- **Windows 10/11 (64-bit)** - This project is Windows-only and uses WASAPI
 - Rust toolchain (1.70+): https://rustup.rs/
 - Visual Studio Build Tools or MSVC compiler
 - Virtual Audio Cable (see Virtual Audio Device Setup below)
+
+**Note**: This project cannot be built on Linux or macOS as it uses Windows-specific audio APIs.
 
 ### Build from Source
 
@@ -86,11 +88,14 @@ git clone https://github.com/didouye/voiceboard.git
 cd voiceboard
 
 # Build release version (optimized for low latency)
+# Must be run on Windows with MSVC toolchain
 cargo build --release
 
 # Run the application
 cargo run --release
 ```
+
+For detailed build instructions and troubleshooting, see [BUILD.md](BUILD.md).
 
 ## Virtual Audio Device Setup
 
@@ -319,3 +324,12 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 - DSP algorithms based on standard audio processing techniques
 - WASAPI integration using the `windows` crate
 - FFT processing using `realfft` and `rustfft` crates
+
+## Documentation
+
+- **[Quick Start Guide](QUICKSTART.md)** - Fast setup and common commands
+- **[Build Guide](BUILD.md)** - Detailed build and testing instructions
+- **[Usage Examples](EXAMPLES.md)** - Configuration examples and presets
+- **[Virtual Audio Setup](VIRTUAL_AUDIO_SETUP.md)** - Complete virtual cable setup guide
+- **[Architecture](ARCHITECTURE.md)** - Technical architecture and design
+- **[FAQ](FAQ.md)** - Frequently asked questions
