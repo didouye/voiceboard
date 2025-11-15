@@ -1,0 +1,28 @@
+# VoiceBoard Configuration File
+
+# Audio Settings
+sample_rate = 48000      # Sample rate in Hz (44100 or 48000 recommended)
+buffer_size = 512        # Buffer size in samples (256-1024, smaller = lower latency)
+
+# Effect Settings
+[effects]
+# Pitch Shifting: Change pitch in semitones (-12 to +12)
+# Examples: -5 for deeper voice, +5 for higher voice
+# Set to null or comment out to disable
+pitch_shift = -3.0
+
+# Formant Shifting: Change vocal characteristics in semitones (-12 to +12)
+# Positive values = younger/female, Negative values = older/male
+# Set to null or comment out to disable
+formant_shift = 2.0
+
+# Reverb: Add spatial depth
+reverb_enabled = true
+
+# Robot Effect: Add synthetic/robotic quality
+robot_enabled = false
+
+# Distortion: Add grit and harmonics (0.0 to 1.0)
+# 0.0 = clean, 1.0 = maximum distortion
+# Set to null or comment out to disable
+distortion = 0.2

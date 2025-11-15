@@ -1,0 +1,61 @@
+[package]
+name = "voiceboard"
+version = "0.1.0"
+edition = "2021"
+authors = ["VoiceBoard Contributors"]
+description = "A Windows real-time voice changer with DSP effects"
+license = "MIT"
+readme = "README.md"
+
+[dependencies]
+# Windows Audio API
+windows = { version = "0.54", features = [
+    "Win32_Media_Audio",
+    "Win32_Media_Audio_DirectSound",
+    "Win32_System_Com",
+    "Win32_Foundation",
+    "Win32_System_Threading",
+    "Win32_Media_KernelStreaming",
+    "Win32_Devices_FunctionDiscovery",
+    "Win32_Security",
+] }
+
+# Audio processing and DSP
+realfft = "3.3"
+rustfft = "6.2"
+
+# Math and numeric operations
+num-complex = "0.4"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging
+log = "0.4"
+env_logger = "0.11"
+
+# Configuration
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+
+# Utilities
+crossbeam-channel = "0.5"
+parking_lot = "0.12"
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bin]]
+name = "voiceboard"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+
+[profile.dev]
+opt-level = 1
