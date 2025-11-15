@@ -1,0 +1,46 @@
+<div class="soundboard-container">
+  <div class="soundboard-header">
+    <h2>Soundboard</h2>
+    <button class="btn-add-sound" (click)="onAddSound()">
+      Add Sound
+    </button>
+  </div>
+
+  <div class="sounds-grid">
+    <div *ngFor="let sound of sounds$ | async" class="sound-card">
+      <div class="sound-info">
+        <h3>{{ sound.name }}</h3>
+        <span class="sound-path">{{ sound.file_path }}</span>
+      </div>
+
+      <div class="sound-controls">
+        <button class="btn-play" (click)="onPlaySound(sound)">
+          Play
+        </button>
+        <button class="btn-rename" (click)="onRenameSound(sound)">
+          Rename
+        </button>
+        <button class="btn-delete" (click)="onDeleteSound(sound.id)">
+          Delete
+        </button>
+      </div>
+
+      <div class="sound-volume">
+        <label>Volume:</label>
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.01"
+          [value]="sound.volume"
+          (input)="onVolumeChange(sound, $any($event.target).value)"
+        />
+        <span>{{ (sound.volume * 100) | number:'1.0-0' }}%</span>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="(sounds$ | async)?.length === 0" class="empty-state">
+    <p>No sounds added yet. Click "Add Sound" to get started!</p>
+  </div>
+</div>

@@ -1,0 +1,72 @@
+{
+  "$schema": "https://schema.tauri.app/config/2.0.0",
+  "productName": "Voiceboard",
+  "version": "0.1.0",
+  "identifier": "com.voiceboard.app",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devUrl": "http://localhost:4200",
+    "frontendDist": "../src-ui/dist/voiceboard/browser"
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["msi", "nsis"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "",
+      "wix": {
+        "language": "en-US"
+      },
+      "nsis": {
+        "installerIcon": "icons/icon.ico",
+        "license": "../LICENSE"
+      }
+    }
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Voiceboard",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true,
+        "transparent": false,
+        "alwaysOnTop": false,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["**"]
+      }
+    }
+  },
+  "plugins": {
+    "dialog": {
+      "all": true,
+      "open": true,
+      "save": false,
+      "message": true,
+      "ask": true,
+      "confirm": true
+    },
+    "fs": {
+      "scope": ["**"]
+    }
+  }
+}
