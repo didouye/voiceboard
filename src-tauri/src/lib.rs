@@ -21,10 +21,17 @@ pub mod infrastructure;
 
 use application::{
     commands::{
-        add_audio_file_channel, add_microphone_channel, check_virtual_driver,
-        get_audio_devices, get_input_devices, get_mixer_config, is_mixing,
-        remove_channel, set_channel_volume, set_master_volume, start_mixing,
-        stop_mixing, toggle_channel_mute,
+        // Device management
+        get_audio_devices, get_input_devices, get_virtual_output_devices, check_virtual_driver,
+        // Settings
+        get_settings, save_settings, load_settings, set_input_device, set_output_device,
+        // Mixer configuration
+        get_mixer_config, set_master_volume,
+        // Channel management
+        add_microphone_channel, add_audio_file_channel, remove_channel,
+        set_channel_volume, toggle_channel_mute,
+        // Mixing control
+        start_mixing, stop_mixing, is_mixing,
     },
     AppState,
 };
@@ -39,12 +46,20 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_store::Builder::default().build())
         .manage(AppState::new())
         .invoke_handler(tauri::generate_handler![
             // Device management
             get_audio_devices,
             get_input_devices,
+            get_virtual_output_devices,
             check_virtual_driver,
+            // Settings
+            get_settings,
+            save_settings,
+            load_settings,
+            set_input_device,
+            set_output_device,
             // Mixer configuration
             get_mixer_config,
             set_master_volume,

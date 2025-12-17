@@ -7,6 +7,7 @@ export interface AudioDevice {
   name: string;
   deviceType: string;
   isDefault: boolean;
+  isVirtual: boolean;
 }
 
 export interface MixerChannel {
@@ -23,6 +24,20 @@ export interface MixerConfig {
   channels: MixerChannel[];
   sampleRate: number;
   bufferSize: number;
+}
+
+export interface AudioSettings {
+  inputDeviceId: string | null;
+  outputDeviceId: string | null;
+  masterVolume: number;
+  sampleRate: number;
+  bufferSize: number;
+}
+
+export interface AppSettings {
+  audio: AudioSettings;
+  startMinimized: boolean;
+  autoStartMixing: boolean;
 }
 
 export interface ApiResponse<T> {

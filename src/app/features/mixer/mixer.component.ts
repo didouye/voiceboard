@@ -3,25 +3,17 @@ import { CommonModule } from '@angular/common';
 import { MixerService } from '../../core/services';
 import { ChannelStripComponent } from './channel-strip/channel-strip.component';
 import { MasterControlComponent } from './master-control/master-control.component';
+import { DeviceSelectorComponent } from '../devices/device-selector.component';
 
 @Component({
   selector: 'app-mixer',
   standalone: true,
-  imports: [CommonModule, ChannelStripComponent, MasterControlComponent],
+  imports: [CommonModule, ChannelStripComponent, MasterControlComponent, DeviceSelectorComponent],
   template: `
     <div class="mixer-container">
       <header class="mixer-header">
         <h1>Voiceboard</h1>
         <p class="subtitle">Virtual Microphone Mixer</p>
-
-        @if (mixer.virtualDriverInstalled() === false) {
-          <div class="warning-banner">
-            Virtual Audio Driver not installed.
-            <a href="https://github.com/VirtualDrivers/Virtual-Audio-Driver" target="_blank">
-              Install Driver
-            </a>
-          </div>
-        }
       </header>
 
       @if (mixer.loading()) {
@@ -33,40 +25,49 @@ import { MasterControlComponent } from './master-control/master-control.componen
         </div>
       }
 
-      <div class="mixer-controls">
-        <div class="channels-section">
-          <div class="section-header">
-            <h2>Channels</h2>
-            <div class="add-buttons">
-              <button (click)="addMicrophone()" class="btn-add">+ Microphone</button>
-              <button (click)="addAudioFile()" class="btn-add">+ Audio File</button>
+      <div class="mixer-layout">
+        <!-- Left Sidebar - Device Selection -->
+        <aside class="sidebar">
+          <app-device-selector />
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+          <div class="channels-section">
+            <div class="section-header">
+              <h2>Channels</h2>
+              <div class="add-buttons">
+                <button (click)="addMicrophone()" class="btn-add">+ Microphone</button>
+                <button (click)="addAudioFile()" class="btn-add">+ Audio File</button>
+              </div>
+            </div>
+
+            <div class="channels-grid">
+              @for (channel of mixer.channels(); track channel.id) {
+                <app-channel-strip
+                  [channel]="channel"
+                  (volumeChange)="onVolumeChange(channel.id, $event)"
+                  (muteToggle)="onMuteToggle(channel.id)"
+                  (remove)="onRemoveChannel(channel.id)"
+                />
+              } @empty {
+                <div class="no-channels">
+                  No channels added. Click "+ Microphone" or "+ Audio File" to add one.
+                </div>
+              }
             </div>
           </div>
+        </main>
 
-          <div class="channels-grid">
-            @for (channel of mixer.channels(); track channel.id) {
-              <app-channel-strip
-                [channel]="channel"
-                (volumeChange)="onVolumeChange(channel.id, $event)"
-                (muteToggle)="onMuteToggle(channel.id)"
-                (remove)="onRemoveChannel(channel.id)"
-              />
-            } @empty {
-              <div class="no-channels">
-                No channels added. Click "+ Microphone" or "+ Audio File" to add one.
-              </div>
-            }
-          </div>
-        </div>
-
-        <div class="master-section">
+        <!-- Right Sidebar - Master Control -->
+        <aside class="master-section">
           <app-master-control
             [volume]="mixer.masterVolume()"
             [isRunning]="mixer.isRunning()"
             (volumeChange)="onMasterVolumeChange($event)"
             (startStop)="onStartStop()"
           />
-        </div>
+        </aside>
       </div>
     </div>
   `,
@@ -96,20 +97,6 @@ import { MasterControlComponent } from './master-control/master-control.componen
       margin: 5px 0 0;
     }
 
-    .warning-banner {
-      background: #ff6b35;
-      padding: 10px 20px;
-      border-radius: 8px;
-      margin-top: 15px;
-      display: inline-block;
-    }
-
-    .warning-banner a {
-      color: #fff;
-      font-weight: bold;
-      margin-left: 10px;
-    }
-
     .error-banner {
       background: #e74c3c;
       padding: 15px 20px;
@@ -118,6 +105,9 @@ import { MasterControlComponent } from './master-control/master-control.componen
       display: flex;
       justify-content: space-between;
       align-items: center;
+      max-width: 1400px;
+      margin-left: auto;
+      margin-right: auto;
     }
 
     .error-banner button {
@@ -135,12 +125,22 @@ import { MasterControlComponent } from './master-control/master-control.componen
       color: #888;
     }
 
-    .mixer-controls {
+    .mixer-layout {
       display: grid;
-      grid-template-columns: 1fr 200px;
-      gap: 30px;
-      max-width: 1400px;
+      grid-template-columns: 300px 1fr 200px;
+      gap: 25px;
+      max-width: 1600px;
       margin: 0 auto;
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 20px;
+      align-self: start;
+    }
+
+    .main-content {
+      min-width: 0;
     }
 
     .section-header {
@@ -190,6 +190,34 @@ import { MasterControlComponent } from './master-control/master-control.componen
       background: rgba(255,255,255,0.05);
       border-radius: 12px;
       border: 2px dashed #333;
+    }
+
+    .master-section {
+      position: sticky;
+      top: 20px;
+      align-self: start;
+    }
+
+    /* Responsive */
+    @media (max-width: 1200px) {
+      .mixer-layout {
+        grid-template-columns: 250px 1fr 180px;
+      }
+    }
+
+    @media (max-width: 900px) {
+      .mixer-layout {
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+
+      .sidebar, .master-section {
+        position: static;
+      }
+
+      .master-section {
+        order: -1;
+      }
     }
   `]
 })

@@ -6,7 +6,9 @@
 pub mod audio;
 pub mod device;
 pub mod mixer;
+pub mod settings;
 
 pub use audio::*;
 pub use device::*;
 pub use mixer::*;
+pub use settings::*;

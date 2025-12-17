@@ -3,6 +3,17 @@
 use crate::domain::{AudioDevice, DeviceId, DeviceType};
 use crate::ports::{DeviceManager, DeviceManagerError};
 
+/// Known virtual audio device name patterns
+const VIRTUAL_DEVICE_PATTERNS: &[&str] = &[
+    "virtual audio",
+    "vb-audio",
+    "cable",
+    "voicemeeter",
+    "blackhole",
+    "loopback",
+    "virtual cable",
+];
+
 /// Device manager adapter using CPAL
 pub struct CpalDeviceManager {
     cached_devices: Vec<AudioDevice>,
@@ -13,6 +24,14 @@ impl CpalDeviceManager {
         Self {
             cached_devices: Vec::new(),
         }
+    }
+
+    /// Check if a device name matches known virtual device patterns
+    fn is_virtual_device(name: &str) -> bool {
+        let name_lower = name.to_lowercase();
+        VIRTUAL_DEVICE_PATTERNS
+            .iter()
+            .any(|pattern| name_lower.contains(pattern))
     }
 
     fn enumerate_devices(&self) -> Result<Vec<AudioDevice>, DeviceManagerError> {
@@ -34,14 +53,21 @@ impl CpalDeviceManager {
             for device in input_devices {
                 if let Ok(name) = device.name() {
                     let is_default = default_input_name.as_ref() == Some(&name);
+                    let is_virtual = Self::is_virtual_device(&name);
 
                     // Get supported configurations
                     let (sample_rates, channels) = Self::get_device_capabilities(&device, true);
 
+                    let device_type = if is_virtual {
+                        DeviceType::InputVirtual
+                    } else {
+                        DeviceType::InputPhysical
+                    };
+
                     devices.push(AudioDevice::new(
                         DeviceId::new(&name),
                         name,
-                        DeviceType::InputPhysical,
+                        device_type,
                         is_default,
                         sample_rates,
                         channels,
@@ -55,13 +81,20 @@ impl CpalDeviceManager {
             for device in output_devices {
                 if let Ok(name) = device.name() {
                     let is_default = default_output_name.as_ref() == Some(&name);
+                    let is_virtual = Self::is_virtual_device(&name);
 
                     let (sample_rates, channels) = Self::get_device_capabilities(&device, false);
+
+                    let device_type = if is_virtual {
+                        DeviceType::OutputVirtual
+                    } else {
+                        DeviceType::OutputPhysical
+                    };
 
                     devices.push(AudioDevice::new(
                         DeviceId::new(&name),
                         name,
-                        DeviceType::OutputPhysical,
+                        device_type,
                         is_default,
                         sample_rates,
                         channels,
@@ -117,6 +150,16 @@ impl CpalDeviceManager {
 
         (sample_rates, channels)
     }
+
+    /// Find virtual output devices (for sending mixed audio to virtual mic)
+    pub fn find_virtual_outputs(&self) -> Result<Vec<AudioDevice>, DeviceManagerError> {
+        self.list_devices_by_type(DeviceType::OutputVirtual)
+    }
+
+    /// Find physical input devices (real microphones)
+    pub fn find_physical_inputs(&self) -> Result<Vec<AudioDevice>, DeviceManagerError> {
+        self.list_devices_by_type(DeviceType::InputPhysical)
+    }
 }
 
 impl Default for CpalDeviceManager {
@@ -170,5 +213,14 @@ mod tests {
     fn test_device_manager_creation() {
         let manager = CpalDeviceManager::new();
         assert!(manager.cached_devices.is_empty());
+    }
+
+    #[test]
+    fn test_virtual_device_detection() {
+        assert!(CpalDeviceManager::is_virtual_device("Virtual Audio Device"));
+        assert!(CpalDeviceManager::is_virtual_device("CABLE Output (VB-Audio Virtual Cable)"));
+        assert!(CpalDeviceManager::is_virtual_device("Voicemeeter Input"));
+        assert!(!CpalDeviceManager::is_virtual_device("Realtek HD Audio"));
+        assert!(!CpalDeviceManager::is_virtual_device("Built-in Microphone"));
     }
 }

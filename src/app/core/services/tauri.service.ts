@@ -4,6 +4,7 @@ import {
   AudioDevice,
   MixerChannel,
   MixerConfig,
+  AppSettings,
   ApiResponse
 } from '../models';
 
@@ -27,7 +28,7 @@ export class TauriService {
     if (!response.success || !response.data) {
       throw new Error(response.error || 'Failed to get audio devices');
     }
-    return response.data;
+    return this.mapDevices(response.data);
   }
 
   /**
@@ -38,7 +39,18 @@ export class TauriService {
     if (!response.success || !response.data) {
       throw new Error(response.error || 'Failed to get input devices');
     }
-    return response.data;
+    return this.mapDevices(response.data);
+  }
+
+  /**
+   * Get virtual output devices (for sending mixed audio)
+   */
+  async getVirtualOutputDevices(): Promise<AudioDevice[]> {
+    const response = await invoke<ApiResponse<AudioDevice[]>>('get_virtual_output_devices');
+    if (!response.success || !response.data) {
+      throw new Error(response.error || 'Failed to get virtual output devices');
+    }
+    return this.mapDevices(response.data);
   }
 
   /**
@@ -49,6 +61,94 @@ export class TauriService {
     return response.success && response.data === true;
   }
 
+  /**
+   * Map backend device DTOs to frontend model (handle snake_case to camelCase)
+   */
+  private mapDevices(devices: any[]): AudioDevice[] {
+    return devices.map(d => ({
+      id: d.id,
+      name: d.name,
+      deviceType: d.device_type,
+      isDefault: d.is_default,
+      isVirtual: d.is_virtual
+    }));
+  }
+
+  // =========================================================================
+  // Settings Management
+  // =========================================================================
+
+  /**
+   * Get current application settings
+   */
+  async getSettings(): Promise<AppSettings> {
+    const settings = await invoke<any>('get_settings');
+    return this.mapSettings(settings);
+  }
+
+  /**
+   * Save application settings
+   */
+  async saveSettings(settings: AppSettings): Promise<void> {
+    await invoke('save_settings', { settings: this.unmapSettings(settings) });
+  }
+
+  /**
+   * Load settings from persistent storage
+   */
+  async loadSettings(): Promise<AppSettings> {
+    const settings = await invoke<any>('load_settings');
+    return this.mapSettings(settings);
+  }
+
+  /**
+   * Set input device (microphone)
+   */
+  async setInputDevice(deviceId: string | null): Promise<void> {
+    await invoke('set_input_device', { deviceId });
+  }
+
+  /**
+   * Set output device (virtual microphone)
+   */
+  async setOutputDevice(deviceId: string | null): Promise<void> {
+    await invoke('set_output_device', { deviceId });
+  }
+
+  /**
+   * Map backend settings to frontend model
+   */
+  private mapSettings(s: any): AppSettings {
+    return {
+      audio: {
+        inputDeviceId: s.audio.input_device_id,
+        outputDeviceId: s.audio.output_device_id,
+        masterVolume: s.audio.master_volume,
+        sampleRate: s.audio.sample_rate,
+        bufferSize: s.audio.buffer_size
+      },
+      startMinimized: s.start_minimized,
+      autoStartMixing: s.auto_start_mixing
+    };
+  }
+
+  /**
+   * Unmap frontend settings to backend format
+   */
+  private unmapSettings(s: AppSettings): any {
+    return {
+      audio: {
+        input_device_id: s.audio.inputDeviceId,
+        output_device_id: s.audio.outputDeviceId,
+        master_volume: s.audio.masterVolume,
+        sample_rate: s.audio.sampleRate,
+        buffer_size: s.audio.bufferSize
+      },
+      start_minimized: s.startMinimized,
+      auto_start_mixing: s.autoStartMixing
+    };
+  }
+
   // =========================================================================
   // Mixer Configuration
   // =========================================================================
@@ -57,7 +157,20 @@ export class TauriService {
    * Get current mixer configuration
    */
   async getMixerConfig(): Promise<MixerConfig> {
-    return invoke<MixerConfig>('get_mixer_config');
+    const config = await invoke<any>('get_mixer_config');
+    return {
+      masterVolume: config.master_volume,
+      channels: config.channels.map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        channelType: c.channel_type,
+        volume: c.volume,
+        muted: c.muted,
+        solo: c.solo
+      })),
+      sampleRate: config.sample_rate,
+      bufferSize: config.buffer_size
+    };
   }
 
   /**
