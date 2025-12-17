@@ -4,10 +4,12 @@
 //! (cpal, rodio, WASAPI, etc.)
 
 mod cpal_input;
+mod cpal_output;
 mod cpal_device_manager;
 mod rodio_decoder;
 
 pub use cpal_input::*;
+pub use cpal_output::*;
 pub use cpal_device_manager::*;
 pub use rodio_decoder::*;
 

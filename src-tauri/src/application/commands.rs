@@ -1,6 +1,7 @@
 //! Tauri commands - Bridge between frontend and Rust backend
 
 use crate::adapters::CpalDeviceManager;
+use crate::application::audio_engine::AudioEngineCommand;
 use crate::application::AppState;
 use crate::domain::{AppSettings, AudioDevice, AudioSettings, ChannelType, DeviceType, MixerChannel, MixerConfig};
 use crate::ports::DeviceManager;
@@ -443,13 +444,29 @@ pub async fn toggle_channel_mute(
 pub async fn start_mixing(state: State<'_, AppState>) -> Result<(), String> {
     // Verify we have devices selected
     let settings = state.settings.read().await;
-    if settings.audio.input_device_id.is_none() {
-        return Err("No input device selected".to_string());
-    }
-    if settings.audio.output_device_id.is_none() {
-        return Err("No output device selected".to_string());
-    }
+    let input_device = settings
+        .audio
+        .input_device_id
+        .clone()
+        .ok_or_else(|| "No input device selected".to_string())?;
+    let output_device = settings
+        .audio
+        .output_device_id
+        .clone()
+        .ok_or_else(|| "No output device selected".to_string())?;
+    let sample_rate = settings.audio.sample_rate;
     drop(settings);
+
+    // Send start command to audio engine
+    let engine = state.audio_engine.lock().await;
+    engine
+        .send_command(AudioEngineCommand::Start {
+            input_device,
+            output_device,
+            sample_rate,
+            channels: 2, // Stereo
+        })
+        .map_err(|e| format!("Failed to start audio engine: {}", e))?;
 
     let mut is_mixing = state.is_mixing.write().await;
     *is_mixing = true;
@@ -460,6 +477,12 @@ pub async fn start_mixing(state: State<'_, AppState>) -> Result<(), String> {
 /// Stop mixing
 #[tauri::command]
 pub async fn stop_mixing(state: State<'_, AppState>) -> Result<(), String> {
+    // Send stop command to audio engine
+    let engine = state.audio_engine.lock().await;
+    engine
+        .send_command(AudioEngineCommand::Stop)
+        .map_err(|e| format!("Failed to stop audio engine: {}", e))?;
+
     let mut is_mixing = state.is_mixing.write().await;
     *is_mixing = false;
     tracing::info!("Mixing stopped");
@@ -469,5 +492,6 @@ pub async fn stop_mixing(state: State<'_, AppState>) -> Result<(), String> {
 /// Get mixing status
 #[tauri::command]
 pub async fn is_mixing(state: State<'_, AppState>) -> Result<bool, String> {
-    Ok(*state.is_mixing.read().await)
+    let engine = state.audio_engine.lock().await;
+    Ok(engine.is_running())
 }

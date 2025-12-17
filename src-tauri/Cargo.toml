@@ -26,6 +26,8 @@ serde_json = "1"
 # Audio
 cpal = "0.15"                    # Cross-platform audio I/O
 rodio = "0.19"                   # Audio playback and decoding
+crossbeam-channel = "0.5"        # Lock-free channels for real-time audio
+ringbuf = "0.4"                  # Lock-free ring buffer for audio streaming
 
 # Async runtime
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "macros"] }
