@@ -109,30 +109,46 @@ impl CpalDeviceManager {
     fn get_device_capabilities(device: &cpal::Device, is_input: bool) -> (Vec<u32>, Vec<u16>) {
         use cpal::traits::DeviceTrait;
 
-        let configs = if is_input {
-            device.supported_input_configs()
-        } else {
-            device.supported_output_configs()
-        };
-
         let mut sample_rates = Vec::new();
         let mut channels = Vec::new();
 
-        if let Ok(configs) = configs {
-            for config in configs {
-                // Common sample rates
-                for rate in [8000, 16000, 22050, 44100, 48000, 96000] {
-                    let sr = cpal::SampleRate(rate);
-                    if sr >= config.min_sample_rate() && sr <= config.max_sample_rate() {
-                        if !sample_rates.contains(&rate) {
-                            sample_rates.push(rate);
+        // Handle input and output configs separately to avoid type mismatch
+        if is_input {
+            if let Ok(configs) = device.supported_input_configs() {
+                for config in configs {
+                    // Common sample rates
+                    for rate in [8000, 16000, 22050, 44100, 48000, 96000] {
+                        let sr = cpal::SampleRate(rate);
+                        if sr >= config.min_sample_rate() && sr <= config.max_sample_rate() {
+                            if !sample_rates.contains(&rate) {
+                                sample_rates.push(rate);
+                            }
                         }
                     }
-                }
 
-                let ch = config.channels();
-                if !channels.contains(&ch) {
-                    channels.push(ch);
+                    let ch = config.channels();
+                    if !channels.contains(&ch) {
+                        channels.push(ch);
+                    }
+                }
+            }
+        } else {
+            if let Ok(configs) = device.supported_output_configs() {
+                for config in configs {
+                    // Common sample rates
+                    for rate in [8000, 16000, 22050, 44100, 48000, 96000] {
+                        let sr = cpal::SampleRate(rate);
+                        if sr >= config.min_sample_rate() && sr <= config.max_sample_rate() {
+                            if !sample_rates.contains(&rate) {
+                                sample_rates.push(rate);
+                            }
+                        }
+                    }
+
+                    let ch = config.channels();
+                    if !channels.contains(&ch) {
+                        channels.push(ch);
+                    }
                 }
             }
         }

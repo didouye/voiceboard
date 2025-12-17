@@ -3,7 +3,7 @@
 //! This layer coordinates the domain logic and adapters to implement
 //! the application's use cases.
 
-mod commands;
+pub mod commands;
 mod services;
 mod state;
 

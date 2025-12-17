@@ -468,6 +468,6 @@ pub async fn stop_mixing(state: State<'_, AppState>) -> Result<(), String> {
 
 /// Get mixing status
 #[tauri::command]
-pub async fn is_mixing(state: State<'_, AppState>) -> bool {
-    *state.is_mixing.read().await
+pub async fn is_mixing(state: State<'_, AppState>) -> Result<bool, String> {
+    Ok(*state.is_mixing.read().await)
 }

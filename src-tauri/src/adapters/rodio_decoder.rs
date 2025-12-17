@@ -2,6 +2,7 @@
 
 use crate::domain::{AudioBuffer, AudioFileFormat, AudioFormat, Sample};
 use crate::ports::{AudioFileMetadata, FileDecoder, FileDecoderError, FileDecoderFactory};
+use rodio::Source;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;

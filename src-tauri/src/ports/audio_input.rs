@@ -26,8 +26,11 @@ pub enum AudioInputError {
 ///
 /// This trait defines the contract for capturing audio from input devices
 /// like microphones. Implementations should handle device-specific details.
+///
+/// Note: Send + Sync bounds removed because cpal::Stream is !Send + !Sync.
+/// For async contexts, wrap implementations in Arc<Mutex<>> as needed.
 #[cfg_attr(test, mockall::automock)]
-pub trait AudioInput: Send + Sync {
+pub trait AudioInput {
     /// Start capturing audio from the specified device
     fn start(&mut self, device_id: &DeviceId, format: AudioFormat) -> Result<(), AudioInputError>;
 
