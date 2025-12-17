@@ -1,0 +1,57 @@
+[package]
+name = "voiceboard"
+version = "0.1.0"
+description = "Virtual microphone mixer - Mix real microphone with audio files"
+authors = ["Voiceboard Team"]
+edition = "2021"
+license = "MIT"
+
+[lib]
+name = "voiceboard_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# Tauri
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Audio
+cpal = "0.15"                    # Cross-platform audio I/O
+rodio = "0.19"                   # Audio playback and decoding
+
+# Async runtime
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "macros"] }
+
+# Error handling
+thiserror = "2"
+anyhow = "1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Windows-specific
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = [
+    "Win32_Media_Audio",
+    "Win32_System_Com",
+    "Win32_Foundation",
+] }
+
+[dev-dependencies]
+mockall = "0.13"                 # Mocking for tests
+tokio-test = "0.4"
+rstest = "0.23"                  # Parameterized tests
+
+[features]
+default = ["mp3", "ogg", "wav"]
+mp3 = []
+ogg = []
+wav = []
