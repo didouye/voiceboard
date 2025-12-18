@@ -375,8 +375,23 @@ fn run_engine_thread(
                     }
 
                     AudioEngineCommand::Stop => {
+                        // Pause streams before dropping to ensure clean stop
+                        if let Some(ref stream) = input_stream {
+                            let _ = stream.pause();
+                        }
+                        if let Some(ref stream) = output_stream {
+                            let _ = stream.pause();
+                        }
+
+                        // Drop the streams
                         input_stream = None;
                         output_stream = None;
+
+                        // Clear the ring buffer to prevent any leftover audio
+                        if let Ok(mut rb) = ring_buffer.lock() {
+                            *rb = None;
+                        }
+
                         is_running.store(false, Ordering::SeqCst);
 
                         if let Ok(mut state) = audio_state.lock() {
@@ -415,6 +430,14 @@ fn run_engine_thread(
                     }
 
                     AudioEngineCommand::Shutdown => {
+                        // Pause streams before dropping
+                        if let Some(ref stream) = input_stream {
+                            let _ = stream.pause();
+                        }
+                        if let Some(ref stream) = output_stream {
+                            let _ = stream.pause();
+                        }
+
                         input_stream = None;
                         output_stream = None;
                         is_running.store(false, Ordering::SeqCst);

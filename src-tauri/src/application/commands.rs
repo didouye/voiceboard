@@ -506,7 +506,9 @@ pub struct SoundFileDto {
     pub id: String,
     pub name: String,
     pub path: String,
-    pub duration_ms: u64,
+    pub duration: f64,      // Duration in seconds
+    pub sample_rate: u32,
+    pub channels: u16,
 }
 
 /// Load and decode an audio file, returning its metadata
@@ -531,26 +533,33 @@ pub async fn load_sound_file(path: String) -> Result<SoundFileDto, String> {
         .unwrap_or("Unknown")
         .to_string();
 
-    // Open and decode the file to get duration
+    // Open and decode the file to get metadata
     let file = File::open(&path).map_err(|e| format!("Failed to open file: {}", e))?;
     let reader = BufReader::new(file);
 
     let decoder = rodio::Decoder::new(reader)
         .map_err(|e| format!("Failed to decode audio file: {}", e))?;
 
-    // Get duration
+    let sample_rate = decoder.sample_rate();
+    let channels = decoder.channels();
+
+    // Get duration in seconds
     let duration = decoder.total_duration()
-        .map(|d| d.as_millis() as u64)
-        .unwrap_or(0);
+        .map(|d| d.as_secs_f64())
+        .unwrap_or(0.0);
 
     // Generate unique ID
-    let id = format!("sound_{}", uuid::Uuid::new_v4().to_string().replace("-", "")[..8].to_string());
+    let id = format!("sound_{}", &uuid::Uuid::new_v4().to_string().replace("-", "")[..8]);
+
+    tracing::info!("Loaded sound: {} ({:.1}s, {}Hz, {}ch)", name, duration, sample_rate, channels);
 
     Ok(SoundFileDto {
         id,
         name,
         path,
-        duration_ms: duration,
+        duration,
+        sample_rate,
+        channels,
     })
 }
 
