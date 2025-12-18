@@ -257,11 +257,17 @@ export class DeviceSelectorComponent implements OnInit {
     this._error.set(null);
 
     try {
+      console.log('[DeviceSelector] Loading devices and settings...');
+
       const [inputDevices, allDevices, settings] = await Promise.all([
         this.tauri.getInputDevices(),
         this.tauri.getAudioDevices(),
         this.tauri.loadSettings()
       ]);
+
+      console.log('[DeviceSelector] Loaded settings:', settings);
+      console.log('[DeviceSelector] Input device from settings:', settings.audio.inputDeviceId);
+      console.log('[DeviceSelector] Output device from settings:', settings.audio.outputDeviceId);
 
       this._inputDevices.set(inputDevices);
 
@@ -271,7 +277,14 @@ export class DeviceSelectorComponent implements OnInit {
         d.deviceType === 'OutputVirtual' || d.deviceType === 'OutputPhysical'
       );
       this._outputDevices.set(outputDevices);
+
+      console.log('[DeviceSelector] Input devices available:', inputDevices.map(d => d.id));
+      console.log('[DeviceSelector] Output devices available:', outputDevices.map(d => d.id));
+
       this._settings.set(settings);
+
+      console.log('[DeviceSelector] Selected input:', this.selectedInputId());
+      console.log('[DeviceSelector] Selected output:', this.selectedOutputId());
     } catch (err) {
       this._error.set(err instanceof Error ? err.message : 'Failed to load devices');
       console.error('Failed to load devices:', err);

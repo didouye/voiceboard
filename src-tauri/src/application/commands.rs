@@ -264,11 +264,27 @@ pub async fn load_settings(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<AppSettingsDto, String> {
-    let store = app.store(SETTINGS_STORE).map_err(|e| e.to_string())?;
+    let store = app.store(SETTINGS_STORE).map_err(|e| {
+        tracing::error!("Failed to open settings store: {}", e);
+        e.to_string()
+    })?;
+
+    // Explicitly load from disk to ensure we have the latest data
+    if let Err(e) = store.load() {
+        tracing::warn!("Could not load settings from disk (may be first run): {}", e);
+    }
 
     if let Some(value) = store.get(SETTINGS_KEY) {
+        tracing::info!("Found saved settings: {:?}", value);
         let settings: AppSettingsDto = serde_json::from_value(value.clone())
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| {
+                tracing::error!("Failed to parse settings: {}", e);
+                e.to_string()
+            })?;
+
+        tracing::info!("Loaded settings - input: {:?}, output: {:?}",
+            settings.audio.input_device_id,
+            settings.audio.output_device_id);
 
         // Update in-memory state
         {
@@ -278,6 +294,7 @@ pub async fn load_settings(
 
         Ok(settings)
     } else {
+        tracing::info!("No saved settings found, returning defaults");
         // Return default settings
         let settings = state.settings.read().await;
         Ok(AppSettingsDto::from(&*settings))
@@ -291,9 +308,11 @@ pub async fn set_input_device(
     state: State<'_, AppState>,
     device_id: Option<String>,
 ) -> Result<(), String> {
+    tracing::info!("Setting input device to: {:?}", device_id);
+
     {
         let mut settings = state.settings.write().await;
-        settings.audio.input_device_id = device_id;
+        settings.audio.input_device_id = device_id.clone();
     }
 
     // Auto-save settings
@@ -302,10 +321,15 @@ pub async fn set_input_device(
     drop(settings);
 
     let store = app.store(SETTINGS_STORE).map_err(|e| e.to_string())?;
+    // Ensure store is loaded before updating
+    let _ = store.load();
     store.set(SETTINGS_KEY, serde_json::to_value(&dto).map_err(|e| e.to_string())?);
-    store.save().map_err(|e| e.to_string())?;
+    store.save().map_err(|e| {
+        tracing::error!("Failed to save settings: {}", e);
+        e.to_string()
+    })?;
 
-    tracing::info!("Input device updated");
+    tracing::info!("Input device saved: {:?}", device_id);
     Ok(())
 }
 
@@ -316,9 +340,11 @@ pub async fn set_output_device(
     state: State<'_, AppState>,
     device_id: Option<String>,
 ) -> Result<(), String> {
+    tracing::info!("Setting output device to: {:?}", device_id);
+
     {
         let mut settings = state.settings.write().await;
-        settings.audio.output_device_id = device_id;
+        settings.audio.output_device_id = device_id.clone();
     }
 
     // Auto-save settings
@@ -327,10 +353,15 @@ pub async fn set_output_device(
     drop(settings);
 
     let store = app.store(SETTINGS_STORE).map_err(|e| e.to_string())?;
+    // Ensure store is loaded before updating
+    let _ = store.load();
     store.set(SETTINGS_KEY, serde_json::to_value(&dto).map_err(|e| e.to_string())?);
-    store.save().map_err(|e| e.to_string())?;
+    store.save().map_err(|e| {
+        tracing::error!("Failed to save settings: {}", e);
+        e.to_string()
+    })?;
 
-    tracing::info!("Output device updated");
+    tracing::info!("Output device saved: {:?}", device_id);
     Ok(())
 }
 
