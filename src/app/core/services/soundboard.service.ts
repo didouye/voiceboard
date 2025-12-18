@@ -9,6 +9,14 @@ const PAD_COLORS = [
   '#00bcd4', '#8bc34a', '#ff5722', '#795548'
 ];
 
+/** Serializable pad data for persistence */
+interface SavedPad {
+  id: string;
+  sound: SoundFile | null;
+  color: string;
+  hotkey?: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -17,6 +25,7 @@ export class SoundboardService {
   private _pads = signal<SoundPad[]>(this.createInitialPads(12));
   private _loading = signal(false);
   private _error = signal<string | null>(null);
+  private _initialized = false;
 
   // Public readonly signals
   readonly pads = this._pads.asReadonly();
@@ -27,7 +36,10 @@ export class SoundboardService {
   readonly activePads = computed(() => this._pads().filter(p => p.sound !== null));
   readonly playingCount = computed(() => this._pads().filter(p => p.isPlaying).length);
 
-  constructor(private tauri: TauriService) {}
+  constructor(private tauri: TauriService) {
+    // Load saved state on construction
+    this.loadState();
+  }
 
   private createInitialPads(count: number): SoundPad[] {
     return Array.from({ length: count }, (_, i) => ({
@@ -36,6 +48,46 @@ export class SoundboardService {
       color: PAD_COLORS[i % PAD_COLORS.length],
       isPlaying: false
     }));
+  }
+
+  /**
+   * Load soundboard state from persistent storage
+   */
+  private async loadState(): Promise<void> {
+    try {
+      const saved = await this.tauri.loadSoundboardState();
+      if (saved && saved.length > 0) {
+        // Restore pads, ensuring isPlaying is false
+        const restoredPads: SoundPad[] = saved.map(p => ({
+          ...p,
+          isPlaying: false
+        }));
+        this._pads.set(restoredPads);
+        console.log(`Loaded ${saved.filter(p => p.sound).length} sounds from storage`);
+      }
+    } catch (err) {
+      console.error('Failed to load soundboard state:', err);
+    }
+    this._initialized = true;
+  }
+
+  /**
+   * Save soundboard state to persistent storage
+   */
+  private async saveState(): Promise<void> {
+    if (!this._initialized) return;
+
+    try {
+      const padsToSave: SavedPad[] = this._pads().map(p => ({
+        id: p.id,
+        sound: p.sound,
+        color: p.color,
+        hotkey: p.hotkey
+      }));
+      await this.tauri.saveSoundboardState(padsToSave);
+    } catch (err) {
+      console.error('Failed to save soundboard state:', err);
+    }
   }
 
   /**
@@ -51,6 +103,7 @@ export class SoundboardService {
       isPlaying: false
     }));
     this._pads.set([...current, ...newPads]);
+    this.saveState();
   }
 
   /**
@@ -86,6 +139,9 @@ export class SoundboardService {
           ? { ...pad, sound: soundFile }
           : pad
       ));
+
+      // Persist the change
+      await this.saveState();
     } catch (err) {
       this._error.set(err instanceof Error ? err.message : 'Failed to import sound');
       console.error('Import sound error:', err);
@@ -165,6 +221,7 @@ export class SoundboardService {
         ? { ...pad, sound: null, isPlaying: false }
         : pad
     ));
+    this.saveState();
   }
 
   /**
@@ -174,6 +231,7 @@ export class SoundboardService {
     this._pads.update(pads => pads.map(pad =>
       pad.id === padId ? { ...pad, color } : pad
     ));
+    this.saveState();
   }
 
   /**

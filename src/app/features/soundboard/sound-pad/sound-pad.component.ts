@@ -17,6 +17,9 @@ import { SoundboardService } from '../../../core/services/soundboard.service';
       (click)="onClick($event)"
       (contextmenu)="onRightClick($event)"
     >
+      @if (hotkey) {
+        <span class="hotkey-badge">{{ hotkey }}</span>
+      }
       @if (pad.sound) {
         <div class="pad-content">
           <span class="sound-name">{{ pad.sound.name }}</span>
@@ -190,10 +193,29 @@ import { SoundboardService } from '../../../core/services/soundboard.service';
     .sound-pad:hover .empty-pad {
       color: rgba(255,255,255,0.6);
     }
+
+    .hotkey-badge {
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      background: rgba(0, 0, 0, 0.6);
+      color: rgba(255, 255, 255, 0.8);
+      font-size: 0.65rem;
+      font-weight: 600;
+      padding: 2px 5px;
+      border-radius: 3px;
+      text-transform: uppercase;
+      font-family: monospace;
+    }
+
+    .sound-pad.has-sound .hotkey-badge {
+      background: rgba(0, 0, 0, 0.4);
+    }
   `]
 })
 export class SoundPadComponent {
   @Input({ required: true }) pad!: SoundPad;
+  @Input() hotkey?: string;
   @Input() loading = false;
 
   @Output() play = new EventEmitter<void>();

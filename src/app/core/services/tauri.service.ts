@@ -291,4 +291,22 @@ export class TauriService {
   async setMicMuted(muted: boolean): Promise<void> {
     await invoke('set_mic_muted', { muted });
   }
+
+  // =========================================================================
+  // Soundboard Persistence
+  // =========================================================================
+
+  /**
+   * Save soundboard state to persistent storage
+   */
+  async saveSoundboardState(pads: any[]): Promise<void> {
+    await invoke('save_soundboard', { pads });
+  }
+
+  /**
+   * Load soundboard state from persistent storage
+   */
+  async loadSoundboardState(): Promise<any[] | null> {
+    return invoke<any[] | null>('load_soundboard');
+  }
 }

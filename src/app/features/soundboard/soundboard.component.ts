@@ -1,7 +1,10 @@
-import { Component } from '@angular/core';
+import { Component, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { SoundboardService } from '../../core/services/soundboard.service';
 import { SoundPadComponent } from './sound-pad/sound-pad.component';
+
+// Default hotkeys for first 12 pads: 1-9, 0, -, =
+const DEFAULT_HOTKEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '='];
 
 @Component({
   selector: 'app-soundboard',
@@ -29,9 +32,10 @@ import { SoundPadComponent } from './sound-pad/sound-pad.component';
       }
 
       <div class="pads-grid">
-        @for (pad of soundboard.pads(); track pad.id) {
+        @for (pad of soundboard.pads(); track pad.id; let i = $index) {
           <app-sound-pad
             [pad]="pad"
+            [hotkey]="getHotkey(i)"
             [loading]="soundboard.loading()"
             (play)="soundboard.playSound(pad.id)"
             (import)="soundboard.importSound(pad.id)"
@@ -135,4 +139,44 @@ import { SoundPadComponent } from './sound-pad/sound-pad.component';
 })
 export class SoundboardComponent {
   constructor(public soundboard: SoundboardService) {}
+
+  @HostListener('window:keydown', ['$event'])
+  handleKeydown(event: KeyboardEvent): void {
+    // Ignore if user is typing in an input field
+    if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+      return;
+    }
+
+    // Escape stops all sounds
+    if (event.key === 'Escape') {
+      this.soundboard.stopAll();
+      return;
+    }
+
+    // Find pad by hotkey
+    const pads = this.soundboard.pads();
+    const padIndex = pads.findIndex(p => {
+      const hotkey = p.hotkey || DEFAULT_HOTKEYS[pads.indexOf(p)];
+      return hotkey === event.key;
+    });
+
+    if (padIndex >= 0) {
+      const pad = pads[padIndex];
+      if (pad.sound) {
+        event.preventDefault();
+        this.soundboard.playSound(pad.id);
+      }
+    }
+  }
+
+  /**
+   * Get the display hotkey for a pad
+   */
+  getHotkey(padIndex: number): string | undefined {
+    const pads = this.soundboard.pads();
+    if (padIndex < pads.length) {
+      return pads[padIndex].hotkey || DEFAULT_HOTKEYS[padIndex];
+    }
+    return undefined;
+  }
 }

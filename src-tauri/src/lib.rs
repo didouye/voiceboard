@@ -34,6 +34,8 @@ use application::{
         start_mixing, stop_mixing, is_mixing,
         // Sound playback
         load_sound_file, play_sound, stop_sound, set_mic_volume, set_mic_muted,
+        // Soundboard persistence
+        save_soundboard, load_soundboard,
     },
     AppState,
 };
@@ -82,6 +84,9 @@ pub fn run() {
             stop_sound,
             set_mic_volume,
             set_mic_muted,
+            // Soundboard persistence
+            save_soundboard,
+            load_soundboard,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

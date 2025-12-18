@@ -646,3 +646,34 @@ pub async fn set_mic_muted(
 
     Ok(())
 }
+
+// ============================================================================
+// Soundboard Persistence Commands
+// ============================================================================
+
+const SOUNDBOARD_STORE: &str = "soundboard.json";
+const SOUNDBOARD_KEY: &str = "pads";
+
+/// Save soundboard pads to persistent storage
+#[tauri::command]
+pub async fn save_soundboard(
+    app: tauri::AppHandle,
+    pads: serde_json::Value,
+) -> Result<(), String> {
+    let store = app.store(SOUNDBOARD_STORE).map_err(|e| e.to_string())?;
+    store.set(SOUNDBOARD_KEY, pads);
+    store.save().map_err(|e| e.to_string())?;
+    tracing::debug!("Soundboard state saved");
+    Ok(())
+}
+
+/// Load soundboard pads from persistent storage
+#[tauri::command]
+pub async fn load_soundboard(
+    app: tauri::AppHandle,
+) -> Result<Option<serde_json::Value>, String> {
+    let store = app.store(SOUNDBOARD_STORE).map_err(|e| e.to_string())?;
+    let pads = store.get(SOUNDBOARD_KEY).cloned();
+    tracing::debug!("Soundboard state loaded: {:?}", pads.is_some());
+    Ok(pads)
+}
