@@ -673,7 +673,7 @@ pub async fn load_soundboard(
     app: tauri::AppHandle,
 ) -> Result<Option<serde_json::Value>, String> {
     let store = app.store(SOUNDBOARD_STORE).map_err(|e| e.to_string())?;
-    let pads = store.get(SOUNDBOARD_KEY).cloned();
+    let pads = store.get(SOUNDBOARD_KEY).map(|v| v.clone());
     tracing::debug!("Soundboard state loaded: {:?}", pads.is_some());
     Ok(pads)
 }
