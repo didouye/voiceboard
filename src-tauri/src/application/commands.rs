@@ -269,9 +269,9 @@ pub async fn load_settings(
         e.to_string()
     })?;
 
-    // Explicitly load from disk to ensure we have the latest data
-    if let Err(e) = store.load() {
-        tracing::warn!("Could not load settings from disk (may be first run): {}", e);
+    // Explicitly reload from disk to ensure we have the latest data
+    if let Err(e) = store.reload() {
+        tracing::warn!("Could not reload settings from disk (may be first run): {}", e);
     }
 
     if let Some(value) = store.get(SETTINGS_KEY) {
@@ -321,8 +321,8 @@ pub async fn set_input_device(
     drop(settings);
 
     let store = app.store(SETTINGS_STORE).map_err(|e| e.to_string())?;
-    // Ensure store is loaded before updating
-    let _ = store.load();
+    // Ensure store is reloaded before updating to avoid overwriting other settings
+    let _ = store.reload();
     store.set(SETTINGS_KEY, serde_json::to_value(&dto).map_err(|e| e.to_string())?);
     store.save().map_err(|e| {
         tracing::error!("Failed to save settings: {}", e);
@@ -353,8 +353,8 @@ pub async fn set_output_device(
     drop(settings);
 
     let store = app.store(SETTINGS_STORE).map_err(|e| e.to_string())?;
-    // Ensure store is loaded before updating
-    let _ = store.load();
+    // Ensure store is reloaded before updating to avoid overwriting other settings
+    let _ = store.reload();
     store.set(SETTINGS_KEY, serde_json::to_value(&dto).map_err(|e| e.to_string())?);
     store.save().map_err(|e| {
         tracing::error!("Failed to save settings: {}", e);
