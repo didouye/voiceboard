@@ -495,3 +495,144 @@ pub async fn is_mixing(state: State<'_, AppState>) -> Result<bool, String> {
     let engine = state.audio_engine.lock().await;
     Ok(engine.is_running())
 }
+
+// ============================================================================
+// Sound Playback Commands
+// ============================================================================
+
+/// DTO for sound file information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SoundFileDto {
+    pub id: String,
+    pub name: String,
+    pub path: String,
+    pub duration_ms: u64,
+}
+
+/// Load and decode an audio file, returning its metadata
+#[tauri::command]
+pub async fn load_sound_file(path: String) -> Result<SoundFileDto, String> {
+    use rodio::Source;
+    use std::fs::File;
+    use std::io::BufReader;
+    use std::path::Path;
+
+    let file_path = Path::new(&path);
+
+    // Validate file exists
+    if !file_path.exists() {
+        return Err(format!("File not found: {}", path));
+    }
+
+    // Get file name
+    let name = file_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("Unknown")
+        .to_string();
+
+    // Open and decode the file to get duration
+    let file = File::open(&path).map_err(|e| format!("Failed to open file: {}", e))?;
+    let reader = BufReader::new(file);
+
+    let decoder = rodio::Decoder::new(reader)
+        .map_err(|e| format!("Failed to decode audio file: {}", e))?;
+
+    // Get duration
+    let duration = decoder.total_duration()
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0);
+
+    // Generate unique ID
+    let id = format!("sound_{}", uuid::Uuid::new_v4().to_string().replace("-", "")[..8].to_string());
+
+    Ok(SoundFileDto {
+        id,
+        name,
+        path,
+        duration_ms: duration,
+    })
+}
+
+/// Play a sound file (mix with microphone)
+#[tauri::command]
+pub async fn play_sound(
+    state: State<'_, AppState>,
+    id: String,
+    path: String,
+) -> Result<(), String> {
+    use rodio::Source;
+    use std::fs::File;
+    use std::io::BufReader;
+
+    // Decode the audio file
+    let file = File::open(&path).map_err(|e| format!("Failed to open file: {}", e))?;
+    let reader = BufReader::new(file);
+
+    let decoder = rodio::Decoder::new(reader)
+        .map_err(|e| format!("Failed to decode audio file: {}", e))?;
+
+    // Get format info
+    let sample_rate = decoder.sample_rate();
+    let channels = decoder.channels();
+
+    // Collect all samples as f32
+    let samples: Vec<f32> = decoder.convert_samples::<f32>().collect();
+
+    if samples.is_empty() {
+        return Err("Audio file contains no samples".to_string());
+    }
+
+    // Send to audio engine
+    let engine = state.audio_engine.lock().await;
+    engine
+        .send_command(AudioEngineCommand::PlaySound { id, samples })
+        .map_err(|e| format!("Failed to play sound: {}", e))?;
+
+    tracing::info!("Playing sound: {} ({} samples, {}Hz, {} ch)",
+        path, samples.len(), sample_rate, channels);
+
+    Ok(())
+}
+
+/// Stop a playing sound
+#[tauri::command]
+pub async fn stop_sound(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<(), String> {
+    let engine = state.audio_engine.lock().await;
+    engine
+        .send_command(AudioEngineCommand::StopSound { id })
+        .map_err(|e| format!("Failed to stop sound: {}", e))?;
+
+    Ok(())
+}
+
+/// Set microphone volume (0.0 - 2.0)
+#[tauri::command]
+pub async fn set_mic_volume(
+    state: State<'_, AppState>,
+    volume: f32,
+) -> Result<(), String> {
+    let engine = state.audio_engine.lock().await;
+    engine
+        .send_command(AudioEngineCommand::SetMicVolume(volume))
+        .map_err(|e| format!("Failed to set mic volume: {}", e))?;
+
+    Ok(())
+}
+
+/// Mute/unmute microphone
+#[tauri::command]
+pub async fn set_mic_muted(
+    state: State<'_, AppState>,
+    muted: bool,
+) -> Result<(), String> {
+    let engine = state.audio_engine.lock().await;
+    engine
+        .send_command(AudioEngineCommand::SetMicMuted(muted))
+        .map_err(|e| format!("Failed to set mic muted: {}", e))?;
+
+    Ok(())
+}

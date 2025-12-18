@@ -18,6 +18,7 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 tauri-plugin-store = "2"                # Persistent storage for settings
+tauri-plugin-dialog = "2"               # File open dialogs
 
 # Serialization
 serde = { version = "1", features = ["derive"] }
@@ -35,6 +36,9 @@ tokio = { version = "1", features = ["rt-multi-thread", "sync", "macros"] }
 # Error handling
 thiserror = "2"
 anyhow = "1"
+
+# Utilities
+uuid = { version = "1", features = ["v4"] }
 
 # Logging
 tracing = "0.1"
