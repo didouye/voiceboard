@@ -519,12 +519,16 @@ pub async fn load_sound_file(path: String) -> Result<SoundFileDto, String> {
     use std::io::BufReader;
     use std::path::Path;
 
+    tracing::info!("[load_sound_file] Called with path: {}", path);
+
     let file_path = Path::new(&path);
 
     // Validate file exists
     if !file_path.exists() {
+        tracing::error!("[load_sound_file] File not found: {}", path);
         return Err(format!("File not found: {}", path));
     }
+    tracing::info!("[load_sound_file] File exists: {}", path);
 
     // Get file name
     let name = file_path
@@ -532,26 +536,36 @@ pub async fn load_sound_file(path: String) -> Result<SoundFileDto, String> {
         .and_then(|s| s.to_str())
         .unwrap_or("Unknown")
         .to_string();
+    tracing::info!("[load_sound_file] File name: {}", name);
 
     // Open and decode the file to get metadata
-    let file = File::open(&path).map_err(|e| format!("Failed to open file: {}", e))?;
+    let file = File::open(&path).map_err(|e| {
+        tracing::error!("[load_sound_file] Failed to open file: {}", e);
+        format!("Failed to open file: {}", e)
+    })?;
     let reader = BufReader::new(file);
+    tracing::info!("[load_sound_file] File opened successfully");
 
-    let decoder = rodio::Decoder::new(reader)
-        .map_err(|e| format!("Failed to decode audio file: {}", e))?;
+    let decoder = rodio::Decoder::new(reader).map_err(|e| {
+        tracing::error!("[load_sound_file] Failed to decode audio: {}", e);
+        format!("Failed to decode audio file: {}", e)
+    })?;
+    tracing::info!("[load_sound_file] Decoder created successfully");
 
     let sample_rate = decoder.sample_rate();
     let channels = decoder.channels();
+    tracing::info!("[load_sound_file] Audio info: {}Hz, {} channels", sample_rate, channels);
 
     // Get duration in seconds
     let duration = decoder.total_duration()
         .map(|d| d.as_secs_f64())
         .unwrap_or(0.0);
+    tracing::info!("[load_sound_file] Duration: {:.2}s", duration);
 
     // Generate unique ID
     let id = format!("sound_{}", &uuid::Uuid::new_v4().to_string().replace("-", "")[..8]);
 
-    tracing::info!("Loaded sound: {} ({:.1}s, {}Hz, {}ch)", name, duration, sample_rate, channels);
+    tracing::info!("[load_sound_file] Success: {} ({:.1}s, {}Hz, {}ch)", name, duration, sample_rate, channels);
 
     Ok(SoundFileDto {
         id,

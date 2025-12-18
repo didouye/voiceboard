@@ -253,15 +253,22 @@ export class TauriService {
    * Load and decode an audio file, returning its metadata
    */
   async loadSoundFile(path: string): Promise<SoundFile> {
-    const result = await invoke<any>('load_sound_file', { path });
-    return {
-      id: result.id,
-      name: result.name,
-      path: result.path,
-      duration: result.duration,
-      sampleRate: result.sample_rate,
-      channels: result.channels
-    };
+    console.log('[TauriService] loadSoundFile called with path:', path);
+    try {
+      const result = await invoke<any>('load_sound_file', { path });
+      console.log('[TauriService] loadSoundFile result:', result);
+      return {
+        id: result.id,
+        name: result.name,
+        path: result.path,
+        duration: result.duration,
+        sampleRate: result.sample_rate,
+        channels: result.channels
+      };
+    } catch (err) {
+      console.error('[TauriService] loadSoundFile error:', err);
+      throw err;
+    }
   }
 
   /**

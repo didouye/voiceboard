@@ -110,11 +110,13 @@ export class SoundboardService {
    * Import a sound file to a specific pad
    */
   async importSound(padId: string): Promise<void> {
+    console.log('[Soundboard] importSound called for pad:', padId);
     try {
       this._loading.set(true);
       this._error.set(null);
 
       // Open file dialog
+      console.log('[Soundboard] Opening file dialog...');
       const selected = await open({
         multiple: false,
         filters: [{
@@ -122,16 +124,21 @@ export class SoundboardService {
           extensions: ['mp3', 'ogg', 'wav', 'flac']
         }]
       });
+      console.log('[Soundboard] File dialog result:', selected);
 
       if (!selected) {
+        console.log('[Soundboard] User cancelled file selection');
         this._loading.set(false);
         return; // User cancelled
       }
 
       const path = selected as string;
+      console.log('[Soundboard] Selected file path:', path);
 
       // Load and decode the file
+      console.log('[Soundboard] Calling tauri.loadSoundFile...');
       const soundFile = await this.tauri.loadSoundFile(path);
+      console.log('[Soundboard] Sound file loaded:', soundFile);
 
       // Update the pad with the sound
       this._pads.update(pads => pads.map(pad =>
@@ -139,12 +146,16 @@ export class SoundboardService {
           ? { ...pad, sound: soundFile }
           : pad
       ));
+      console.log('[Soundboard] Pad updated with sound');
 
       // Persist the change
       await this.saveState();
+      console.log('[Soundboard] State saved');
     } catch (err) {
-      this._error.set(err instanceof Error ? err.message : 'Failed to import sound');
-      console.error('Import sound error:', err);
+      console.error('[Soundboard] Import sound error:', err);
+      console.error('[Soundboard] Error type:', typeof err);
+      console.error('[Soundboard] Error details:', JSON.stringify(err, null, 2));
+      this._error.set(err instanceof Error ? err.message : String(err));
     } finally {
       this._loading.set(false);
     }
