@@ -578,6 +578,7 @@ pub async fn play_sound(
 
     // Collect all samples as f32
     let samples: Vec<f32> = decoder.convert_samples::<f32>().collect();
+    let samples_len = samples.len();
 
     if samples.is_empty() {
         return Err("Audio file contains no samples".to_string());
@@ -590,7 +591,7 @@ pub async fn play_sound(
         .map_err(|e| format!("Failed to play sound: {}", e))?;
 
     tracing::info!("Playing sound: {} ({} samples, {}Hz, {} ch)",
-        path, samples.len(), sample_rate, channels);
+        path, samples_len, sample_rate, channels);
 
     Ok(())
 }
