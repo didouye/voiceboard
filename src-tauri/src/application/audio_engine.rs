@@ -139,7 +139,6 @@ fn run_audio_loop(
 ) {
     let mut input = CpalAudioInput::new();
     let mut output = CpalAudioOutput::new();
-    let device_manager = CpalDeviceManager::new();
 
     let mut playing_sounds: HashMap<String, PlayingSound> = HashMap::new();
     let mut mic_volume: f32 = 1.0;
