@@ -382,12 +382,25 @@ pub async fn set_master_volume(
     state: State<'_, AppState>,
     volume: f32,
 ) -> Result<(), String> {
-    let mut config = state.mixer_config.write().await;
-    config.master_volume = volume.clamp(0.0, 1.0);
+    let clamped_volume = volume.clamp(0.0, 1.0);
 
-    // Also update in settings
-    let mut settings = state.settings.write().await;
-    settings.audio.master_volume = config.master_volume;
+    // Update mixer config
+    {
+        let mut config = state.mixer_config.write().await;
+        config.master_volume = clamped_volume;
+    }
+
+    // Update settings
+    {
+        let mut settings = state.settings.write().await;
+        settings.audio.master_volume = clamped_volume;
+    }
+
+    // Send to audio engine
+    let engine = state.audio_engine.lock().await;
+    engine
+        .send_command(AudioEngineCommand::SetMasterVolume(clamped_volume))
+        .map_err(|e| format!("Failed to set master volume: {}", e))?;
 
     Ok(())
 }
