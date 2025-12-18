@@ -45,3 +45,26 @@ export interface ApiResponse<T> {
   data: T | null;
   error: string | null;
 }
+
+/**
+ * Sound file metadata for the soundboard
+ */
+export interface SoundFile {
+  id: string;
+  name: string;
+  path: string;
+  duration: number;  // in seconds
+  sampleRate: number;
+  channels: number;
+}
+
+/**
+ * Sound pad configuration (position + sound)
+ */
+export interface SoundPad {
+  id: string;
+  sound: SoundFile | null;
+  color: string;
+  hotkey?: string;
+  isPlaying: boolean;
+}

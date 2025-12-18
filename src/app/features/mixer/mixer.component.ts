@@ -4,11 +4,12 @@ import { MixerService } from '../../core/services';
 import { ChannelStripComponent } from './channel-strip/channel-strip.component';
 import { MasterControlComponent } from './master-control/master-control.component';
 import { DeviceSelectorComponent } from '../devices/device-selector.component';
+import { SoundboardComponent } from '../soundboard/soundboard.component';
 
 @Component({
   selector: 'app-mixer',
   standalone: true,
-  imports: [CommonModule, ChannelStripComponent, MasterControlComponent, DeviceSelectorComponent],
+  imports: [CommonModule, ChannelStripComponent, MasterControlComponent, DeviceSelectorComponent, SoundboardComponent],
   template: `
     <div class="mixer-container">
       <header class="mixer-header">
@@ -33,6 +34,10 @@ import { DeviceSelectorComponent } from '../devices/device-selector.component';
 
         <!-- Main Content -->
         <main class="main-content">
+          <!-- Soundboard Section -->
+          <app-soundboard />
+
+          <!-- Channels Section -->
           <div class="channels-section">
             <div class="section-header">
               <h2>Channels</h2>
@@ -141,6 +146,9 @@ import { DeviceSelectorComponent } from '../devices/device-selector.component';
 
     .main-content {
       min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 25px;
     }
 
     .section-header {

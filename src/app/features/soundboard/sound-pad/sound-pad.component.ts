@@ -1,0 +1,228 @@
+import { Component, Input, Output, EventEmitter } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { SoundPad } from '../../../core/models';
+import { SoundboardService } from '../../../core/services/soundboard.service';
+
+@Component({
+  selector: 'app-sound-pad',
+  standalone: true,
+  imports: [CommonModule],
+  template: `
+    <div
+      class="sound-pad"
+      [class.has-sound]="pad.sound"
+      [class.playing]="pad.isPlaying"
+      [class.loading]="loading"
+      [style.--pad-color]="pad.color"
+      (click)="onClick($event)"
+      (contextmenu)="onRightClick($event)"
+    >
+      @if (pad.sound) {
+        <div class="pad-content">
+          <span class="sound-name">{{ pad.sound.name }}</span>
+          <span class="sound-duration">{{ formatDuration(pad.sound.duration) }}</span>
+        </div>
+        @if (pad.isPlaying) {
+          <div class="playing-indicator">
+            <span class="bar"></span>
+            <span class="bar"></span>
+            <span class="bar"></span>
+          </div>
+        }
+        <button class="remove-btn" (click)="onRemove($event)" title="Remove sound">
+          &times;
+        </button>
+      } @else {
+        <div class="empty-pad">
+          <span class="plus-icon">+</span>
+          <span class="import-text">Import</span>
+        </div>
+      }
+    </div>
+  `,
+  styles: [`
+    .sound-pad {
+      --pad-color: #7b2cbf;
+      aspect-ratio: 1;
+      background: linear-gradient(145deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+      border: 2px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .sound-pad:hover {
+      border-color: rgba(255, 255, 255, 0.25);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    .sound-pad:active {
+      transform: translateY(0);
+    }
+
+    .sound-pad.has-sound {
+      background: linear-gradient(145deg, var(--pad-color), color-mix(in srgb, var(--pad-color) 70%, black));
+      border-color: var(--pad-color);
+    }
+
+    .sound-pad.has-sound:hover {
+      box-shadow: 0 4px 20px color-mix(in srgb, var(--pad-color) 50%, transparent);
+    }
+
+    .sound-pad.playing {
+      animation: pulse 0.5s ease-in-out infinite alternate;
+      border-color: #fff;
+    }
+
+    .sound-pad.loading {
+      opacity: 0.5;
+      pointer-events: none;
+    }
+
+    @keyframes pulse {
+      from { box-shadow: 0 0 10px var(--pad-color); }
+      to { box-shadow: 0 0 25px var(--pad-color); }
+    }
+
+    .pad-content {
+      text-align: center;
+      padding: 10px;
+      width: 100%;
+    }
+
+    .sound-name {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 4px;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    }
+
+    .sound-duration {
+      display: block;
+      font-size: 0.7rem;
+      color: rgba(255,255,255,0.7);
+    }
+
+    .playing-indicator {
+      position: absolute;
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 3px;
+      align-items: flex-end;
+      height: 16px;
+    }
+
+    .bar {
+      width: 4px;
+      background: #fff;
+      border-radius: 2px;
+      animation: soundbar 0.4s ease-in-out infinite alternate;
+    }
+
+    .bar:nth-child(1) { animation-delay: 0s; height: 8px; }
+    .bar:nth-child(2) { animation-delay: 0.1s; height: 14px; }
+    .bar:nth-child(3) { animation-delay: 0.2s; height: 10px; }
+
+    @keyframes soundbar {
+      from { height: 4px; }
+      to { height: 16px; }
+    }
+
+    .remove-btn {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 20px;
+      height: 20px;
+      background: rgba(0,0,0,0.5);
+      border: none;
+      border-radius: 50%;
+      color: #fff;
+      font-size: 14px;
+      line-height: 1;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .sound-pad:hover .remove-btn {
+      opacity: 1;
+    }
+
+    .remove-btn:hover {
+      background: #e74c3c;
+    }
+
+    .empty-pad {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      color: rgba(255,255,255,0.3);
+    }
+
+    .plus-icon {
+      font-size: 2rem;
+      font-weight: 300;
+    }
+
+    .import-text {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .sound-pad:hover .empty-pad {
+      color: rgba(255,255,255,0.6);
+    }
+  `]
+})
+export class SoundPadComponent {
+  @Input({ required: true }) pad!: SoundPad;
+  @Input() loading = false;
+
+  @Output() play = new EventEmitter<void>();
+  @Output() import = new EventEmitter<void>();
+  @Output() remove = new EventEmitter<void>();
+
+  constructor(private soundboardService: SoundboardService) {}
+
+  onClick(event: MouseEvent): void {
+    if (this.pad.sound) {
+      this.play.emit();
+    } else {
+      this.import.emit();
+    }
+  }
+
+  onRightClick(event: MouseEvent): void {
+    event.preventDefault();
+    if (this.pad.sound) {
+      // Could show context menu in future
+    }
+  }
+
+  onRemove(event: MouseEvent): void {
+    event.stopPropagation();
+    this.remove.emit();
+  }
+
+  formatDuration(seconds: number): string {
+    return this.soundboardService.formatDuration(seconds);
+  }
+}

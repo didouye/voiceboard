@@ -5,7 +5,8 @@ import {
   MixerChannel,
   MixerConfig,
   AppSettings,
-  ApiResponse
+  ApiResponse,
+  SoundFile
 } from '../models';
 
 /**
@@ -242,5 +243,52 @@ export class TauriService {
    */
   async isMixing(): Promise<boolean> {
     return invoke<boolean>('is_mixing');
+  }
+
+  // =========================================================================
+  // Sound Playback (Soundboard)
+  // =========================================================================
+
+  /**
+   * Load and decode an audio file, returning its metadata
+   */
+  async loadSoundFile(path: string): Promise<SoundFile> {
+    const result = await invoke<any>('load_sound_file', { path });
+    return {
+      id: result.id,
+      name: result.name,
+      path: result.path,
+      duration: result.duration,
+      sampleRate: result.sample_rate,
+      channels: result.channels
+    };
+  }
+
+  /**
+   * Play a sound file (mixed with microphone)
+   */
+  async playSound(id: string, path: string): Promise<void> {
+    await invoke('play_sound', { id, path });
+  }
+
+  /**
+   * Stop a playing sound
+   */
+  async stopSound(id: string): Promise<void> {
+    await invoke('stop_sound', { id });
+  }
+
+  /**
+   * Set microphone volume (0.0 to 2.0)
+   */
+  async setMicVolume(volume: number): Promise<void> {
+    await invoke('set_mic_volume', { volume: Math.max(0, Math.min(2, volume)) });
+  }
+
+  /**
+   * Mute or unmute microphone
+   */
+  async setMicMuted(muted: boolean): Promise<void> {
+    await invoke('set_mic_muted', { muted });
   }
 }
