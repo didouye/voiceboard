@@ -24,13 +24,12 @@ import { AudioDevice, AppSettings } from '../../core/models';
             <span class="label-text">Input Device (Microphone)</span>
           </label>
           <select
-            [value]="selectedInputId()"
             (change)="onInputDeviceChange($event)"
             class="device-select"
           >
-            <option value="">-- Select Microphone --</option>
+            <option value="" [selected]="!selectedInputId()">-- Select Microphone --</option>
             @for (device of inputDevices(); track device.id) {
-              <option [value]="device.id">
+              <option [value]="device.id" [selected]="device.id === selectedInputId()">
                 {{ device.name }}
                 @if (device.isDefault) { (Default) }
               </option>
@@ -48,13 +47,12 @@ import { AudioDevice, AppSettings } from '../../core/models';
             <span class="label-text">Output Device (Virtual Microphone)</span>
           </label>
           <select
-            [value]="selectedOutputId()"
             (change)="onOutputDeviceChange($event)"
             class="device-select"
           >
-            <option value="">-- Select Virtual Device --</option>
+            <option value="" [selected]="!selectedOutputId()">-- Select Virtual Device --</option>
             @for (device of outputDevices(); track device.id) {
-              <option [value]="device.id">
+              <option [value]="device.id" [selected]="device.id === selectedOutputId()">
                 {{ device.name }}
                 @if (device.isDefault) { (Default) }
               </option>
