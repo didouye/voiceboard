@@ -28,8 +28,11 @@ pub enum AudioOutputError {
 ///
 /// This trait defines the contract for sending audio to output devices
 /// like virtual microphones or speakers.
+///
+/// Note: Send + Sync bounds removed because cpal::Stream is !Send + !Sync.
+/// For async contexts, wrap implementations in Arc<Mutex<>> as needed.
 #[cfg_attr(test, mockall::automock)]
-pub trait AudioOutput: Send + Sync {
+pub trait AudioOutput {
     /// Start the audio output stream
     fn start(&mut self, device_id: &DeviceId, format: AudioFormat) -> Result<(), AudioOutputError>;
 

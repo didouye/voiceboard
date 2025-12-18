@@ -1,9 +1,9 @@
 //! Application services - Business logic orchestration
 
-use crate::domain::{AudioBuffer, AudioFormat, MixerChannel, MixerConfig};
+use crate::domain::{AudioBuffer, MixerChannel, MixerConfig};
 use crate::ports::{
     AudioInput, AudioInputError, AudioOutput, AudioOutputError, DeviceManager,
-    DeviceManagerError, FileDecoder, FileDecoderError,
+    DeviceManagerError, FileDecoderError,
 };
 use std::sync::Arc;
 use tokio::sync::RwLock;

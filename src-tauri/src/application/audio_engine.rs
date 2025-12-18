@@ -3,9 +3,9 @@
 //! This module handles the real-time audio capture, mixing, and output.
 //! It runs in a dedicated thread to ensure low-latency processing.
 
-use crate::adapters::{CpalAudioInput, CpalAudioOutput, CpalDeviceManager};
-use crate::domain::{AudioBuffer, AudioFormat, DeviceId, Sample};
-use crate::ports::{AudioInput, AudioOutput, DeviceManager};
+use crate::adapters::{CpalAudioInput, CpalAudioOutput};
+use crate::domain::{AudioBuffer, AudioFormat, DeviceId};
+use crate::ports::{AudioInput, AudioOutput};
 use crossbeam_channel::{bounded, Receiver, Sender};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};

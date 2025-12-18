@@ -3,7 +3,7 @@
 use crate::domain::{AudioBuffer, AudioFormat, DeviceId};
 use crate::ports::{AudioOutput, AudioOutputError};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use ringbuf::{HeapRb, traits::{Consumer, Producer, Split}};
+use ringbuf::{HeapRb, traits::{Consumer, Observer, Producer, Split}};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
