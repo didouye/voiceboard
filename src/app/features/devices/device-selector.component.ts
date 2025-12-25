@@ -69,6 +69,26 @@ import { AudioDevice, AppSettings } from '../../core/models';
           }
         </div>
 
+        <!-- Preview Output Device Selection -->
+        <div class="device-group">
+          <label>
+            <span class="label-icon">🎧</span>
+            <span class="label-text">Preview Output (Monitoring)</span>
+          </label>
+          <select
+            (change)="onPreviewDeviceChange($event)"
+            class="device-select"
+          >
+            <option value="" [selected]="!selectedPreviewId()">-- System Default --</option>
+            @for (device of outputDevices(); track device.id) {
+              <option [value]="device.id" [selected]="device.id === selectedPreviewId()">
+                {{ device.name }}
+                @if (device.isDefault) { (Default) }
+              </option>
+            }
+          </select>
+        </div>
+
         <!-- Status -->
         <div class="status-section">
           <div class="status-item" [class.ready]="isConfigured()">
@@ -239,6 +259,7 @@ export class DeviceSelectorComponent implements OnInit {
   // Computed
   readonly selectedInputId = computed(() => this._settings()?.audio.inputDeviceId ?? '');
   readonly selectedOutputId = computed(() => this._settings()?.audio.outputDeviceId ?? '');
+  readonly selectedPreviewId = computed(() => this._settings()?.audio.previewDeviceId ?? '');
   readonly isConfigured = computed(() => {
     const settings = this._settings();
     return !!(settings?.audio.inputDeviceId && settings?.audio.outputDeviceId);
@@ -332,6 +353,26 @@ export class DeviceSelectorComponent implements OnInit {
       }
     } catch (err) {
       console.error('Failed to set output device:', err);
+    }
+  }
+
+  async onPreviewDeviceChange(event: Event): Promise<void> {
+    const select = event.target as HTMLSelectElement;
+    const deviceId = select.value || null;
+
+    try {
+      await this.tauri.setPreviewDevice(deviceId);
+
+      // Update local state
+      const settings = this._settings();
+      if (settings) {
+        this._settings.set({
+          ...settings,
+          audio: { ...settings.audio, previewDeviceId: deviceId }
+        });
+      }
+    } catch (err) {
+      console.error('Failed to set preview device:', err);
     }
   }
 }
