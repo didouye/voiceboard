@@ -29,6 +29,7 @@ export interface MixerConfig {
 export interface AudioSettings {
   inputDeviceId: string | null;
   outputDeviceId: string | null;
+  previewDeviceId: string | null;
   masterVolume: number;
   sampleRate: number;
   bufferSize: number;

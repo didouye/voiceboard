@@ -111,6 +111,7 @@ impl From<&MixerConfig> for MixerConfigDto {
 pub struct AudioSettingsDto {
     pub input_device_id: Option<String>,
     pub output_device_id: Option<String>,
+    pub preview_device_id: Option<String>,
     pub master_volume: f32,
     pub sample_rate: u32,
     pub buffer_size: u32,
@@ -121,6 +122,7 @@ impl From<&AudioSettings> for AudioSettingsDto {
         Self {
             input_device_id: settings.input_device_id.clone(),
             output_device_id: settings.output_device_id.clone(),
+            preview_device_id: settings.preview_device_id.clone(),
             master_volume: settings.master_volume,
             sample_rate: settings.sample_rate,
             buffer_size: settings.buffer_size,
@@ -133,6 +135,7 @@ impl From<AudioSettingsDto> for AudioSettings {
         Self {
             input_device_id: dto.input_device_id,
             output_device_id: dto.output_device_id,
+            preview_device_id: dto.preview_device_id,
             master_volume: dto.master_volume,
             sample_rate: dto.sample_rate,
             buffer_size: dto.buffer_size,

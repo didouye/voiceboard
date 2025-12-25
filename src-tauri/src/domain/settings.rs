@@ -9,6 +9,8 @@ pub struct AudioSettings {
     pub input_device_id: Option<String>,
     /// Selected output device ID (virtual microphone)
     pub output_device_id: Option<String>,
+    /// Selected preview output device ID (for monitoring)
+    pub preview_device_id: Option<String>,
     /// Master volume (0.0 to 1.0)
     pub master_volume: f32,
     /// Sample rate to use
@@ -22,6 +24,7 @@ impl AudioSettings {
         Self {
             input_device_id: None,
             output_device_id: None,
+            preview_device_id: None,
             master_volume: 1.0,
             sample_rate: 48000,
             buffer_size: 1024,

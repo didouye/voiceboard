@@ -124,6 +124,7 @@ export class TauriService {
       audio: {
         inputDeviceId: s.audio.input_device_id,
         outputDeviceId: s.audio.output_device_id,
+        previewDeviceId: s.audio.preview_device_id,
         masterVolume: s.audio.master_volume,
         sampleRate: s.audio.sample_rate,
         bufferSize: s.audio.buffer_size
@@ -141,6 +142,7 @@ export class TauriService {
       audio: {
         input_device_id: s.audio.inputDeviceId,
         output_device_id: s.audio.outputDeviceId,
+        preview_device_id: s.audio.previewDeviceId,
         master_volume: s.audio.masterVolume,
         sample_rate: s.audio.sampleRate,
         buffer_size: s.audio.bufferSize
