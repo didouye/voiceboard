@@ -37,6 +37,7 @@ const DEFAULT_HOTKEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', 
             [pad]="pad"
             [hotkey]="getHotkey(i)"
             [loading]="soundboard.loading()"
+            [isPreviewing]="soundboard.previewingPadId() === pad.id"
             (play)="soundboard.playSound(pad.id)"
             (preview)="soundboard.previewSound(pad.id)"
             (import)="soundboard.importSound(pad.id)"
