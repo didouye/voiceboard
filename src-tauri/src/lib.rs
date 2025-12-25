@@ -25,7 +25,7 @@ use application::{
         // Device management
         get_audio_devices, get_input_devices, get_virtual_output_devices, check_virtual_driver,
         // Settings
-        get_settings, save_settings, load_settings, set_input_device, set_output_device,
+        get_settings, save_settings, load_settings, set_input_device, set_output_device, set_preview_device,
         // Mixer configuration
         get_mixer_config, set_master_volume,
         // Channel management
@@ -81,6 +81,7 @@ pub fn run() {
             load_settings,
             set_input_device,
             set_output_device,
+            set_preview_device,
             // Mixer configuration
             get_mixer_config,
             set_master_volume,

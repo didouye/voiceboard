@@ -368,6 +368,38 @@ pub async fn set_output_device(
     Ok(())
 }
 
+/// Set preview output device (for monitoring)
+#[tauri::command]
+pub async fn set_preview_device(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    device_id: Option<String>,
+) -> Result<(), String> {
+    tracing::info!("Setting preview device to: {:?}", device_id);
+
+    {
+        let mut settings = state.settings.write().await;
+        settings.audio.preview_device_id = device_id.clone();
+    }
+
+    // Auto-save settings
+    let settings = state.settings.read().await;
+    let dto = AppSettingsDto::from(&*settings);
+    drop(settings);
+
+    let store = app.store(SETTINGS_STORE).map_err(|e| e.to_string())?;
+    // Ensure store is reloaded before updating to avoid overwriting other settings
+    let _ = store.reload();
+    store.set(SETTINGS_KEY, serde_json::to_value(&dto).map_err(|e| e.to_string())?);
+    store.save().map_err(|e| {
+        tracing::error!("Failed to save settings: {}", e);
+        e.to_string()
+    })?;
+
+    tracing::info!("Preview device saved: {:?}", device_id);
+    Ok(())
+}
+
 // ============================================================================
 // Mixer Configuration Commands
 // ============================================================================
