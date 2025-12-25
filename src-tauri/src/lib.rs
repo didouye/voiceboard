@@ -33,7 +33,7 @@ use application::{
         // Mixing control
         start_mixing, stop_mixing, is_mixing,
         // Sound playback
-        load_sound_file, play_sound, stop_sound, set_mic_volume, set_mic_muted,
+        load_sound_file, play_sound, stop_sound, preview_sound, set_mic_volume, set_mic_muted,
         // Soundboard persistence
         save_soundboard, load_soundboard,
     },
@@ -82,6 +82,7 @@ pub fn run() {
             load_sound_file,
             play_sound,
             stop_sound,
+            preview_sound,
             set_mic_volume,
             set_mic_muted,
             // Soundboard persistence

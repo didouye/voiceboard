@@ -224,6 +224,20 @@ export class SoundboardService {
   }
 
   /**
+   * Preview a sound on system default output (for monitoring)
+   */
+  async previewSound(padId: string): Promise<void> {
+    const pad = this._pads().find(p => p.id === padId);
+    if (!pad?.sound) return;
+
+    try {
+      await this.tauri.previewSound(pad.sound.path);
+    } catch (err) {
+      this._error.set(err instanceof Error ? err.message : 'Failed to preview sound');
+    }
+  }
+
+  /**
    * Remove sound from a pad
    */
   removeSound(padId: string): void {

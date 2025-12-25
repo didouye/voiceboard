@@ -32,9 +32,14 @@ import { SoundboardService } from '../../../core/services/soundboard.service';
             <span class="bar"></span>
           </div>
         }
-        <button class="remove-btn" (click)="onRemove($event)" title="Remove sound">
-          &times;
-        </button>
+        <div class="action-buttons">
+          <button class="action-btn play-btn" (click)="onPreview($event)" title="Preview (system output)">
+            ▶
+          </button>
+          <button class="action-btn remove-btn" (click)="onRemove($event)" title="Remove sound">
+            ×
+          </button>
+        </div>
       } @else {
         <div class="empty-pad">
           <span class="plus-icon">+</span>
@@ -144,28 +149,38 @@ import { SoundboardService } from '../../../core/services/soundboard.service';
       to { height: 16px; }
     }
 
-    .remove-btn {
+    .action-buttons {
       position: absolute;
       top: 4px;
       right: 4px;
+      display: flex;
+      gap: 4px;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .sound-pad:hover .action-buttons {
+      opacity: 1;
+    }
+
+    .action-btn {
       width: 20px;
       height: 20px;
       background: rgba(0,0,0,0.5);
       border: none;
       border-radius: 50%;
       color: #fff;
-      font-size: 14px;
+      font-size: 10px;
       line-height: 1;
       cursor: pointer;
-      opacity: 0;
-      transition: opacity 0.2s;
       display: flex;
       align-items: center;
       justify-content: center;
+      transition: background 0.2s;
     }
 
-    .sound-pad:hover .remove-btn {
-      opacity: 1;
+    .play-btn:hover {
+      background: #27ae60;
     }
 
     .remove-btn:hover {
@@ -219,6 +234,7 @@ export class SoundPadComponent {
   @Input() loading = false;
 
   @Output() play = new EventEmitter<void>();
+  @Output() preview = new EventEmitter<void>();
   @Output() import = new EventEmitter<void>();
   @Output() remove = new EventEmitter<void>();
 
@@ -237,6 +253,11 @@ export class SoundPadComponent {
     if (this.pad.sound) {
       // Could show context menu in future
     }
+  }
+
+  onPreview(event: MouseEvent): void {
+    event.stopPropagation();
+    this.preview.emit();
   }
 
   onRemove(event: MouseEvent): void {

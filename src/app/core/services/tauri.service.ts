@@ -286,6 +286,13 @@ export class TauriService {
   }
 
   /**
+   * Preview a sound on system default output (for monitoring)
+   */
+  async previewSound(path: string): Promise<void> {
+    await invoke('preview_sound', { path });
+  }
+
+  /**
    * Set microphone volume (0.0 to 2.0)
    */
   async setMicVolume(volume: number): Promise<void> {

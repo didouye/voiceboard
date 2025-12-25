@@ -663,6 +663,37 @@ pub async fn play_sound(
     Ok(())
 }
 
+/// Preview a sound file on system default output (for monitoring)
+#[tauri::command]
+pub async fn preview_sound(path: String) -> Result<(), String> {
+    use rodio::{Decoder, OutputStream, Sink};
+    use std::fs::File;
+    use std::io::BufReader;
+
+    // Get the default output stream (system default speakers)
+    let (_stream, stream_handle) = OutputStream::try_default()
+        .map_err(|e| format!("Failed to get default output device: {}", e))?;
+
+    // Create a sink for playback
+    let sink = Sink::try_new(&stream_handle)
+        .map_err(|e| format!("Failed to create audio sink: {}", e))?;
+
+    // Open and decode the file
+    let file = File::open(&path).map_err(|e| format!("Failed to open file: {}", e))?;
+    let reader = BufReader::new(file);
+    let source = Decoder::new(reader)
+        .map_err(|e| format!("Failed to decode audio file: {}", e))?;
+
+    // Play the sound
+    sink.append(source);
+
+    // Detach so playback continues in background
+    sink.detach();
+
+    tracing::info!("Preview sound on default output: {}", path);
+    Ok(())
+}
+
 /// Stop a playing sound
 #[tauri::command]
 pub async fn stop_sound(
