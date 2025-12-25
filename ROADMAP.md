@@ -25,12 +25,13 @@
 
 ## Phase 2 - Distribution & CI/CD
 
-### To Do
-- [ ] **GitHub Actions CI**
+### Done
+- [x] **GitHub Actions CI**
   - Automated build and compilation
+  - Clippy linting
   - Automated tests
-  - Application packaging
 
+### To Do
 - [ ] **Windows Installer**
   - Evaluate open source solutions:
     - NSIS (Nullsoft Scriptable Install System)
