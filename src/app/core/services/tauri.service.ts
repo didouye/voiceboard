@@ -288,10 +288,31 @@ export class TauriService {
   }
 
   /**
-   * Preview a sound on system default output (for monitoring)
+   * Preview a sound on a specific output device
    */
-  async previewSound(path: string): Promise<void> {
-    await invoke('preview_sound', { path });
+  async previewSound(path: string, deviceName: string, padId: string): Promise<void> {
+    await invoke('preview_sound', { path, deviceName, padId });
+  }
+
+  /**
+   * Stop the currently playing preview
+   */
+  async stopPreview(): Promise<void> {
+    await invoke('stop_preview');
+  }
+
+  /**
+   * Get the currently previewing pad ID
+   */
+  async getPreviewState(): Promise<string | null> {
+    return invoke<string | null>('get_preview_state');
+  }
+
+  /**
+   * Set the preview output device
+   */
+  async setPreviewDevice(deviceId: string | null): Promise<void> {
+    await invoke('set_preview_device', { deviceId });
   }
 
   /**
@@ -324,5 +345,31 @@ export class TauriService {
    */
   async loadSoundboardState(): Promise<any[] | null> {
     return invoke<any[] | null>('load_soundboard');
+  }
+
+  // =========================================================================
+  // Preview Event Listeners
+  // =========================================================================
+
+  /**
+   * Listen for preview started events
+   */
+  async listenPreviewStarted(callback: (padId: string) => void): Promise<() => void> {
+    const { listen } = await import('@tauri-apps/api/event');
+    const unlisten = await listen<string>('preview-started', (event) => {
+      callback(event.payload);
+    });
+    return unlisten;
+  }
+
+  /**
+   * Listen for preview stopped events
+   */
+  async listenPreviewStopped(callback: (padId: string) => void): Promise<() => void> {
+    const { listen } = await import('@tauri-apps/api/event');
+    const unlisten = await listen<string>('preview-stopped', (event) => {
+      callback(event.payload);
+    });
+    return unlisten;
   }
 }
