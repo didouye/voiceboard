@@ -5,10 +5,12 @@
 
 pub mod audio_engine;
 pub mod commands;
+pub mod preview_engine;
 mod services;
 mod state;
 
 pub use audio_engine::*;
 pub use commands::*;
+pub use preview_engine::*;
 pub use services::*;
 pub use state::*;
