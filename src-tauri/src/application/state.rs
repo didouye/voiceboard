@@ -1,6 +1,7 @@
 //! Application state management
 
 use crate::application::audio_engine::AudioEngine;
+use crate::application::preview_engine::PreviewEngine;
 use crate::domain::{AppSettings, MixerConfig};
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
@@ -11,6 +12,7 @@ pub struct AppState {
     pub settings: Arc<RwLock<AppSettings>>,
     pub is_mixing: Arc<RwLock<bool>>,
     pub audio_engine: Arc<Mutex<AudioEngine>>,
+    pub preview_engine: Arc<Mutex<Option<PreviewEngine>>>,
 }
 
 impl AppState {
@@ -20,6 +22,7 @@ impl AppState {
             settings: Arc::new(RwLock::new(AppSettings::default())),
             is_mixing: Arc::new(RwLock::new(false)),
             audio_engine: Arc::new(Mutex::new(AudioEngine::new())),
+            preview_engine: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -33,6 +36,7 @@ impl AppState {
             settings: Arc::new(RwLock::new(settings)),
             is_mixing: Arc::new(RwLock::new(false)),
             audio_engine: Arc::new(Mutex::new(AudioEngine::new())),
+            preview_engine: Arc::new(Mutex::new(None)),
         }
     }
 }

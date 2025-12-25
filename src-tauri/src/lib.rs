@@ -19,6 +19,7 @@ pub mod adapters;
 pub mod application;
 pub mod infrastructure;
 
+use tauri::Manager;
 use application::{
     commands::{
         // Device management
@@ -37,7 +38,7 @@ use application::{
         // Soundboard persistence
         save_soundboard, load_soundboard,
     },
-    AppState,
+    AppState, PreviewEngine,
 };
 
 /// Run the Tauri application
@@ -52,7 +53,21 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
-        .manage(AppState::new())
+        .setup(|app| {
+            let state = AppState::new();
+            app.manage(state);
+
+            // Initialize preview engine with app handle
+            let app_handle = app.handle().clone();
+            let state_ref = app.state::<AppState>();
+            let preview_engine = PreviewEngine::new(app_handle);
+            {
+                let mut preview = state_ref.preview_engine.blocking_lock();
+                *preview = Some(preview_engine);
+            }
+
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             // Device management
             get_audio_devices,
