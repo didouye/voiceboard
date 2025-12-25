@@ -146,46 +146,48 @@ where
         self.config.read().await.clone()
     }
 
-    /// Mix multiple audio buffers together
-    pub fn mix_buffers(buffers: &[AudioBuffer], weights: &[f32]) -> Option<AudioBuffer> {
-        if buffers.is_empty() || buffers.len() != weights.len() {
-            return None;
-        }
+}
 
-        let first = &buffers[0];
-        let mut result = first.clone();
-
-        for (i, buffer) in buffers.iter().enumerate().skip(1) {
-            if let Ok(mixed) = result.mix(buffer) {
-                result = mixed;
-            }
-        }
-
-        // Apply weights (simplified - in practice would be per-sample)
-        let total_weight: f32 = weights.iter().sum();
-        if total_weight > 0.0 {
-            result.apply_gain(1.0 / total_weight);
-        }
-
-        Some(result)
+/// Mix multiple audio buffers together
+///
+/// Takes a slice of buffers and corresponding weights, returns mixed result.
+/// Returns None if buffers is empty or lengths don't match.
+pub fn mix_buffers(buffers: &[AudioBuffer], weights: &[f32]) -> Option<AudioBuffer> {
+    if buffers.is_empty() || buffers.len() != weights.len() {
+        return None;
     }
+
+    let first = &buffers[0];
+    let mut result = first.clone();
+
+    for buffer in buffers.iter().skip(1) {
+        if let Ok(mixed) = result.mix(buffer) {
+            result = mixed;
+        }
+    }
+
+    // Apply weights (simplified - in practice would be per-sample)
+    let total_weight: f32 = weights.iter().sum();
+    if total_weight > 0.0 {
+        result.apply_gain(1.0 / total_weight);
+    }
+
+    Some(result)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::ChannelType;
-
-    // Tests would use mock implementations of the ports
-    // Example structure for future tests:
 
     #[test]
     fn test_mix_buffers_empty() {
-        let result = MixerService::<
-            crate::adapters::CpalAudioInput,
-            crate::adapters::CpalAudioInput, // Placeholder
-            crate::adapters::CpalDeviceManager,
-        >::mix_buffers(&[], &[]);
+        let result = mix_buffers(&[], &[]);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_mix_buffers_mismatched_lengths() {
+        let result = mix_buffers(&[], &[1.0]);
         assert!(result.is_none());
     }
 }

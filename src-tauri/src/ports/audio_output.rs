@@ -55,7 +55,6 @@ pub trait AudioOutput {
 /// Port specifically for virtual audio device output
 ///
 /// This extends AudioOutput with virtual device specific functionality
-#[cfg_attr(test, mockall::automock)]
 pub trait VirtualAudioOutput: AudioOutput {
     /// Check if the virtual device driver is installed
     fn is_driver_installed(&self) -> bool;
