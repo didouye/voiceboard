@@ -13,9 +13,7 @@
 - [x] Device selector (input/output)
 - [x] Master control with volume and start/stop button
 - [x] Modern UI with dark theme
-
-### In Progress
-- [ ] Sound preview on system output (listen before sending to virtual mic)
+- [x] Sound preview on system output with device selection
 
 ### To Do
 - [ ] Virtual microphone output - Implement WASAPI to send audio to Virtual Audio Driver
