@@ -39,6 +39,7 @@ where
 {
     input: Arc<RwLock<I>>,
     output: Arc<RwLock<O>>,
+    #[allow(dead_code)]
     device_manager: Arc<D>,
     config: Arc<RwLock<MixerConfig>>,
     is_running: Arc<RwLock<bool>>,

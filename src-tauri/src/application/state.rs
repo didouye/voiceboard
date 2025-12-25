@@ -28,8 +28,10 @@ impl AppState {
 
     /// Create state with pre-loaded settings
     pub fn with_settings(settings: AppSettings) -> Self {
-        let mut mixer_config = MixerConfig::default();
-        mixer_config.master_volume = settings.audio.master_volume;
+        let mixer_config = MixerConfig {
+            master_volume: settings.audio.master_volume,
+            ..Default::default()
+        };
 
         Self {
             mixer_config: Arc::new(RwLock::new(mixer_config)),

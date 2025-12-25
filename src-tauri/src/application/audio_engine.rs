@@ -64,6 +64,7 @@ struct PlayingSound {
 }
 
 /// Shared state for audio processing
+#[allow(dead_code)]
 struct AudioState {
     playing_sounds: HashMap<String, PlayingSound>,
     mic_volume: f32,
@@ -314,8 +315,8 @@ fn run_engine_thread(
                                         let remaining = sound.samples.len() - sound.position;
                                         let to_mix = remaining.min(data.len());
 
-                                        for i in 0..to_mix {
-                                            data[i] = (data[i] + sound.samples[sound.position + i]).clamp(-1.0, 1.0);
+                                        for (i, sample) in data.iter_mut().take(to_mix).enumerate() {
+                                            *sample = (*sample + sound.samples[sound.position + i]).clamp(-1.0, 1.0);
                                         }
 
                                         sound.position += to_mix;
@@ -438,8 +439,8 @@ fn run_engine_thread(
                             let _ = stream.pause();
                         }
 
-                        input_stream = None;
-                        output_stream = None;
+                        drop(input_stream);
+                        drop(output_stream);
                         is_running.store(false, Ordering::SeqCst);
                         tracing::info!("Audio engine shutdown");
                         return;

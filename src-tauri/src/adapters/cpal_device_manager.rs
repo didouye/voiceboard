@@ -119,10 +119,11 @@ impl CpalDeviceManager {
                     // Common sample rates
                     for rate in [8000, 16000, 22050, 44100, 48000, 96000] {
                         let sr = cpal::SampleRate(rate);
-                        if sr >= config.min_sample_rate() && sr <= config.max_sample_rate() {
-                            if !sample_rates.contains(&rate) {
-                                sample_rates.push(rate);
-                            }
+                        if sr >= config.min_sample_rate()
+                            && sr <= config.max_sample_rate()
+                            && !sample_rates.contains(&rate)
+                        {
+                            sample_rates.push(rate);
                         }
                     }
 
@@ -132,23 +133,22 @@ impl CpalDeviceManager {
                     }
                 }
             }
-        } else {
-            if let Ok(configs) = device.supported_output_configs() {
-                for config in configs {
-                    // Common sample rates
-                    for rate in [8000, 16000, 22050, 44100, 48000, 96000] {
-                        let sr = cpal::SampleRate(rate);
-                        if sr >= config.min_sample_rate() && sr <= config.max_sample_rate() {
-                            if !sample_rates.contains(&rate) {
-                                sample_rates.push(rate);
-                            }
-                        }
+        } else if let Ok(configs) = device.supported_output_configs() {
+            for config in configs {
+                // Common sample rates
+                for rate in [8000, 16000, 22050, 44100, 48000, 96000] {
+                    let sr = cpal::SampleRate(rate);
+                    if sr >= config.min_sample_rate()
+                        && sr <= config.max_sample_rate()
+                        && !sample_rates.contains(&rate)
+                    {
+                        sample_rates.push(rate);
                     }
+                }
 
-                    let ch = config.channels();
-                    if !channels.contains(&ch) {
-                        channels.push(ch);
-                    }
+                let ch = config.channels();
+                if !channels.contains(&ch) {
+                    channels.push(ch);
                 }
             }
         }
