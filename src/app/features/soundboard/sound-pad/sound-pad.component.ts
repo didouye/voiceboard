@@ -12,6 +12,7 @@ import { SoundboardService } from '../../../core/services/soundboard.service';
       class="sound-pad"
       [class.has-sound]="pad.sound"
       [class.playing]="pad.isPlaying"
+      [class.previewing]="isPreviewing"
       [class.loading]="loading"
       [style.--pad-color]="pad.color"
       (click)="onClick($event)"
@@ -33,8 +34,11 @@ import { SoundboardService } from '../../../core/services/soundboard.service';
           </div>
         }
         <div class="action-buttons">
-          <button class="action-btn play-btn" (click)="onPreview($event)" title="Preview (system output)">
-            ▶
+          <button class="action-btn preview-btn"
+                  [class.active]="isPreviewing"
+                  (click)="onPreview($event)"
+                  [title]="isPreviewing ? 'Stop preview' : 'Preview (system output)'">
+            {{ isPreviewing ? '⏹' : '▶' }}
           </button>
           <button class="action-btn remove-btn" (click)="onRemove($event)" title="Remove sound">
             ×
@@ -179,12 +183,31 @@ import { SoundboardService } from '../../../core/services/soundboard.service';
       transition: background 0.2s;
     }
 
-    .play-btn:hover {
+    .preview-btn:hover {
       background: #27ae60;
+    }
+
+    .preview-btn.active {
+      background: #00d4ff;
+      color: #000;
     }
 
     .remove-btn:hover {
       background: #e74c3c;
+    }
+
+    .sound-pad.previewing {
+      animation: preview-pulse 1s ease-in-out infinite;
+      border-color: #00d4ff;
+    }
+
+    @keyframes preview-pulse {
+      0%, 100% {
+        box-shadow: 0 0 8px rgba(0, 212, 255, 0.4);
+      }
+      50% {
+        box-shadow: 0 0 16px rgba(0, 212, 255, 0.7);
+      }
     }
 
     .empty-pad {
@@ -232,6 +255,7 @@ export class SoundPadComponent {
   @Input({ required: true }) pad!: SoundPad;
   @Input() hotkey?: string;
   @Input() loading = false;
+  @Input() isPreviewing = false;
 
   @Output() play = new EventEmitter<void>();
   @Output() preview = new EventEmitter<void>();
