@@ -663,35 +663,46 @@ pub async fn play_sound(
     Ok(())
 }
 
-/// Preview a sound file on system default output (for monitoring)
+/// Preview a sound file on a specific output device
 #[tauri::command]
-pub async fn preview_sound(path: String) -> Result<(), String> {
-    use rodio::{Decoder, OutputStream, Sink};
-    use std::fs::File;
-    use std::io::BufReader;
+pub async fn preview_sound(
+    state: State<'_, AppState>,
+    path: String,
+    device_name: String,
+    pad_id: String,
+) -> Result<(), String> {
+    use crate::application::preview_engine::PreviewCommand;
 
-    // Get the default output stream (system default speakers)
-    let (_stream, stream_handle) = OutputStream::try_default()
-        .map_err(|e| format!("Failed to get default output device: {}", e))?;
+    let preview = state.preview_engine.lock().await;
+    if let Some(ref engine) = *preview {
+        engine.send_command(PreviewCommand::Play {
+            path,
+            device_name,
+            pad_id,
+        })
+    } else {
+        Err("Preview engine not initialized".to_string())
+    }
+}
 
-    // Create a sink for playback
-    let sink = Sink::try_new(&stream_handle)
-        .map_err(|e| format!("Failed to create audio sink: {}", e))?;
+/// Stop the currently playing preview
+#[tauri::command]
+pub async fn stop_preview(state: State<'_, AppState>) -> Result<(), String> {
+    use crate::application::preview_engine::PreviewCommand;
 
-    // Open and decode the file
-    let file = File::open(&path).map_err(|e| format!("Failed to open file: {}", e))?;
-    let reader = BufReader::new(file);
-    let source = Decoder::new(reader)
-        .map_err(|e| format!("Failed to decode audio file: {}", e))?;
+    let preview = state.preview_engine.lock().await;
+    if let Some(ref engine) = *preview {
+        engine.send_command(PreviewCommand::Stop)
+    } else {
+        Err("Preview engine not initialized".to_string())
+    }
+}
 
-    // Play the sound
-    sink.append(source);
-
-    // Detach so playback continues in background
-    sink.detach();
-
-    tracing::info!("Preview sound on default output: {}", path);
-    Ok(())
+/// Get the currently previewing pad ID
+#[tauri::command]
+pub async fn get_preview_state(state: State<'_, AppState>) -> Result<Option<String>, String> {
+    let preview = state.preview_engine.lock().await;
+    Ok(preview.as_ref().and_then(|e| e.current_pad_id()))
 }
 
 /// Stop a playing sound
