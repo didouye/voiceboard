@@ -41,10 +41,12 @@ src-tauri/src/
 ## Prerequisites
 
 ### Windows
+
 - Windows 10 (Build 1903+) or Windows 11
 - [Virtual Audio Driver](https://github.com/VirtualDrivers/Virtual-Audio-Driver) - Open source virtual audio device
 
 ### Development
+
 - [Rust](https://rustup.rs/) 1.70+
 - [Node.js](https://nodejs.org/) 18+
 - [Tauri CLI](https://tauri.app/v1/guides/getting-started/prerequisites)
@@ -54,17 +56,20 @@ src-tauri/src/
 1. Install the Virtual Audio Driver from [GitHub](https://github.com/VirtualDrivers/Virtual-Audio-Driver/releases)
 
 2. Clone the repository:
+
 ```bash
 git clone https://github.com/yourusername/voiceboard.git
 cd voiceboard
 ```
 
 3. Install dependencies:
+
 ```bash
 npm install
 ```
 
 4. Run in development mode:
+
 ```bash
 npm run tauri dev
 ```
@@ -78,35 +83,76 @@ npm run tauri build
 ## Testing
 
 ### Rust tests
+
 ```bash
 cd src-tauri
 cargo test
 ```
 
 ### Angular tests
+
 ```bash
 npm test
 ```
 
 ## Tech Stack
 
-### Backend (Rust)
+### Desktop App
+
+#### Backend (Rust)
+
 - **Tauri 2.0** - Desktop application framework
 - **cpal** - Cross-platform audio I/O
 - **rodio** - Audio playback and decoding
 - **tokio** - Async runtime
 - **thiserror/anyhow** - Error handling
 
-### Frontend (Angular)
+#### Frontend (Angular)
+
 - **Angular 18+** - UI framework
 - **TypeScript** - Type-safe JavaScript
 - **Angular Signals** - Reactive state management
+
+### Cloud (Future)
+
+- **Backend**: Django + Django REST Framework
+- **Database**: PostgreSQL
+- **Storage**: S3-compatible
+
+### Discord Bot (Future)
+
+- **Preferred**: Rust (serenity + songbird)
+- **Fallback**: Python (discord.py)
+
+### Architecture
+
+- **Hexagonal Architecture** (Ports & Adapters)
+- **Domain-Driven Design** (DDD)
+- **Test-Driven Development** (TDD) - when writing new features
 
 ## Development Methodology
 
 - **TDD** (Test-Driven Development) - Tests written first for domain logic
 - **DDD** (Domain-Driven Design) - Rich domain model with entities and value objects
 - **Hexagonal Architecture** - Separation of concerns with ports and adapters
+
+## Project Structure
+
+```
+voiceboard/
+├── src/                    # Angular frontend
+│   └── app/
+│       ├── core/           # Services, models
+│       └── features/       # Feature modules
+├── src-tauri/              # Rust backend
+│   └── src/
+│       ├── domain/         # Business logic (DDD)
+│       ├── ports/          # Interfaces (traits)
+│       ├── adapters/       # Implementations
+│       ├── application/    # Commands, services, state
+│       └── infrastructure/ # Cross-cutting concerns
+└── ROADMAP.md              # Project roadmap and progress
+```
 
 ## License
 
