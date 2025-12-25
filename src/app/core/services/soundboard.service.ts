@@ -27,6 +27,15 @@ export class SoundboardService {
   private _error = signal<string | null>(null);
   private _initialized = false;
 
+  // Preview state
+  private _previewingPadId = signal<string | null>(null);
+  private _previewDeviceId = signal<string | null>(null);
+  readonly previewingPadId = this._previewingPadId.asReadonly();
+  readonly previewDeviceId = this._previewDeviceId.asReadonly();
+
+  private unlistenPreviewStarted?: () => void;
+  private unlistenPreviewStopped?: () => void;
+
   // Public readonly signals
   readonly pads = this._pads.asReadonly();
   readonly loading = this._loading.asReadonly();
@@ -39,6 +48,19 @@ export class SoundboardService {
   constructor(private tauri: TauriService) {
     // Load saved state on construction
     this.loadState();
+    this.initPreviewListeners();
+  }
+
+  private async initPreviewListeners(): Promise<void> {
+    this.unlistenPreviewStarted = await this.tauri.listenPreviewStarted((padId) => {
+      this._previewingPadId.set(padId);
+    });
+
+    this.unlistenPreviewStopped = await this.tauri.listenPreviewStopped((padId) => {
+      if (this._previewingPadId() === padId) {
+        this._previewingPadId.set(null);
+      }
+    });
   }
 
   private createInitialPads(count: number): SoundPad[] {
@@ -69,6 +91,9 @@ export class SoundboardService {
       console.error('Failed to load soundboard state:', err);
     }
     this._initialized = true;
+
+    // Also load preview device setting
+    this.loadPreviewDevice();
   }
 
   /**
@@ -224,16 +249,58 @@ export class SoundboardService {
   }
 
   /**
-   * Preview a sound on system default output (for monitoring)
+   * Preview a sound on the selected preview output device
    */
   async previewSound(padId: string): Promise<void> {
     const pad = this._pads().find(p => p.id === padId);
     if (!pad?.sound) return;
 
     try {
-      await this.tauri.previewSound(pad.sound.path);
+      // If same pad is previewing, stop it
+      if (this._previewingPadId() === padId) {
+        await this.stopPreview();
+        return;
+      }
+
+      const previewDeviceId = this._previewDeviceId() || 'default';
+      await this.tauri.previewSound(pad.sound.path, previewDeviceId, padId);
     } catch (err) {
       this._error.set(err instanceof Error ? err.message : 'Failed to preview sound');
+    }
+  }
+
+  /**
+   * Stop the currently playing preview
+   */
+  async stopPreview(): Promise<void> {
+    try {
+      await this.tauri.stopPreview();
+    } catch (err) {
+      this._error.set(err instanceof Error ? err.message : 'Failed to stop preview');
+    }
+  }
+
+  /**
+   * Set the preview output device
+   */
+  async setPreviewDevice(deviceId: string | null): Promise<void> {
+    this._previewDeviceId.set(deviceId);
+    try {
+      await this.tauri.setPreviewDevice(deviceId);
+    } catch (err) {
+      this._error.set(err instanceof Error ? err.message : 'Failed to set preview device');
+    }
+  }
+
+  /**
+   * Load preview device from settings
+   */
+  async loadPreviewDevice(): Promise<void> {
+    try {
+      const settings = await this.tauri.loadSettings();
+      this._previewDeviceId.set(settings.audio.previewDeviceId);
+    } catch (err) {
+      console.error('Failed to load preview device:', err);
     }
   }
 
