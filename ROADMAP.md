@@ -116,6 +116,18 @@
   - AI sound effect generation
   - Generation history
 
+- [ ] **Remote Control Infrastructure**
+  - WebSocket gateway (Django Channels + Redis)
+  - Desktop persistent connection to cloud
+  - Remote registry (paired devices, tokens, revocation)
+  - Command relay from remotes to desktops
+
+- [ ] **Web Remote Control**
+  - Angular SPA integrated into dashboard
+  - WebSocket connection to cloud gateway
+  - Real-time pad grid with state updates
+  - Works from anywhere (no local network required)
+
 ---
 
 ## Phase 5 - Discord Bot
@@ -138,9 +150,67 @@
 
 ---
 
+## Phase 6 - Mobile Remote Control
+
+### Stack
+- **Framework**: Flutter (iOS + Android)
+- **mDNS**: bonsoir package
+- **QR Scanner**: mobile_scanner package
+- **State Management**: Provider
+- **Local Storage**: Hive
+
+### Desktop App Extensions
+- [ ] **Local WebSocket Server**
+  - Expose WS server on configurable port
+  - HMAC-SHA256 signature validation
+  - Anti-replay protection (timestamp + nonce cache)
+  - State broadcast to connected remotes
+
+- [ ] **mDNS Broadcast**
+  - Service type: `_voiceboard._tcp`
+  - Broadcast desktop name and port
+  - Auto-discovery on local network
+
+- [ ] **QR Code Pairing**
+  - Generate QR code with pairing data
+  - Contains: desktop_id, local_secret, local_ip, port
+  - Display in settings or dedicated pairing screen
+
+- [ ] **Cloud Sync for Remotes**
+  - Register paired remotes to cloud
+  - Generate derived token for cloud auth
+  - Revocation management
+
+### Mobile App (Flutter)
+- [ ] **Discovery & Pairing**
+  - mDNS scanner for local desktops
+  - QR code scanner for secure pairing
+  - Store paired desktops locally
+
+- [ ] **Remote Control UI**
+  - 4x3 pad grid (matching desktop)
+  - Connection status indicator (local/cloud/offline)
+  - Stop All button
+  - Master volume slider
+  - Real-time state sync
+
+- [ ] **Hybrid Connection**
+  - Auto-detect local vs remote mode
+  - Direct WebSocket for local (low latency)
+  - Cloud relay for remote access
+  - Seamless mode switching
+
+- [ ] **Security**
+  - HMAC-SHA256 signatures for local commands
+  - Derived token for cloud authentication
+  - Secure storage for secrets (Hive encrypted)
+
+---
+
 ## Priorities
 
 1. Finish Phase 1 (functional MVP)
 2. Phase 2 (distribution)
 3. Phase 3 (UI)
 4. Phase 4 & 5 (cloud and bot - can be parallelized)
+5. Phase 6 (mobile remote - requires Phase 4 cloud infrastructure for remote mode)
