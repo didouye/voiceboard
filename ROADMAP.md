@@ -31,27 +31,29 @@
   - Clippy linting
   - Automated tests
 
+- [x] **Multi-platform Release Build**
+  - Windows x64 (.msi, .zip)
+  - macOS ARM64 and x64 (.dmg, .tar.gz)
+  - Linux x64 (.AppImage, .tar.gz)
+  - CalVer versioning (YYYYMMDD.HHMM)
+  - Automatic GitHub Release on merge to main
+  - SHA256 checksums
+
 ### To Do
-- [ ] **Windows Installer**
-  - Evaluate open source solutions:
-    - NSIS (Nullsoft Scriptable Install System)
-    - WiX Toolset
-    - Inno Setup
-  - Create installer with:
-    - **Bundled Virtual Audio Driver** (auto-install, no separate download)
-    - Desktop/Start menu shortcuts
-    - Clean uninstallation
+- [ ] **Windows Installer Improvements**
+  - Code signing (requires certificate)
+  - Bundled Virtual Audio Driver
+
+- [ ] **macOS Improvements**
+  - Code signing + notarization (requires Apple Developer)
 
 - [ ] **Linux Support**
-  - Virtual audio device (PulseAudio/PipeWire virtual sink)
-  - Linux packaging (AppImage, .deb, .rpm)
-  - Test on major distributions (Ubuntu, Fedora, Arch)
+  - Virtual audio device (PulseAudio/PipeWire)
+  - Additional packages (.deb, .rpm)
 
 - [ ] **Auto-Update System**
   - Use tauri-plugin-updater
-  - Update server (GitHub Releases or custom)
-  - In-app update notifications
-  - Background updates
+  - Update notifications in app
 
 ---
 
