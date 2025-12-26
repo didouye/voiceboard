@@ -17,7 +17,8 @@ jobs:
       - name: Generate CalVer version
         id: version
         run: |
-          VERSION=$(date -u '+%Y%m%d.%H%M')
+          # Format: 0.YYYYMMDD.HHMM (semver-compliant CalVer)
+          VERSION="0.$(date -u '+%Y%m%d.%H%M')"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Generated version: $VERSION"
 
