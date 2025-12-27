@@ -39,21 +39,18 @@
   - Automatic GitHub Release on merge to main
   - SHA256 checksums
 
+- [x] **Auto-Update System**
+  - Check for updates on startup
+  - Toast notification with "Update now" button
+  - Auto-download and restart
+
 ### To Do
 - [ ] **Windows Installer Improvements**
-  - Code signing (requires certificate)
   - Bundled Virtual Audio Driver
-
-- [ ] **macOS Improvements**
-  - Code signing + notarization (requires Apple Developer)
 
 - [ ] **Linux Support**
   - Virtual audio device (PulseAudio/PipeWire)
   - Additional packages (.deb, .rpm)
-
-- [ ] **Auto-Update System**
-  - Use tauri-plugin-updater
-  - Update notifications in app
 
 ---
 
@@ -209,6 +206,27 @@
 
 ---
 
+## Phase 7 - Code Signing & Security
+
+### To Do
+- [ ] **Windows Code Signing**
+  - Obtain code signing certificate
+  - Sign executables and installers
+  - Eliminate SmartScreen warnings
+
+- [ ] **macOS Code Signing & Notarization**
+  - Obtain Apple Developer certificate
+  - Sign app bundle
+  - Notarize with Apple
+  - Eliminate Gatekeeper warnings
+
+- [ ] **Signed Update Manifests**
+  - Generate signing keypair
+  - Sign latest.json manifests
+  - Configure updater pubkey verification
+
+---
+
 ## Priorities
 
 1. Finish Phase 1 (functional MVP)
@@ -216,3 +234,4 @@
 3. Phase 3 (UI)
 4. Phase 4 & 5 (cloud and bot - can be parallelized)
 5. Phase 6 (mobile remote - requires Phase 4 cloud infrastructure for remote mode)
+6. Phase 7 (code signing - when certificates are obtained)
