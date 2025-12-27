@@ -4,11 +4,12 @@ import { MixerService } from '../../core/services';
 import { MasterControlComponent } from './master-control/master-control.component';
 import { DeviceSelectorComponent } from '../devices/device-selector.component';
 import { SoundboardComponent } from '../soundboard/soundboard.component';
+import { LevelMetersComponent } from './level-meters/level-meters.component';
 
 @Component({
   selector: 'app-mixer',
   standalone: true,
-  imports: [CommonModule, MasterControlComponent, DeviceSelectorComponent, SoundboardComponent],
+  imports: [CommonModule, MasterControlComponent, DeviceSelectorComponent, SoundboardComponent, LevelMetersComponent],
   template: `
     <div class="mixer-container">
       <header class="mixer-header">
@@ -25,28 +26,34 @@ import { SoundboardComponent } from '../soundboard/soundboard.component';
         </div>
       }
 
-      <div class="mixer-layout">
-        <!-- Left Sidebar - Device Selection -->
-        <aside class="sidebar">
-          <app-device-selector />
-        </aside>
+      <div class="mixer-content">
+        <div class="mixer-layout">
+          <!-- Left Sidebar - Device Selection -->
+          <aside class="sidebar">
+            <app-device-selector />
+          </aside>
 
-        <!-- Main Content -->
-        <main class="main-content">
-          <!-- Soundboard Section -->
-          <app-soundboard />
-        </main>
+          <!-- Main Content -->
+          <main class="main-content">
+            <!-- Soundboard Section -->
+            <app-soundboard />
+          </main>
 
-        <!-- Right Sidebar - Master Control -->
-        <aside class="master-section">
-          <app-master-control
-            [volume]="mixer.masterVolume()"
-            [isRunning]="mixer.isRunning()"
-            (volumeChange)="onMasterVolumeChange($event)"
-            (startStop)="onStartStop()"
-          />
-        </aside>
+          <!-- Right Sidebar - Master Control -->
+          <aside class="master-section">
+            <app-master-control
+              [volume]="mixer.masterVolume()"
+              [isRunning]="mixer.isRunning()"
+              (volumeChange)="onMasterVolumeChange($event)"
+              (startStop)="onStartStop()"
+            />
+          </aside>
+        </div>
       </div>
+
+      <footer class="mixer-footer">
+        <app-level-meters />
+      </footer>
     </div>
   `,
   styles: [`
@@ -54,12 +61,13 @@ import { SoundboardComponent } from '../soundboard/soundboard.component';
       min-height: 100vh;
       background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
       color: #fff;
-      padding: 20px;
+      display: flex;
+      flex-direction: column;
     }
 
     .mixer-header {
       text-align: center;
-      margin-bottom: 30px;
+      padding: 20px;
     }
 
     .mixer-header h1 {
@@ -79,7 +87,7 @@ import { SoundboardComponent } from '../soundboard/soundboard.component';
       background: #e74c3c;
       padding: 15px 20px;
       border-radius: 8px;
-      margin-bottom: 20px;
+      margin: 0 20px 20px;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -101,6 +109,12 @@ import { SoundboardComponent } from '../soundboard/soundboard.component';
       text-align: center;
       padding: 40px;
       color: #888;
+    }
+
+    .mixer-content {
+      flex: 1;
+      padding: 0 20px 20px;
+      overflow-y: auto;
     }
 
     .mixer-layout {
@@ -128,6 +142,12 @@ import { SoundboardComponent } from '../soundboard/soundboard.component';
       position: sticky;
       top: 20px;
       align-self: start;
+    }
+
+    .mixer-footer {
+      position: sticky;
+      bottom: 0;
+      z-index: 100;
     }
 
     /* Responsive */
