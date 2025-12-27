@@ -20,6 +20,7 @@ pub mod application;
 pub mod infrastructure;
 
 use tauri::{Manager, Emitter};
+use tauri::menu::{Menu, MenuItem, Submenu};
 use crate::application::audio_engine::AudioEngineEvent;
 use application::{
     commands::{
@@ -41,6 +42,8 @@ use application::{
         save_soundboard, load_soundboard,
         // Updates
         check_for_update, install_update,
+        // Debug
+        get_debug_mode, set_debug_mode, get_sentry_dsn,
     },
     AppState, PreviewEngine,
 };
@@ -64,6 +67,17 @@ pub fn run() {
         .setup(|app| {
             let state = AppState::new();
             app.manage(state);
+
+            // Create application menu with Debug toggle
+            let toggle_debug = MenuItem::with_id(app, "toggle_debug", "Toggle Debug Mode", true, None::<&str>)?;
+            let app_submenu = Submenu::with_items(
+                app,
+                "Voiceboard",
+                true,
+                &[&toggle_debug],
+            )?;
+            let menu = Menu::with_items(app, &[&app_submenu])?;
+            app.set_menu(menu)?;
 
             // Initialize preview engine with app handle
             let app_handle = app.handle().clone();
@@ -98,6 +112,20 @@ pub fn run() {
             });
 
             Ok(())
+        })
+        .on_menu_event(|app, event| {
+            if event.id() == "toggle_debug" {
+                // Toggle debug mode
+                let current = get_debug_mode(app.clone());
+                let new_value = !current;
+                if let Err(e) = set_debug_mode(app.clone(), new_value) {
+                    tracing::error!(error = %e, "Failed to toggle debug mode");
+                } else {
+                    // Emit event to frontend to update UI
+                    let _ = app.emit("debug-mode-changed", new_value);
+                    tracing::info!(enabled = new_value, "Debug mode toggled via menu");
+                }
+            }
         })
         .invoke_handler(tauri::generate_handler![
             // Device management
@@ -140,6 +168,10 @@ pub fn run() {
             // Updates
             check_for_update,
             install_update,
+            // Debug
+            get_debug_mode,
+            set_debug_mode,
+            get_sentry_dsn,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

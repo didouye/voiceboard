@@ -46,6 +46,20 @@
   - Toast notification with "Update now" button
   - Auto-download and restart
 
+### In Progress
+- [ ] **Error Tracking & Debugging (Sentry)**
+  - Integrate Sentry SDK in Rust backend
+  - Integrate Sentry SDK in Angular frontend
+  - Capture panics and errors
+  - Source maps for frontend errors
+  - Release tracking with version tags
+  - Debug console UI (accessible via help icon in footer)
+
+- [ ] **Auto-Update Debugging**
+  - Add detailed logging for update process
+  - Send update errors to Sentry
+  - Investigate "Update failed" error
+
 ### To Do
 - [ ] **Windows Installer Improvements**
   - Bundled Virtual Audio Driver
@@ -53,12 +67,6 @@
 - [ ] **Linux Support**
   - Virtual audio device (PulseAudio/PipeWire)
   - Additional packages (.deb, .rpm)
-
-- [ ] **Error Tracking (Sentry)**
-  - Integrate Sentry SDK in Rust backend
-  - Capture panics and errors
-  - Source maps for frontend errors
-  - Release tracking with version tags
 
 ---
 

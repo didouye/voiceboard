@@ -1,4 +1,5 @@
 import { Injectable, signal } from '@angular/core';
+import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import * as Sentry from '@sentry/angular';
 
@@ -9,65 +10,49 @@ export interface LogEntry {
   context?: Record<string, unknown>;
 }
 
-const DEBUG_STORAGE_KEY = 'voiceboard_debug_mode';
-
 @Injectable({ providedIn: 'root' })
 export class DebugConsoleService {
   private readonly MAX_LOGS = 500;
   private readonly _logs = signal<LogEntry[]>([]);
   private readonly _isOpen = signal(false);
-  private readonly _isEnabled: boolean;
+  private readonly _isEnabled = signal(false);
 
   readonly logs = this._logs.asReadonly();
   readonly isOpen = this._isOpen.asReadonly();
-
-  get isEnabled(): boolean {
-    return this._isEnabled;
-  }
+  readonly isEnabled = this._isEnabled.asReadonly();
 
   constructor() {
-    // Debug mode can be enabled via:
-    // 1. localStorage: localStorage.setItem('voiceboard_debug_mode', 'true')
-    // 2. URL parameter: ?debug=true (also persists to localStorage)
-    this._isEnabled = this.checkDebugMode();
-
-    if (this._isEnabled) {
-      this.setupEventListeners();
-      this.log('info', 'Debug console initialized');
-    }
+    this.initialize();
   }
 
-  private checkDebugMode(): boolean {
-    // Check URL parameter first (and persist if present)
-    const urlParams = new URLSearchParams(window.location.search);
-    const debugParam = urlParams.get('debug');
+  private async initialize() {
+    // Get initial debug mode from backend
+    try {
+      const enabled = await invoke<boolean>('get_debug_mode');
+      this._isEnabled.set(enabled);
 
-    if (debugParam === 'true') {
-      localStorage.setItem(DEBUG_STORAGE_KEY, 'true');
-      return true;
-    } else if (debugParam === 'false') {
-      localStorage.removeItem(DEBUG_STORAGE_KEY);
-      return false;
+      if (enabled) {
+        this.setupEventListeners();
+        this.log('info', 'Debug console initialized');
+      }
+    } catch (e) {
+      console.error('Failed to get debug mode:', e);
     }
 
-    // Check localStorage
-    return localStorage.getItem(DEBUG_STORAGE_KEY) === 'true';
-  }
-
-  /**
-   * Enable debug mode (persists across sessions)
-   */
-  static enableDebugMode(): void {
-    localStorage.setItem(DEBUG_STORAGE_KEY, 'true');
-    window.location.reload();
-  }
-
-  /**
-   * Disable debug mode
-   */
-  static disableDebugMode(): void {
-    localStorage.removeItem(DEBUG_STORAGE_KEY);
-    window.location.reload();
+    // Listen for debug mode changes from menu toggle
+    try {
+      await listen<boolean>('debug-mode-changed', (event) => {
+        this._isEnabled.set(event.payload);
+        if (event.payload) {
+          this.setupEventListeners();
+          this.log('info', 'Debug mode enabled');
+        } else {
+          this.log('info', 'Debug mode disabled');
+        }
+      });
+    } catch {
+      // Event listener not available
+    }
   }
 
   private async setupEventListeners() {
@@ -96,7 +81,7 @@ export class DebugConsoleService {
   }
 
   log(level: LogEntry['level'], message: string, context?: Record<string, unknown>) {
-    if (!this._isEnabled) return;
+    if (!this._isEnabled()) return;
 
     this.addLog({
       timestamp: new Date(),

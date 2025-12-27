@@ -7,7 +7,7 @@ import { DebugConsoleService } from '../../services/debug-console.service';
   standalone: true,
   imports: [CommonModule],
   template: `
-    @if (debugConsole.isEnabled) {
+    @if (debugConsole.isEnabled()) {
       <!-- Toggle Button -->
       <button
         class="debug-toggle"

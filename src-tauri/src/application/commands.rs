@@ -954,3 +954,48 @@ pub async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
         }
     }
 }
+
+// ============================================================================
+// Debug Configuration
+// ============================================================================
+
+const DEBUG_STORE: &str = "debug.json";
+const DEBUG_MODE_KEY: &str = "debug_mode";
+
+/// Check if debug mode is enabled
+/// Priority: 1) Runtime toggle (stored), 2) Build-time env var DEBUG_MODE
+#[tauri::command]
+pub fn get_debug_mode(app: tauri::AppHandle) -> bool {
+    // First check the persistent store for runtime toggle
+    if let Ok(store) = app.store(DEBUG_STORE) {
+        if let Some(value) = store.get(DEBUG_MODE_KEY) {
+            if let Some(enabled) = value.as_bool() {
+                return enabled;
+            }
+        }
+    }
+
+    // Fall back to build-time environment variable
+    option_env!("DEBUG_MODE")
+        .map(|v| v.eq_ignore_ascii_case("true") || v == "1")
+        .unwrap_or(false)
+}
+
+/// Toggle debug mode and persist the setting
+#[tauri::command]
+pub fn set_debug_mode(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
+    let store = app.store(DEBUG_STORE).map_err(|e| e.to_string())?;
+    store.set(DEBUG_MODE_KEY, serde_json::json!(enabled));
+    store.save().map_err(|e| e.to_string())?;
+
+    tracing::info!(enabled = enabled, "Debug mode toggled");
+    Ok(())
+}
+
+/// Get Sentry DSN (if configured at build time)
+#[tauri::command]
+pub fn get_sentry_dsn() -> Option<String> {
+    option_env!("SENTRY_DSN")
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+}
