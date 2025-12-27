@@ -34,5 +34,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/didouye/voiceboard/releases/latest/download/latest.json"
+      ],
+      "pubkey": ""
+    }
   }
 }
