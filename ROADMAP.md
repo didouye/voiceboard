@@ -17,7 +17,7 @@
 
 ### To Do
 - [ ] Virtual microphone output - Implement WASAPI to send audio to Virtual Audio Driver
-- [ ] Level visualization (VU meters) - AudioEngine emits `LevelUpdate`, connect to UI
+- [x] Level visualization (VU meters) - AudioEngine emits `LevelUpdate`, connect to UI
 - [ ] Mic monitoring on preview output - Switch next to VU meter to hear own microphone
 - [ ] Unit and integration tests
 - [ ] Individual volume control per pad in UI
