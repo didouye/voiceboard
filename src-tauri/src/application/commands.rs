@@ -963,7 +963,7 @@ const DEBUG_STORE: &str = "debug.json";
 const DEBUG_MODE_KEY: &str = "debug_mode";
 
 /// Check if debug mode is enabled
-/// Priority: 1) Runtime toggle (stored), 2) Build-time env var DEBUG_MODE
+/// Priority: 1) Runtime toggle (stored), 2) Runtime env var DEBUG_MODE
 #[tauri::command]
 pub fn get_debug_mode(app: tauri::AppHandle) -> bool {
     // First check the persistent store for runtime toggle
@@ -975,8 +975,8 @@ pub fn get_debug_mode(app: tauri::AppHandle) -> bool {
         }
     }
 
-    // Fall back to build-time environment variable
-    option_env!("DEBUG_MODE")
+    // Fall back to runtime environment variable
+    std::env::var("DEBUG_MODE")
         .map(|v| v.eq_ignore_ascii_case("true") || v == "1")
         .unwrap_or(false)
 }
@@ -992,10 +992,10 @@ pub fn set_debug_mode(app: tauri::AppHandle, enabled: bool) -> Result<(), String
     Ok(())
 }
 
-/// Get Sentry DSN (if configured at build time)
+/// Get Sentry DSN (runtime env var)
 #[tauri::command]
 pub fn get_sentry_dsn() -> Option<String> {
-    option_env!("SENTRY_DSN")
+    std::env::var("SENTRY_DSN")
+        .ok()
         .filter(|s| !s.is_empty())
-        .map(|s| s.to_string())
 }

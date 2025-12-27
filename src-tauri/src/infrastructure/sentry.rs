@@ -1,11 +1,12 @@
 //! Sentry error tracking configuration
 
 use sentry::ClientInitGuard;
+use std::env;
 
 /// Initialize Sentry error tracking
 /// Returns a guard that must be kept alive for the duration of the application
 pub fn init_sentry() -> Option<ClientInitGuard> {
-    let dsn = option_env!("SENTRY_DSN");
+    let dsn = env::var("SENTRY_DSN").ok();
 
     if let Some(dsn) = dsn {
         if dsn.is_empty() {
