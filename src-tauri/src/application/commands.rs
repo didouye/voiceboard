@@ -813,3 +813,69 @@ pub async fn load_soundboard(
     tracing::debug!("Soundboard state loaded: {:?}", pads.is_some());
     Ok(pads)
 }
+
+// ============================================================================
+// Update Commands
+// ============================================================================
+
+use tauri_plugin_updater::UpdaterExt;
+
+/// Information about an available update
+#[derive(Debug, Serialize)]
+pub struct UpdateInfo {
+    pub available: bool,
+    pub version: Option<String>,
+    pub body: Option<String>,
+}
+
+/// Check if an update is available
+#[tauri::command]
+pub async fn check_for_update(app: tauri::AppHandle) -> Result<UpdateInfo, String> {
+    let updater = app.updater().map_err(|e| e.to_string())?;
+
+    match updater.check().await {
+        Ok(Some(update)) => {
+            tracing::info!("Update available: {}", update.version);
+            Ok(UpdateInfo {
+                available: true,
+                version: Some(update.version.clone()),
+                body: update.body.clone(),
+            })
+        }
+        Ok(None) => {
+            tracing::debug!("No update available");
+            Ok(UpdateInfo {
+                available: false,
+                version: None,
+                body: None,
+            })
+        }
+        Err(e) => {
+            // Silent fail - just report no update available
+            tracing::warn!("Update check failed: {}", e);
+            Ok(UpdateInfo {
+                available: false,
+                version: None,
+                body: None,
+            })
+        }
+    }
+}
+
+/// Download and install an available update, then restart
+#[tauri::command]
+pub async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
+    let updater = app.updater().map_err(|e| e.to_string())?;
+
+    if let Some(update) = updater.check().await.map_err(|e| e.to_string())? {
+        tracing::info!("Downloading update: {}", update.version);
+        update
+            .download_and_install(|_, _| {}, || {})
+            .await
+            .map_err(|e| e.to_string())?;
+        tracing::info!("Update installed, restarting...");
+        app.restart();
+    }
+
+    Ok(())
+}

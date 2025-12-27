@@ -38,6 +38,8 @@ use application::{
         set_mic_volume, set_mic_muted,
         // Soundboard persistence
         save_soundboard, load_soundboard,
+        // Updates
+        check_for_update, install_update,
     },
     AppState, PreviewEngine,
 };
@@ -108,6 +110,9 @@ pub fn run() {
             // Soundboard persistence
             save_soundboard,
             load_soundboard,
+            // Updates
+            check_for_update,
+            install_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
