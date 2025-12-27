@@ -182,6 +182,39 @@ jobs:
           sha256sum voiceboard-* > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
+      - name: Generate update manifest
+        run: |
+          VERSION="${{ needs.version.outputs.release_tag }}"
+          APP_VERSION="${{ needs.version.outputs.app_version }}"
+
+          cat > artifacts/latest.json << EOF
+          {
+            "version": "$APP_VERSION",
+            "notes": "Voiceboard $VERSION - Automated release",
+            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "platforms": {
+              "darwin-aarch64": {
+                "url": "https://github.com/${{ github.repository }}/releases/download/v$VERSION/voiceboard-$VERSION-macos-arm64.tar.gz",
+                "signature": ""
+              },
+              "darwin-x86_64": {
+                "url": "https://github.com/${{ github.repository }}/releases/download/v$VERSION/voiceboard-$VERSION-macos-x64.tar.gz",
+                "signature": ""
+              },
+              "linux-x86_64": {
+                "url": "https://github.com/${{ github.repository }}/releases/download/v$VERSION/voiceboard-$VERSION-linux-x64.tar.gz",
+                "signature": ""
+              },
+              "windows-x86_64": {
+                "url": "https://github.com/${{ github.repository }}/releases/download/v$VERSION/voiceboard-$VERSION-windows-x64.zip",
+                "signature": ""
+              }
+            }
+          }
+          EOF
+
+          cat artifacts/latest.json
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -220,3 +253,4 @@ jobs:
           files: |
             artifacts/voiceboard-*
             artifacts/SHA256SUMS.txt
+            artifacts/latest.json
