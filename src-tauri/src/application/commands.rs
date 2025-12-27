@@ -831,11 +831,28 @@ pub struct UpdateInfo {
 /// Check if an update is available
 #[tauri::command]
 pub async fn check_for_update(app: tauri::AppHandle) -> Result<UpdateInfo, String> {
-    let updater = app.updater().map_err(|e| e.to_string())?;
+    tracing::info!("Starting update check");
+
+    let updater = match app.updater() {
+        Ok(u) => {
+            tracing::debug!("Updater instance created successfully");
+            u
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to create updater instance");
+            return Err(e.to_string());
+        }
+    };
+
+    tracing::debug!("Checking for updates from remote endpoint");
 
     match updater.check().await {
         Ok(Some(update)) => {
-            tracing::info!("Update available: {}", update.version);
+            tracing::info!(
+                version = %update.version,
+                current_version = env!("CARGO_PKG_VERSION"),
+                "Update available"
+            );
             Ok(UpdateInfo {
                 available: true,
                 version: Some(update.version.clone()),
@@ -843,7 +860,10 @@ pub async fn check_for_update(app: tauri::AppHandle) -> Result<UpdateInfo, Strin
             })
         }
         Ok(None) => {
-            tracing::debug!("No update available");
+            tracing::info!(
+                current_version = env!("CARGO_PKG_VERSION"),
+                "No update available - already on latest version"
+            );
             Ok(UpdateInfo {
                 available: false,
                 version: None,
@@ -851,13 +871,14 @@ pub async fn check_for_update(app: tauri::AppHandle) -> Result<UpdateInfo, Strin
             })
         }
         Err(e) => {
-            // Silent fail - just report no update available
-            tracing::warn!("Update check failed: {}", e);
-            Ok(UpdateInfo {
-                available: false,
-                version: None,
-                body: None,
-            })
+            tracing::error!(
+                error = %e,
+                error_debug = ?e,
+                current_version = env!("CARGO_PKG_VERSION"),
+                "Update check failed"
+            );
+            // Return error instead of silently failing
+            Err(format!("Update check failed: {}", e))
         }
     }
 }
@@ -865,17 +886,71 @@ pub async fn check_for_update(app: tauri::AppHandle) -> Result<UpdateInfo, Strin
 /// Download and install an available update, then restart
 #[tauri::command]
 pub async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
-    let updater = app.updater().map_err(|e| e.to_string())?;
+    tracing::info!("Starting update installation");
 
-    if let Some(update) = updater.check().await.map_err(|e| e.to_string())? {
-        tracing::info!("Downloading update: {}", update.version);
-        update
-            .download_and_install(|_, _| {}, || {})
-            .await
-            .map_err(|e| e.to_string())?;
-        tracing::info!("Update installed, restarting...");
-        app.restart();
+    let updater = match app.updater() {
+        Ok(u) => {
+            tracing::debug!("Updater instance created for installation");
+            u
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to create updater instance for installation");
+            return Err(format!("Failed to initialize updater: {}", e));
+        }
+    };
+
+    tracing::debug!("Checking for update before installation");
+
+    let update = match updater.check().await {
+        Ok(Some(update)) => {
+            tracing::info!(version = %update.version, "Update found, proceeding with download");
+            update
+        }
+        Ok(None) => {
+            tracing::warn!("No update available when trying to install");
+            return Err("No update available".to_string());
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to check for update during installation");
+            return Err(format!("Failed to check for update: {}", e));
+        }
+    };
+
+    tracing::info!(version = %update.version, "Starting download and installation");
+
+    let download_result = update
+        .download_and_install(
+            |downloaded, total| {
+                if let Some(total) = total {
+                    let percent = (downloaded as f64 / total as f64 * 100.0) as u32;
+                    if percent % 25 == 0 {
+                        tracing::debug!(
+                            downloaded_bytes = downloaded,
+                            total_bytes = total,
+                            percent = percent,
+                            "Download progress"
+                        );
+                    }
+                }
+            },
+            || {
+                tracing::info!("Download complete, starting installation");
+            },
+        )
+        .await;
+
+    match download_result {
+        Ok(()) => {
+            tracing::info!("Update installed successfully, restarting application");
+            app.restart();
+        }
+        Err(e) => {
+            tracing::error!(
+                error = %e,
+                error_debug = ?e,
+                "Failed to download and install update"
+            );
+            Err(format!("Failed to install update: {}", e))
+        }
     }
-
-    Ok(())
 }
