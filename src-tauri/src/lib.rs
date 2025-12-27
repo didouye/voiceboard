@@ -48,7 +48,10 @@ use application::{
 /// Run the Tauri application
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Initialize logging
+    // Initialize Sentry first (returns guard that must be kept alive)
+    let _sentry_guard = infrastructure::init_sentry();
+
+    // Initialize logging (with Sentry integration if enabled)
     infrastructure::init_logging();
 
     tracing::info!("Starting Voiceboard application");
