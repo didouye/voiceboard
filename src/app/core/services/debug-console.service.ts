@@ -1,5 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 import { listen } from '@tauri-apps/api/event';
+import * as Sentry from '@sentry/angular';
 
 export interface LogEntry {
   timestamp: Date;
@@ -8,18 +9,31 @@ export interface LogEntry {
   context?: Record<string, unknown>;
 }
 
+// Check for debug mode via build-time replacement
+declare const __DEBUG_MODE__: boolean | undefined;
+
 @Injectable({ providedIn: 'root' })
 export class DebugConsoleService {
   private readonly MAX_LOGS = 500;
   private readonly _logs = signal<LogEntry[]>([]);
   private readonly _isOpen = signal(false);
+  private readonly _isEnabled: boolean;
 
   readonly logs = this._logs.asReadonly();
   readonly isOpen = this._isOpen.asReadonly();
 
+  get isEnabled(): boolean {
+    return this._isEnabled;
+  }
+
   constructor() {
-    this.setupEventListeners();
-    this.log('info', 'Debug console initialized');
+    // Debug mode is enabled via build-time variable
+    this._isEnabled = typeof __DEBUG_MODE__ !== 'undefined' && __DEBUG_MODE__ === true;
+
+    if (this._isEnabled) {
+      this.setupEventListeners();
+      this.log('info', 'Debug console initialized');
+    }
   }
 
   private async setupEventListeners() {
@@ -48,6 +62,8 @@ export class DebugConsoleService {
   }
 
   log(level: LogEntry['level'], message: string, context?: Record<string, unknown>) {
+    if (!this._isEnabled) return;
+
     this.addLog({
       timestamp: new Date(),
       level,
@@ -90,5 +106,21 @@ export class DebugConsoleService {
     return this._logs()
       .map(log => `[${log.timestamp.toISOString()}] [${log.level.toUpperCase()}] ${log.message}${log.context ? ' ' + JSON.stringify(log.context) : ''}`)
       .join('\n');
+  }
+
+  /**
+   * Send a test error to Sentry to verify integration
+   */
+  sendTestError(): void {
+    const testError = new Error('Sentry Test Error - Debug Console');
+    this.log('warn', 'Sending test error to Sentry...');
+
+    try {
+      Sentry.captureException(testError);
+      this.log('info', 'Test error sent to Sentry successfully');
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      this.log('error', `Failed to send test error to Sentry: ${errorMessage}`);
+    }
   }
 }
