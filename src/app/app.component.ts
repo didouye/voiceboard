@@ -47,7 +47,9 @@ export class AppComponent implements OnInit {
         });
       }
     } catch (error) {
-      console.warn('Update check failed:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Update check failed:', errorMessage);
+      // Don't show toast for check failures, just log
     }
   }
 
@@ -55,9 +57,11 @@ export class AppComponent implements OnInit {
     try {
       await invoke('install_update');
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Update installation failed:', errorMessage);
       this.toastService.show({
-        message: 'Update failed, try again later',
-        duration: 5000
+        message: `Update failed: ${errorMessage}`,
+        duration: 10000
       });
     }
   }
