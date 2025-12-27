@@ -19,7 +19,8 @@ pub mod adapters;
 pub mod application;
 pub mod infrastructure;
 
-use tauri::Manager;
+use tauri::{Manager, Emitter};
+use crate::application::audio_engine::AudioEngineEvent;
 use application::{
     commands::{
         // Device management
@@ -64,11 +65,34 @@ pub fn run() {
             // Initialize preview engine with app handle
             let app_handle = app.handle().clone();
             let state_ref = app.state::<AppState>();
-            let preview_engine = PreviewEngine::new(app_handle);
+            let preview_engine = PreviewEngine::new(app_handle.clone());
             {
                 let mut preview = state_ref.preview_engine.blocking_lock();
                 *preview = Some(preview_engine);
             }
+
+            // Start level event forwarding
+            let engine_for_levels = state_ref.audio_engine.clone();
+            std::thread::spawn(move || {
+                loop {
+                    if let Ok(engine) = engine_for_levels.try_lock() {
+                        while let Some(event) = engine.try_recv_event() {
+                            match event {
+                                AudioEngineEvent::LevelUpdate { input_rms, input_peak, output_rms, output_peak } => {
+                                    let _ = app_handle.emit("audio-levels", serde_json::json!({
+                                        "inputRms": input_rms,
+                                        "inputPeak": input_peak,
+                                        "outputRms": output_rms,
+                                        "outputPeak": output_peak,
+                                    }));
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(16));
+                }
+            });
 
             Ok(())
         })
