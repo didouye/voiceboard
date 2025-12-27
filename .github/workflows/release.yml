@@ -8,19 +8,24 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # Generate CalVer version
+  # Generate version info
   version:
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.version.outputs.version }}
+      app_version: ${{ steps.version.outputs.app_version }}
+      release_tag: ${{ steps.version.outputs.release_tag }}
     steps:
-      - name: Generate CalVer version
+      - name: Generate version
         id: version
         run: |
-          # Format: 0.YYYYMMDD.HHMM (semver-compliant CalVer)
-          VERSION="0.$(date -u '+%Y%m%d.%H%M')"
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Generated version: $VERSION"
+          # App version: 0.0.{run_number} - WiX compatible (each component ≤ 255)
+          APP_VERSION="0.0.${{ github.run_number }}"
+          # Release tag: date-based for human readability
+          RELEASE_TAG="$(date -u '+%Y%m%d.%H%M')"
+          echo "app_version=$APP_VERSION" >> $GITHUB_OUTPUT
+          echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
+          echo "App version: $APP_VERSION"
+          echo "Release tag: $RELEASE_TAG"
 
   # Build for all platforms
   build:
@@ -51,7 +56,8 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     env:
-      VERSION: ${{ needs.version.outputs.version }}
+      APP_VERSION: ${{ needs.version.outputs.app_version }}
+      RELEASE_TAG: ${{ needs.version.outputs.release_tag }}
 
     steps:
       - name: Checkout
@@ -91,7 +97,7 @@ jobs:
       - name: Update version in tauri.conf.json
         shell: bash
         run: |
-          sed -i.bak 's/"version": "[^"]*"/"version": "${{ env.VERSION }}"/' src-tauri/tauri.conf.json
+          sed -i.bak 's/"version": "[^"]*"/"version": "${{ env.APP_VERSION }}"/' src-tauri/tauri.conf.json
           cat src-tauri/tauri.conf.json | grep version
 
       - name: Build Tauri app
@@ -101,7 +107,7 @@ jobs:
         if: matrix.platform == 'windows'
         shell: pwsh
         run: |
-          $version = "${{ env.VERSION }}"
+          $version = "${{ env.RELEASE_TAG }}"
           $arch = "${{ matrix.arch }}"
 
           # MSI
@@ -117,7 +123,7 @@ jobs:
       - name: Rename artifacts (macOS)
         if: matrix.platform == 'macos'
         run: |
-          VERSION="${{ env.VERSION }}"
+          VERSION="${{ env.RELEASE_TAG }}"
           ARCH="${{ matrix.arch }}"
 
           # DMG
@@ -131,7 +137,7 @@ jobs:
       - name: Rename artifacts (Linux)
         if: matrix.platform == 'linux'
         run: |
-          VERSION="${{ env.VERSION }}"
+          VERSION="${{ env.RELEASE_TAG }}"
           ARCH="${{ matrix.arch }}"
 
           # AppImage
@@ -179,23 +185,25 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ needs.version.outputs.version }}
-          name: Voiceboard ${{ needs.version.outputs.version }}
+          tag_name: v${{ needs.version.outputs.release_tag }}
+          name: Voiceboard ${{ needs.version.outputs.release_tag }}
           draft: false
           prerelease: false
           body: |
-            ## Voiceboard ${{ needs.version.outputs.version }}
+            ## Voiceboard ${{ needs.version.outputs.release_tag }}
 
             Automated release from main branch.
+
+            **App Version:** ${{ needs.version.outputs.app_version }}
 
             ### Downloads
 
             | Platform | Installer | Archive |
             |----------|-----------|---------|
-            | Windows x64 | [.msi](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.version }}/voiceboard-${{ needs.version.outputs.version }}-windows-x64.msi) | [.zip](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.version }}/voiceboard-${{ needs.version.outputs.version }}-windows-x64.zip) |
-            | macOS Apple Silicon | [.dmg](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.version }}/voiceboard-${{ needs.version.outputs.version }}-macos-arm64.dmg) | [.tar.gz](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.version }}/voiceboard-${{ needs.version.outputs.version }}-macos-arm64.tar.gz) |
-            | macOS Intel | [.dmg](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.version }}/voiceboard-${{ needs.version.outputs.version }}-macos-x64.dmg) | [.tar.gz](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.version }}/voiceboard-${{ needs.version.outputs.version }}-macos-x64.tar.gz) |
-            | Linux x64 | [.AppImage](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.version }}/voiceboard-${{ needs.version.outputs.version }}-linux-x64.AppImage) | [.tar.gz](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.version }}/voiceboard-${{ needs.version.outputs.version }}-linux-x64.tar.gz) |
+            | Windows x64 | [.msi](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.release_tag }}/voiceboard-${{ needs.version.outputs.release_tag }}-windows-x64.msi) | [.zip](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.release_tag }}/voiceboard-${{ needs.version.outputs.release_tag }}-windows-x64.zip) |
+            | macOS Apple Silicon | [.dmg](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.release_tag }}/voiceboard-${{ needs.version.outputs.release_tag }}-macos-arm64.dmg) | [.tar.gz](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.release_tag }}/voiceboard-${{ needs.version.outputs.release_tag }}-macos-arm64.tar.gz) |
+            | macOS Intel | [.dmg](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.release_tag }}/voiceboard-${{ needs.version.outputs.release_tag }}-macos-x64.dmg) | [.tar.gz](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.release_tag }}/voiceboard-${{ needs.version.outputs.release_tag }}-macos-x64.tar.gz) |
+            | Linux x64 | [.AppImage](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.release_tag }}/voiceboard-${{ needs.version.outputs.release_tag }}-linux-x64.AppImage) | [.tar.gz](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.release_tag }}/voiceboard-${{ needs.version.outputs.release_tag }}-linux-x64.tar.gz) |
 
             ### Verification
 
