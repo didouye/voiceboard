@@ -15,6 +15,9 @@ use std::time::Duration;
 /// Size of the ring buffer in samples (not frames)
 const RING_BUFFER_SIZE: usize = 8192;
 
+/// Level update interval in milliseconds (~30Hz)
+const LEVEL_UPDATE_INTERVAL_MS: u64 = 33;
+
 /// Commands that can be sent to the audio engine
 #[derive(Debug)]
 pub enum AudioEngineCommand {
@@ -54,7 +57,12 @@ pub enum AudioEngineEvent {
     /// Error occurred
     Error(String),
     /// Audio level update (for UI meters)
-    LevelUpdate { input_level: f32, output_level: f32 },
+    LevelUpdate {
+        input_rms: f32,
+        input_peak: f32,
+        output_rms: f32,
+        output_peak: f32,
+    },
 }
 
 /// A sound that is currently playing
@@ -248,6 +256,11 @@ fn run_engine_thread(
                             buffer_size: cpal::BufferSize::Default,
                         };
 
+                        // Atomic level values for lock-free reading
+                        let input_level = Arc::new(AtomicU32::new(0));
+                        let output_level = Arc::new(AtomicU32::new(0));
+                        let input_level_clone = input_level.clone();
+
                         // Clone references for callbacks
                         let producer_clone = producer.clone();
                         let mic_volume_clone = mic_volume.clone();
@@ -260,12 +273,21 @@ fn run_engine_thread(
                                 let muted = mic_muted_clone.load(Ordering::Relaxed);
                                 let volume = f32::from_bits(mic_volume_clone.load(Ordering::Relaxed));
 
+                                // Calculate RMS for input level
+                                let mut sum_squares = 0.0f32;
+
                                 if let Ok(mut prod) = producer_clone.try_lock() {
                                     for &sample in data {
                                         let processed = if muted { 0.0 } else { sample * volume };
-                                        // If buffer is full, drop samples (acceptable for real-time audio)
+                                        sum_squares += processed * processed;
                                         let _ = prod.try_push(processed);
                                     }
+                                }
+
+                                // Store RMS level (will be read by level monitoring thread)
+                                if !data.is_empty() {
+                                    let rms = (sum_squares / data.len() as f32).sqrt();
+                                    input_level_clone.store(rms.to_bits(), Ordering::Relaxed);
                                 }
                             },
                             move |err| {
@@ -288,6 +310,7 @@ fn run_engine_thread(
                         let consumer_clone = consumer.clone();
                         let master_volume_clone = master_volume.clone();
                         let audio_state_clone = audio_state.clone();
+                        let output_level_for_callback = output_level.clone();
 
                         // Build output stream
                         let output_result = output_dev.build_output_stream(
@@ -334,6 +357,16 @@ fn run_engine_thread(
                                 for sample in data.iter_mut() {
                                     *sample = (*sample * master_vol).clamp(-1.0, 1.0);
                                 }
+
+                                // Calculate output RMS after master volume
+                                let mut sum_squares = 0.0f32;
+                                for sample in data.iter() {
+                                    sum_squares += sample * sample;
+                                }
+                                if !data.is_empty() {
+                                    let rms = (sum_squares / data.len() as f32).sqrt();
+                                    output_level_for_callback.store(rms.to_bits(), Ordering::Relaxed);
+                                }
                             },
                             move |err| {
                                 tracing::error!("Output stream error: {}", err);
@@ -373,6 +406,45 @@ fn run_engine_thread(
                         is_running.store(true, Ordering::SeqCst);
                         let _ = event_tx.send(AudioEngineEvent::Started);
                         tracing::info!("Audio engine started: {} -> {}", input_device, output_device);
+
+                        // Start level monitoring thread
+                        let input_level_monitor = input_level.clone();
+                        let output_level_monitor = output_level.clone();
+                        let event_tx_monitor = event_tx.clone();
+                        let is_running_monitor = is_running.clone();
+
+                        std::thread::spawn(move || {
+                            let mut input_peak = 0.0f32;
+                            let mut output_peak = 0.0f32;
+                            let decay_rate = 0.05; // ~20dB/sec at 30Hz
+
+                            while is_running_monitor.load(Ordering::Relaxed) {
+                                let input_rms = f32::from_bits(input_level_monitor.load(Ordering::Relaxed));
+                                let output_rms = f32::from_bits(output_level_monitor.load(Ordering::Relaxed));
+
+                                // Update peaks
+                                if input_rms > input_peak {
+                                    input_peak = input_rms;
+                                } else {
+                                    input_peak = (input_peak - decay_rate).max(0.0);
+                                }
+
+                                if output_rms > output_peak {
+                                    output_peak = output_rms;
+                                } else {
+                                    output_peak = (output_peak - decay_rate).max(0.0);
+                                }
+
+                                let _ = event_tx_monitor.send(AudioEngineEvent::LevelUpdate {
+                                    input_rms,
+                                    input_peak,
+                                    output_rms,
+                                    output_peak,
+                                });
+
+                                std::thread::sleep(std::time::Duration::from_millis(LEVEL_UPDATE_INTERVAL_MS));
+                            }
+                        });
                     }
 
                     AudioEngineCommand::Stop => {
