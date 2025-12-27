@@ -54,6 +54,12 @@
   - Virtual audio device (PulseAudio/PipeWire)
   - Additional packages (.deb, .rpm)
 
+- [ ] **Error Tracking (Sentry)**
+  - Integrate Sentry SDK in Rust backend
+  - Capture panics and errors
+  - Source maps for frontend errors
+  - Release tracking with version tags
+
 ---
 
 ## Phase 3 - UI/UX Redesign
