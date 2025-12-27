@@ -58,6 +58,8 @@ jobs:
     env:
       APP_VERSION: ${{ needs.version.outputs.app_version }}
       RELEASE_TAG: ${{ needs.version.outputs.release_tag }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
     steps:
       - name: Checkout
@@ -115,7 +117,24 @@ jobs:
           $newMsi = "voiceboard-$version-windows-$arch.msi"
           Copy-Item $msi.FullName -Destination $newMsi
 
-          # Create zip
+          # MSI signature (for updater)
+          $msiSig = Get-ChildItem -Path "src-tauri/target/${{ matrix.target }}/release/bundle/msi/*.msi.sig" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($msiSig) {
+            Copy-Item $msiSig.FullName -Destination "$newMsi.sig"
+          }
+
+          # NSIS zip for updater (if exists)
+          $nsisZip = Get-ChildItem -Path "src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*.nsis.zip" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($nsisZip) {
+            $newNsisZip = "voiceboard-$version-windows-$arch.nsis.zip"
+            Copy-Item $nsisZip.FullName -Destination $newNsisZip
+            $nsisZipSig = Get-ChildItem -Path "src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*.nsis.zip.sig" -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($nsisZipSig) {
+              Copy-Item $nsisZipSig.FullName -Destination "$newNsisZip.sig"
+            }
+          }
+
+          # Create zip from exe (for manual download)
           $exe = "src-tauri/target/${{ matrix.target }}/release/Voiceboard.exe"
           $zip = "voiceboard-$version-windows-$arch.zip"
           Compress-Archive -Path $exe -DestinationPath $zip
@@ -130,9 +149,18 @@ jobs:
           DMG=$(find src-tauri/target/${{ matrix.target }}/release/bundle/dmg -name "*.dmg" | head -1)
           cp "$DMG" "voiceboard-$VERSION-macos-$ARCH.dmg"
 
-          # Create tar.gz from .app
-          APP=$(find src-tauri/target/${{ matrix.target }}/release/bundle/macos -name "*.app" -type d | head -1)
-          tar -czvf "voiceboard-$VERSION-macos-$ARCH.tar.gz" -C "$(dirname "$APP")" "$(basename "$APP")"
+          # Updater tar.gz and signature (created by Tauri with createUpdaterArtifacts)
+          UPDATER_TAR=$(find src-tauri/target/${{ matrix.target }}/release/bundle/macos -name "*.tar.gz" | head -1)
+          if [ -n "$UPDATER_TAR" ]; then
+            cp "$UPDATER_TAR" "voiceboard-$VERSION-macos-$ARCH.tar.gz"
+            if [ -f "${UPDATER_TAR}.sig" ]; then
+              cp "${UPDATER_TAR}.sig" "voiceboard-$VERSION-macos-$ARCH.tar.gz.sig"
+            fi
+          else
+            # Fallback: Create tar.gz from .app if updater artifact not found
+            APP=$(find src-tauri/target/${{ matrix.target }}/release/bundle/macos -name "*.app" -type d | head -1)
+            tar -czvf "voiceboard-$VERSION-macos-$ARCH.tar.gz" -C "$(dirname "$APP")" "$(basename "$APP")"
+          fi
 
       - name: Rename artifacts (Linux)
         if: matrix.platform == 'linux'
@@ -144,9 +172,22 @@ jobs:
           APPIMAGE=$(find src-tauri/target/${{ matrix.target }}/release/bundle/appimage -name "*.AppImage" | head -1)
           cp "$APPIMAGE" "voiceboard-$VERSION-linux-$ARCH.AppImage"
 
-          # Create tar.gz
-          BINARY="src-tauri/target/${{ matrix.target }}/release/voiceboard"
-          tar -czvf "voiceboard-$VERSION-linux-$ARCH.tar.gz" -C "src-tauri/target/${{ matrix.target }}/release" "voiceboard"
+          # AppImage signature (for updater)
+          if [ -f "${APPIMAGE}.sig" ]; then
+            cp "${APPIMAGE}.sig" "voiceboard-$VERSION-linux-$ARCH.AppImage.sig"
+          fi
+
+          # Updater tar.gz and signature (if created by Tauri)
+          UPDATER_TAR=$(find src-tauri/target/${{ matrix.target }}/release/bundle/appimage -name "*.AppImage.tar.gz" | head -1)
+          if [ -n "$UPDATER_TAR" ]; then
+            cp "$UPDATER_TAR" "voiceboard-$VERSION-linux-$ARCH.tar.gz"
+            if [ -f "${UPDATER_TAR}.sig" ]; then
+              cp "${UPDATER_TAR}.sig" "voiceboard-$VERSION-linux-$ARCH.tar.gz.sig"
+            fi
+          else
+            # Fallback: Create tar.gz from binary
+            tar -czvf "voiceboard-$VERSION-linux-$ARCH.tar.gz" -C "src-tauri/target/${{ matrix.target }}/release" "voiceboard"
+          fi
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -154,10 +195,15 @@ jobs:
           name: voiceboard-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
             voiceboard-*.msi
+            voiceboard-*.msi.sig
             voiceboard-*.zip
+            voiceboard-*.nsis.zip
+            voiceboard-*.nsis.zip.sig
             voiceboard-*.dmg
             voiceboard-*.tar.gz
+            voiceboard-*.tar.gz.sig
             voiceboard-*.AppImage
+            voiceboard-*.AppImage.sig
           if-no-files-found: error
 
   # Create GitHub Release
@@ -187,7 +233,32 @@ jobs:
           VERSION="${{ needs.version.outputs.release_tag }}"
           APP_VERSION="${{ needs.version.outputs.app_version }}"
 
-          cat > artifacts/latest.json << EOF
+          cd artifacts
+
+          # Read signatures from .sig files (they contain base64-encoded signatures)
+          read_sig() {
+            local sigfile="$1"
+            if [ -f "$sigfile" ]; then
+              cat "$sigfile"
+            else
+              echo ""
+            fi
+          }
+
+          # Get signatures for each platform
+          SIG_MACOS_ARM64=$(read_sig "voiceboard-$VERSION-macos-arm64.tar.gz.sig")
+          SIG_MACOS_X64=$(read_sig "voiceboard-$VERSION-macos-x64.tar.gz.sig")
+          SIG_LINUX_X64=$(read_sig "voiceboard-$VERSION-linux-x64.tar.gz.sig")
+          # Windows uses NSIS zip for updater if available, otherwise MSI
+          if [ -f "voiceboard-$VERSION-windows-x64.nsis.zip.sig" ]; then
+            SIG_WINDOWS_X64=$(read_sig "voiceboard-$VERSION-windows-x64.nsis.zip.sig")
+            WINDOWS_URL="https://github.com/${{ github.repository }}/releases/download/v$VERSION/voiceboard-$VERSION-windows-x64.nsis.zip"
+          else
+            SIG_WINDOWS_X64=$(read_sig "voiceboard-$VERSION-windows-x64.msi.sig")
+            WINDOWS_URL="https://github.com/${{ github.repository }}/releases/download/v$VERSION/voiceboard-$VERSION-windows-x64.msi"
+          fi
+
+          cat > latest.json << EOF
           {
             "version": "$APP_VERSION",
             "notes": "Voiceboard $VERSION - Automated release",
@@ -195,25 +266,27 @@ jobs:
             "platforms": {
               "darwin-aarch64": {
                 "url": "https://github.com/${{ github.repository }}/releases/download/v$VERSION/voiceboard-$VERSION-macos-arm64.tar.gz",
-                "signature": ""
+                "signature": "$SIG_MACOS_ARM64"
               },
               "darwin-x86_64": {
                 "url": "https://github.com/${{ github.repository }}/releases/download/v$VERSION/voiceboard-$VERSION-macos-x64.tar.gz",
-                "signature": ""
+                "signature": "$SIG_MACOS_X64"
               },
               "linux-x86_64": {
                 "url": "https://github.com/${{ github.repository }}/releases/download/v$VERSION/voiceboard-$VERSION-linux-x64.tar.gz",
-                "signature": ""
+                "signature": "$SIG_LINUX_X64"
               },
               "windows-x86_64": {
-                "url": "https://github.com/${{ github.repository }}/releases/download/v$VERSION/voiceboard-$VERSION-windows-x64.zip",
-                "signature": ""
+                "url": "$WINDOWS_URL",
+                "signature": "$SIG_WINDOWS_X64"
               }
             }
           }
           EOF
 
-          cat artifacts/latest.json
+          echo "=== Generated latest.json ==="
+          cat latest.json
+          cd ..
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
