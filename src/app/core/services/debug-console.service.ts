@@ -9,8 +9,7 @@ export interface LogEntry {
   context?: Record<string, unknown>;
 }
 
-// Check for debug mode via build-time replacement
-declare const __DEBUG_MODE__: boolean | undefined;
+const DEBUG_STORAGE_KEY = 'voiceboard_debug_mode';
 
 @Injectable({ providedIn: 'root' })
 export class DebugConsoleService {
@@ -27,13 +26,48 @@ export class DebugConsoleService {
   }
 
   constructor() {
-    // Debug mode is enabled via build-time variable
-    this._isEnabled = typeof __DEBUG_MODE__ !== 'undefined' && __DEBUG_MODE__ === true;
+    // Debug mode can be enabled via:
+    // 1. localStorage: localStorage.setItem('voiceboard_debug_mode', 'true')
+    // 2. URL parameter: ?debug=true (also persists to localStorage)
+    this._isEnabled = this.checkDebugMode();
 
     if (this._isEnabled) {
       this.setupEventListeners();
       this.log('info', 'Debug console initialized');
     }
+  }
+
+  private checkDebugMode(): boolean {
+    // Check URL parameter first (and persist if present)
+    const urlParams = new URLSearchParams(window.location.search);
+    const debugParam = urlParams.get('debug');
+
+    if (debugParam === 'true') {
+      localStorage.setItem(DEBUG_STORAGE_KEY, 'true');
+      return true;
+    } else if (debugParam === 'false') {
+      localStorage.removeItem(DEBUG_STORAGE_KEY);
+      return false;
+    }
+
+    // Check localStorage
+    return localStorage.getItem(DEBUG_STORAGE_KEY) === 'true';
+  }
+
+  /**
+   * Enable debug mode (persists across sessions)
+   */
+  static enableDebugMode(): void {
+    localStorage.setItem(DEBUG_STORAGE_KEY, 'true');
+    window.location.reload();
+  }
+
+  /**
+   * Disable debug mode
+   */
+  static disableDebugMode(): void {
+    localStorage.removeItem(DEBUG_STORAGE_KEY);
+    window.location.reload();
   }
 
   private async setupEventListeners() {
