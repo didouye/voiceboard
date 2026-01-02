@@ -1174,25 +1174,63 @@ pub async fn download_and_install_vb_cable(_app: tauri::AppHandle) -> Result<(),
 }
 
 fn run_installer(path: &std::path::Path) -> Result<(), String> {
-    tracing::info!(path = ?path, "Running VB-Cable installer");
+    tracing::info!(path = ?path, "Running VB-Cable installer with elevation");
 
     #[cfg(target_os = "windows")]
     {
-        use std::os::windows::process::CommandExt;
-        use std::process::Command;
+        use std::ffi::OsStr;
+        use std::os::windows::ffi::OsStrExt;
+        use windows::core::PCWSTR;
+        use windows::Win32::Foundation::HWND;
+        use windows::Win32::System::Threading::{WaitForSingleObject, INFINITE};
+        use windows::Win32::UI::Shell::{
+            ShellExecuteExW, SEE_MASK_NOCLOSEPROCESS, SHELLEXECUTEINFOW,
+        };
 
-        // CREATE_NO_WINDOW flag
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        // Convert path to wide string
+        let path_wide: Vec<u16> = OsStr::new(path)
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
 
-        let status = Command::new(path)
-            .creation_flags(CREATE_NO_WINDOW)
-            .status()
-            .map_err(|e| format!("Failed to run installer: {}", e))?;
+        // "runas" verb for UAC elevation
+        let verb: Vec<u16> = OsStr::new("runas")
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
 
-        if !status.success() {
-            return Err(format!("Installer exited with code: {:?}", status.code()));
+        let mut info = SHELLEXECUTEINFOW {
+            cbSize: std::mem::size_of::<SHELLEXECUTEINFOW>() as u32,
+            fMask: SEE_MASK_NOCLOSEPROCESS,
+            hwnd: HWND::default(),
+            lpVerb: PCWSTR(verb.as_ptr()),
+            lpFile: PCWSTR(path_wide.as_ptr()),
+            lpParameters: PCWSTR::null(),
+            lpDirectory: PCWSTR::null(),
+            nShow: 1, // SW_SHOWNORMAL
+            hInstApp: Default::default(),
+            lpIDList: std::ptr::null_mut(),
+            lpClass: PCWSTR::null(),
+            hkeyClass: Default::default(),
+            dwHotKey: 0,
+            Anonymous: Default::default(),
+            hProcess: Default::default(),
+        };
+
+        let result = unsafe { ShellExecuteExW(&mut info) };
+
+        if result.is_err() {
+            return Err("Failed to launch installer (UAC may have been cancelled)".to_string());
         }
 
+        // Wait for the installer to complete
+        if !info.hProcess.is_invalid() {
+            unsafe {
+                WaitForSingleObject(info.hProcess, INFINITE);
+            }
+        }
+
+        tracing::info!("VB-Cable installer completed");
         Ok(())
     }
 
