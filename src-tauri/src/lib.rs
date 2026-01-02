@@ -44,6 +44,8 @@ use application::{
         check_for_update, install_update,
         // Debug
         get_debug_mode, set_debug_mode, get_sentry_dsn,
+        // VB-Cable setup
+        check_vb_cable_installed,
     },
     AppState, PreviewEngine,
 };
@@ -172,6 +174,8 @@ pub fn run() {
             get_debug_mode,
             set_debug_mode,
             get_sentry_dsn,
+            // VB-Cable setup
+            check_vb_cable_installed,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

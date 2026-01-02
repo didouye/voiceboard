@@ -999,3 +999,43 @@ pub fn get_sentry_dsn() -> Option<String> {
         .ok()
         .filter(|s| !s.is_empty())
 }
+
+// ============================================================================
+// VB-Cable Setup Commands
+// ============================================================================
+
+/// Status of VB-Cable installation
+#[derive(Debug, Serialize)]
+pub struct VbCableStatus {
+    pub installed: bool,
+    pub device_name: Option<String>,
+}
+
+/// Check if VB-Cable or any virtual audio device is installed
+#[tauri::command]
+pub async fn check_vb_cable_installed() -> Result<VbCableStatus, String> {
+    let manager = CpalDeviceManager::new();
+
+    match manager.find_virtual_outputs() {
+        Ok(devices) => {
+            if let Some(device) = devices.first() {
+                Ok(VbCableStatus {
+                    installed: true,
+                    device_name: Some(device.name().to_string()),
+                })
+            } else {
+                Ok(VbCableStatus {
+                    installed: false,
+                    device_name: None,
+                })
+            }
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "Failed to check virtual devices");
+            Ok(VbCableStatus {
+                installed: false,
+                device_name: None,
+            })
+        }
+    }
+}
