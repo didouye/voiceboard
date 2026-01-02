@@ -246,6 +246,43 @@ fn run_engine_thread(
                             }
                         };
 
+                        // Log device capabilities for debugging
+                        tracing::info!(
+                            "[AudioEngine] Input device: {} - requested config: {}Hz, {} channels",
+                            input_device,
+                            sample_rate,
+                            channels
+                        );
+                        if let Ok(configs) = input_dev.supported_input_configs() {
+                            for config in configs {
+                                tracing::info!(
+                                    "[AudioEngine]   Supported: {:?} format, {} channels, {}Hz-{}Hz",
+                                    config.sample_format(),
+                                    config.channels(),
+                                    config.min_sample_rate().0,
+                                    config.max_sample_rate().0
+                                );
+                            }
+                        }
+
+                        tracing::info!(
+                            "[AudioEngine] Output device: {} - requested config: {}Hz, {} channels",
+                            output_device,
+                            sample_rate,
+                            channels
+                        );
+                        if let Ok(configs) = output_dev.supported_output_configs() {
+                            for config in configs {
+                                tracing::info!(
+                                    "[AudioEngine]   Supported: {:?} format, {} channels, {}Hz-{}Hz",
+                                    config.sample_format(),
+                                    config.channels(),
+                                    config.min_sample_rate().0,
+                                    config.max_sample_rate().0
+                                );
+                            }
+                        }
+
                         // Create ring buffer for audio pass-through
                         let rb = HeapRb::<f32>::new(RING_BUFFER_SIZE);
                         let (producer, consumer) = rb.split();
@@ -270,10 +307,26 @@ fn run_engine_thread(
                         let mic_volume_clone = mic_volume.clone();
                         let mic_muted_clone = mic_muted.clone();
 
+                        // Debug counter for input callback
+                        let input_callback_count = Arc::new(AtomicU32::new(0));
+                        let input_callback_count_clone = input_callback_count.clone();
+
                         // Build input stream
                         let input_result = input_dev.build_input_stream(
                             &config,
                             move |data: &[f32], _: &cpal::InputCallbackInfo| {
+                                // Log first few callbacks to verify stream is working
+                                let count = input_callback_count_clone.fetch_add(1, Ordering::Relaxed);
+                                if count < 5 || count.is_multiple_of(1000) {
+                                    let max_sample = data.iter().fold(0.0f32, |a, &b| a.max(b.abs()));
+                                    tracing::info!(
+                                        "[AudioEngine] Input callback #{}: {} samples, max amplitude: {:.6}",
+                                        count,
+                                        data.len(),
+                                        max_sample
+                                    );
+                                }
+
                                 let muted = mic_muted_clone.load(Ordering::Relaxed);
                                 let volume =
                                     f32::from_bits(mic_volume_clone.load(Ordering::Relaxed));
@@ -318,10 +371,17 @@ fn run_engine_thread(
                         let audio_state_clone = audio_state.clone();
                         let output_level_for_callback = output_level.clone();
 
+                        // Debug counter for output callback
+                        let output_callback_count = Arc::new(AtomicU32::new(0));
+                        let output_callback_count_clone = output_callback_count.clone();
+
                         // Build output stream
                         let output_result = output_dev.build_output_stream(
                             &config,
                             move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
+                                // Log first few callbacks to verify stream is working
+                                let count = output_callback_count_clone.fetch_add(1, Ordering::Relaxed);
+
                                 let master_vol =
                                     f32::from_bits(master_volume_clone.load(Ordering::Relaxed));
 
@@ -376,6 +436,18 @@ fn run_engine_thread(
                                     let rms = (sum_squares / data.len() as f32).sqrt();
                                     output_level_for_callback
                                         .store(rms.to_bits(), Ordering::Relaxed);
+
+                                    // Log first few callbacks
+                                    if count < 5 || count.is_multiple_of(1000) {
+                                        let max_sample = data.iter().fold(0.0f32, |a, &b| a.max(b.abs()));
+                                        tracing::info!(
+                                            "[AudioEngine] Output callback #{}: {} samples, max amplitude: {:.6}, rms: {:.6}",
+                                            count,
+                                            data.len(),
+                                            max_sample,
+                                            rms
+                                        );
+                                    }
                                 }
                             },
                             move |err| {
