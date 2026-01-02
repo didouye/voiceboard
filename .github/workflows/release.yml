@@ -295,6 +295,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.version.outputs.release_tag }}
+          target_commitish: ${{ github.sha }}
           name: Voiceboard ${{ needs.version.outputs.release_tag }}
           draft: false
           prerelease: false
