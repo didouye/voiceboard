@@ -44,6 +44,7 @@ use application::{
         // Settings
         get_settings,
         get_virtual_output_devices,
+        get_virtual_outputs_by_priority,
         install_update,
         is_mixing,
         load_settings,
@@ -162,6 +163,7 @@ pub fn run() {
             get_audio_devices,
             get_input_devices,
             get_virtual_output_devices,
+            get_virtual_outputs_by_priority,
             get_physical_output_devices,
             check_virtual_driver,
             // Settings

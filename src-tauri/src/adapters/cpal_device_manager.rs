@@ -20,6 +20,17 @@ const VB_CABLE_PATTERNS: &[&str] = &[
     "vb-audio virtual cable",
 ];
 
+/// Priority order for virtual output devices (lower index = higher priority)
+const VIRTUAL_OUTPUT_PRIORITY: &[&str] = &[
+    "cable output (vb-audio",
+    "cable input (vb-audio",
+    "vb-audio virtual cable",
+    "voicemeeter",
+    "blackhole",
+    "virtual audio",
+    "loopback",
+];
+
 /// Device manager adapter using CPAL
 pub struct CpalDeviceManager {
     cached_devices: Vec<AudioDevice>,
@@ -190,6 +201,22 @@ impl CpalDeviceManager {
     /// Find physical output devices (speakers, headphones - for preview/monitoring)
     pub fn find_physical_outputs(&self) -> Result<Vec<AudioDevice>, DeviceManagerError> {
         self.list_devices_by_type(DeviceType::OutputPhysical)
+    }
+
+    /// Get priority score for a virtual device (lower = higher priority)
+    fn get_virtual_device_priority(name: &str) -> usize {
+        let name_lower = name.to_lowercase();
+        VIRTUAL_OUTPUT_PRIORITY
+            .iter()
+            .position(|pattern| name_lower.contains(pattern))
+            .unwrap_or(usize::MAX)
+    }
+
+    /// Find virtual output devices sorted by priority
+    pub fn find_virtual_outputs_by_priority(&self) -> Result<Vec<AudioDevice>, DeviceManagerError> {
+        let mut devices = self.list_devices_by_type(DeviceType::OutputVirtual)?;
+        devices.sort_by_key(|d| Self::get_virtual_device_priority(d.name()));
+        Ok(devices)
     }
 }
 

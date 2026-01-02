@@ -233,6 +233,24 @@ pub async fn get_physical_output_devices() -> ApiResponse<Vec<AudioDeviceDto>> {
     }
 }
 
+/// Get virtual output devices sorted by priority (VB-Cable first, then Voicemeeter, etc.)
+#[tauri::command]
+pub async fn get_virtual_outputs_by_priority() -> ApiResponse<Vec<AudioDeviceDto>> {
+    let manager = CpalDeviceManager::new();
+
+    match manager.find_virtual_outputs_by_priority() {
+        Ok(devices) => {
+            tracing::info!("[get_virtual_outputs_by_priority] Found {} virtual outputs", devices.len());
+            for (i, dev) in devices.iter().enumerate() {
+                tracing::info!("[get_virtual_outputs_by_priority]   {}: {}", i + 1, dev.name());
+            }
+            let dtos: Vec<AudioDeviceDto> = devices.into_iter().map(AudioDeviceDto::from).collect();
+            ApiResponse::ok(dtos)
+        }
+        Err(e) => ApiResponse::err(e.to_string()),
+    }
+}
+
 /// Check if virtual audio driver is installed
 #[tauri::command]
 pub async fn check_virtual_driver() -> ApiResponse<bool> {
