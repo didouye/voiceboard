@@ -1,6 +1,6 @@
 [package]
 name = "voiceboard"
-version = "2026.1.0"
+version = "26.1.0"
 description = "Virtual microphone mixer - Mix real microphone with audio files"
 authors = ["Voiceboard Team"]
 edition = "2021"
