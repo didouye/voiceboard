@@ -1014,16 +1014,41 @@ pub struct VbCableStatus {
 /// Check if VB-Cable or any virtual audio device is installed
 #[tauri::command]
 pub async fn check_vb_cable_installed() -> Result<VbCableStatus, String> {
+    tracing::info!("[check_vb_cable] Starting VB-Cable detection");
     let manager = CpalDeviceManager::new();
+
+    // First, log all output devices for debugging
+    match manager.list_devices() {
+        Ok(all_devices) => {
+            let output_devices: Vec<_> = all_devices.iter()
+                .filter(|d| matches!(d.device_type(), crate::domain::DeviceType::OutputPhysical | crate::domain::DeviceType::OutputVirtual))
+                .collect();
+            tracing::info!("[check_vb_cable] Found {} output devices:", output_devices.len());
+            for dev in &output_devices {
+                tracing::info!("[check_vb_cable]   - {} (type: {:?}, virtual: {})",
+                    dev.name(), dev.device_type(), dev.device_type().is_virtual());
+            }
+        }
+        Err(e) => {
+            tracing::warn!("[check_vb_cable] Failed to list all devices: {}", e);
+        }
+    }
 
     match manager.find_virtual_outputs() {
         Ok(devices) => {
+            tracing::info!("[check_vb_cable] Virtual output devices found: {}", devices.len());
+            for dev in &devices {
+                tracing::info!("[check_vb_cable]   Virtual: {}", dev.name());
+            }
+
             if let Some(device) = devices.first() {
+                tracing::info!("[check_vb_cable] VB-Cable detected: {}", device.name());
                 Ok(VbCableStatus {
                     installed: true,
                     device_name: Some(device.name().to_string()),
                 })
             } else {
+                tracing::info!("[check_vb_cable] No virtual output devices found - VB-Cable not installed");
                 Ok(VbCableStatus {
                     installed: false,
                     device_name: None,
@@ -1031,7 +1056,7 @@ pub async fn check_vb_cable_installed() -> Result<VbCableStatus, String> {
             }
         }
         Err(e) => {
-            tracing::warn!(error = %e, "Failed to check virtual devices");
+            tracing::warn!(error = %e, "[check_vb_cable] Failed to check virtual devices");
             Ok(VbCableStatus {
                 installed: false,
                 device_name: None,
