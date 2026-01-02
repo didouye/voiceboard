@@ -3,7 +3,10 @@
 use crate::domain::{AudioBuffer, AudioFormat, DeviceId};
 use crate::ports::{AudioOutput, AudioOutputError};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use ringbuf::{HeapRb, traits::{Consumer, Observer, Producer, Split}};
+use ringbuf::{
+    traits::{Consumer, Observer, Producer, Split},
+    HeapRb,
+};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -33,9 +36,9 @@ impl CpalAudioOutput {
 
         // If looking for default device
         if device_id.as_str() == "default" {
-            return host
-                .default_output_device()
-                .ok_or_else(|| AudioOutputError::DeviceNotFound("No default output device".into()));
+            return host.default_output_device().ok_or_else(|| {
+                AudioOutputError::DeviceNotFound("No default output device".into())
+            });
         }
 
         // Search for device by name
@@ -147,7 +150,10 @@ impl AudioOutput for CpalAudioOutput {
         if pushed < samples.len() {
             // Buffer full - we're producing faster than consuming
             // This is normal, just drop the excess samples
-            tracing::trace!("Ring buffer full, dropped {} samples", samples.len() - pushed);
+            tracing::trace!(
+                "Ring buffer full, dropped {} samples",
+                samples.len() - pushed
+            );
         }
 
         Ok(())
@@ -158,10 +164,7 @@ impl AudioOutput for CpalAudioOutput {
     }
 
     fn available_frames(&self) -> usize {
-        self.producer
-            .as_ref()
-            .map(|p| p.vacant_len())
-            .unwrap_or(0)
+        self.producer.as_ref().map(|p| p.vacant_len()).unwrap_or(0)
     }
 }
 

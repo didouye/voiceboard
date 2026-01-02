@@ -76,6 +76,9 @@ mod tests {
         let settings = AppSettings::default();
         let json = serde_json::to_string(&settings).unwrap();
         let deserialized: AppSettings = serde_json::from_str(&json).unwrap();
-        assert_eq!(settings.audio.master_volume, deserialized.audio.master_volume);
+        assert_eq!(
+            settings.audio.master_volume,
+            deserialized.audio.master_volume
+        );
     }
 }

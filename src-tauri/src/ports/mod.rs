@@ -5,10 +5,10 @@
 
 mod audio_input;
 mod audio_output;
-mod file_decoder;
 mod device_manager;
+mod file_decoder;
 
 pub use audio_input::*;
 pub use audio_output::*;
-pub use file_decoder::*;
 pub use device_manager::*;
+pub use file_decoder::*;

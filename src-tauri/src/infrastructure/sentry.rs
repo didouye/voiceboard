@@ -16,17 +16,20 @@ pub fn init_sentry() -> Option<ClientInitGuard> {
 
         tracing::info!("Initializing Sentry error tracking");
 
-        let guard = sentry::init((dsn, sentry::ClientOptions {
-            release: Some(env!("CARGO_PKG_VERSION").into()),
-            environment: Some(if cfg!(debug_assertions) {
-                "development".into()
-            } else {
-                "production".into()
-            }),
-            attach_stacktrace: true,
-            send_default_pii: false,
-            ..Default::default()
-        }));
+        let guard = sentry::init((
+            dsn,
+            sentry::ClientOptions {
+                release: Some(env!("CARGO_PKG_VERSION").into()),
+                environment: Some(if cfg!(debug_assertions) {
+                    "development".into()
+                } else {
+                    "production".into()
+                }),
+                attach_stacktrace: true,
+                send_default_pii: false,
+                ..Default::default()
+            },
+        ));
 
         tracing::info!("Sentry initialized successfully");
         Some(guard)

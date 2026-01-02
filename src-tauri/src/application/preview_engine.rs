@@ -128,7 +128,11 @@ fn run_preview_thread(
 
         match command_rx.recv_timeout(Duration::from_millis(50)) {
             Ok(command) => match command {
-                PreviewCommand::Play { path, device_name, pad_id } => {
+                PreviewCommand::Play {
+                    path,
+                    device_name,
+                    pad_id,
+                } => {
                     // Stop current preview if any
                     if let Some(sink) = current_sink.take() {
                         sink.stop();

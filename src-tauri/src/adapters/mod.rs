@@ -3,14 +3,14 @@
 //! Adapters implement the port interfaces using specific technologies
 //! (cpal, rodio, WASAPI, etc.)
 
+mod cpal_device_manager;
 mod cpal_input;
 mod cpal_output;
-mod cpal_device_manager;
 mod rodio_decoder;
 
+pub use cpal_device_manager::*;
 pub use cpal_input::*;
 pub use cpal_output::*;
-pub use cpal_device_manager::*;
 pub use rodio_decoder::*;
 
 // Virtual device adapter will be platform-specific

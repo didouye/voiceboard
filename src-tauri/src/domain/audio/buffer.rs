@@ -147,7 +147,10 @@ mod tests {
         let buffer2 = AudioBuffer::from_raw_f32(vec![0.5, 0.5], 2, 44100);
 
         let mixed = buffer1.mix(&buffer2).unwrap();
-        assert!(mixed.samples().iter().all(|s| (s.value() - 0.5).abs() < 0.001));
+        assert!(mixed
+            .samples()
+            .iter()
+            .all(|s| (s.value() - 0.5).abs() < 0.001));
     }
 
     #[test]

@@ -17,6 +17,13 @@ Voiceboard is a virtual microphone mixer application that allows users to mix th
 - Use meaningful variable and function names
 - Keep functions small and focused
 
+### Linting and Formatting
+
+**Run these commands before each commit:**
+
+- Rust: `cargo fmt --manifest-path src-tauri/Cargo.toml` and `cargo clippy --manifest-path src-tauri/Cargo.toml`
+- Angular: `npm run lint` (if available) or ensure ESLint/Prettier are applied
+
 ### Commits and Git
 
 - Use conventional commits format

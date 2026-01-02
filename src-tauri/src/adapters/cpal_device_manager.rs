@@ -41,12 +41,8 @@ impl CpalDeviceManager {
         let mut devices = Vec::new();
 
         // Get default devices for comparison
-        let default_input_name = host
-            .default_input_device()
-            .and_then(|d| d.name().ok());
-        let default_output_name = host
-            .default_output_device()
-            .and_then(|d| d.name().ok());
+        let default_input_name = host.default_input_device().and_then(|d| d.name().ok());
+        let default_output_name = host.default_output_device().and_then(|d| d.name().ok());
 
         // Enumerate input devices
         if let Ok(input_devices) = host.input_devices() {
@@ -234,7 +230,9 @@ mod tests {
     #[test]
     fn test_virtual_device_detection() {
         assert!(CpalDeviceManager::is_virtual_device("Virtual Audio Device"));
-        assert!(CpalDeviceManager::is_virtual_device("CABLE Output (VB-Audio Virtual Cable)"));
+        assert!(CpalDeviceManager::is_virtual_device(
+            "CABLE Output (VB-Audio Virtual Cable)"
+        ));
         assert!(CpalDeviceManager::is_virtual_device("Voicemeeter Input"));
         assert!(!CpalDeviceManager::is_virtual_device("Realtek HD Audio"));
         assert!(!CpalDeviceManager::is_virtual_device("Built-in Microphone"));

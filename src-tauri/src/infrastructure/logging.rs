@@ -9,7 +9,10 @@ pub fn init_logging() {
         .unwrap_or_else(|_| EnvFilter::new("voiceboard=debug,info"));
 
     // Check if Sentry is configured (runtime env var)
-    let sentry_layer = if env::var("SENTRY_DSN").ok().is_some_and(|dsn| !dsn.is_empty()) {
+    let sentry_layer = if env::var("SENTRY_DSN")
+        .ok()
+        .is_some_and(|dsn| !dsn.is_empty())
+    {
         Some(sentry_tracing::layer())
     } else {
         None

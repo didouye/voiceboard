@@ -95,9 +95,18 @@ mod tests {
 
     #[test]
     fn test_format_from_extension() {
-        assert_eq!(AudioFileFormat::from_extension("mp3"), Some(AudioFileFormat::Mp3));
-        assert_eq!(AudioFileFormat::from_extension("MP3"), Some(AudioFileFormat::Mp3));
-        assert_eq!(AudioFileFormat::from_extension("ogg"), Some(AudioFileFormat::Ogg));
+        assert_eq!(
+            AudioFileFormat::from_extension("mp3"),
+            Some(AudioFileFormat::Mp3)
+        );
+        assert_eq!(
+            AudioFileFormat::from_extension("MP3"),
+            Some(AudioFileFormat::Mp3)
+        );
+        assert_eq!(
+            AudioFileFormat::from_extension("ogg"),
+            Some(AudioFileFormat::Ogg)
+        );
         assert_eq!(AudioFileFormat::from_extension("xyz"), None);
     }
 

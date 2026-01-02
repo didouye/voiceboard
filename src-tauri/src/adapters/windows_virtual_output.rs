@@ -71,7 +71,11 @@ impl Default for WindowsVirtualOutput {
 }
 
 impl AudioOutput for WindowsVirtualOutput {
-    fn start(&mut self, _device_id: &DeviceId, format: AudioFormat) -> Result<(), AudioOutputError> {
+    fn start(
+        &mut self,
+        _device_id: &DeviceId,
+        format: AudioFormat,
+    ) -> Result<(), AudioOutputError> {
         if !Self::check_driver_installed() {
             return Err(AudioOutputError::DeviceNotFound(
                 "Virtual Audio Driver not installed. Please install from: \

@@ -2,8 +2,8 @@
 
 use crate::domain::{AudioBuffer, MixerChannel, MixerConfig};
 use crate::ports::{
-    AudioInput, AudioInputError, AudioOutput, AudioOutputError, DeviceManager,
-    DeviceManagerError, FileDecoderError,
+    AudioInput, AudioInputError, AudioOutput, AudioOutputError, DeviceManager, DeviceManagerError,
+    FileDecoderError,
 };
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -146,7 +146,6 @@ where
     pub async fn get_config(&self) -> MixerConfig {
         self.config.read().await.clone()
     }
-
 }
 
 /// Mix multiple audio buffers together

@@ -54,8 +54,7 @@ impl FileDecoder for RodioFileDecoder {
     fn open(&mut self, path: &Path) -> Result<AudioFileMetadata, FileDecoderError> {
         let format = Self::detect_format(path)?;
 
-        let file = File::open(path)
-            .map_err(|e| FileDecoderError::IoError(e.to_string()))?;
+        let file = File::open(path).map_err(|e| FileDecoderError::IoError(e.to_string()))?;
 
         let reader = BufReader::new(file);
 
@@ -88,7 +87,9 @@ impl FileDecoder for RodioFileDecoder {
     }
 
     fn read_next(&mut self) -> Result<Option<AudioBuffer>, FileDecoderError> {
-        let source = self.source.as_mut()
+        let source = self
+            .source
+            .as_mut()
             .ok_or_else(|| FileDecoderError::DecodeError("No file opened".into()))?;
 
         let metadata = self.metadata.as_ref().unwrap();
@@ -117,7 +118,9 @@ impl FileDecoder for RodioFileDecoder {
 
     fn seek(&mut self, _position: Duration) -> Result<(), FileDecoderError> {
         // Rodio doesn't support seeking in all formats
-        Err(FileDecoderError::DecodeError("Seeking not supported".into()))
+        Err(FileDecoderError::DecodeError(
+            "Seeking not supported".into(),
+        ))
     }
 
     fn position(&self) -> Duration {
@@ -134,7 +137,9 @@ impl FileDecoder for RodioFileDecoder {
 
     fn reset(&mut self) -> Result<(), FileDecoderError> {
         // Would need to reopen the file
-        Err(FileDecoderError::DecodeError("Reset requires reopening file".into()))
+        Err(FileDecoderError::DecodeError(
+            "Reset requires reopening file".into(),
+        ))
     }
 
     fn close(&mut self) {
@@ -170,7 +175,10 @@ impl FileDecoderFactory for RodioDecoderFactory {
     fn supports_format(&self, format: AudioFileFormat) -> bool {
         matches!(
             format,
-            AudioFileFormat::Mp3 | AudioFileFormat::Ogg | AudioFileFormat::Wav | AudioFileFormat::Flac
+            AudioFileFormat::Mp3
+                | AudioFileFormat::Ogg
+                | AudioFileFormat::Wav
+                | AudioFileFormat::Flac
         )
     }
 

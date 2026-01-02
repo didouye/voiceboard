@@ -13,42 +13,67 @@
 //! - **Application**: Use cases and orchestration
 //! - **Infrastructure**: Cross-cutting concerns (logging, config)
 
-pub mod domain;
-pub mod ports;
 pub mod adapters;
 pub mod application;
+pub mod domain;
 pub mod infrastructure;
+pub mod ports;
 
-use tauri::{Manager, Emitter};
-use tauri::menu::{Menu, MenuItem, Submenu};
 use crate::application::audio_engine::AudioEngineEvent;
 use application::{
     commands::{
-        // Device management
-        get_audio_devices, get_input_devices, get_virtual_output_devices, check_virtual_driver,
-        // Settings
-        get_settings, save_settings, load_settings, set_input_device, set_output_device, set_preview_device,
-        // Mixer configuration
-        get_mixer_config, set_master_volume,
+        add_audio_file_channel,
         // Channel management
-        add_microphone_channel, add_audio_file_channel, remove_channel,
-        set_channel_volume, toggle_channel_mute,
-        // Mixing control
-        start_mixing, stop_mixing, is_mixing,
-        // Sound playback
-        load_sound_file, play_sound, stop_sound, preview_sound, stop_preview, get_preview_state,
-        set_mic_volume, set_mic_muted,
-        // Soundboard persistence
-        save_soundboard, load_soundboard,
+        add_microphone_channel,
         // Updates
-        check_for_update, install_update,
-        // Debug
-        get_debug_mode, set_debug_mode, get_sentry_dsn,
+        check_for_update,
         // VB-Cable setup
-        check_vb_cable_installed, download_and_install_vb_cable,
+        check_vb_cable_installed,
+        check_virtual_driver,
+        download_and_install_vb_cable,
+        // Device management
+        get_audio_devices,
+        // Debug
+        get_debug_mode,
+        get_input_devices,
+        // Mixer configuration
+        get_mixer_config,
+        get_preview_state,
+        get_sentry_dsn,
+        // Settings
+        get_settings,
+        get_virtual_output_devices,
+        install_update,
+        is_mixing,
+        load_settings,
+        // Sound playback
+        load_sound_file,
+        load_soundboard,
+        play_sound,
+        preview_sound,
+        remove_channel,
+        save_settings,
+        // Soundboard persistence
+        save_soundboard,
+        set_channel_volume,
+        set_debug_mode,
+        set_input_device,
+        set_master_volume,
+        set_mic_muted,
+        set_mic_volume,
+        set_output_device,
+        set_preview_device,
+        // Mixing control
+        start_mixing,
+        stop_mixing,
+        stop_preview,
+        stop_sound,
+        toggle_channel_mute,
     },
     AppState, PreviewEngine,
 };
+use tauri::menu::{Menu, MenuItem, Submenu};
+use tauri::{Emitter, Manager};
 
 /// Run the Tauri application
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -73,13 +98,9 @@ pub fn run() {
             app.manage(state);
 
             // Create application menu with Debug toggle
-            let toggle_debug = MenuItem::with_id(app, "toggle_debug", "Toggle Debug Mode", true, None::<&str>)?;
-            let app_submenu = Submenu::with_items(
-                app,
-                "Voiceboard",
-                true,
-                &[&toggle_debug],
-            )?;
+            let toggle_debug =
+                MenuItem::with_id(app, "toggle_debug", "Toggle Debug Mode", true, None::<&str>)?;
+            let app_submenu = Submenu::with_items(app, "Voiceboard", true, &[&toggle_debug])?;
             let menu = Menu::with_items(app, &[&app_submenu])?;
             app.set_menu(menu)?;
 
@@ -94,25 +115,28 @@ pub fn run() {
 
             // Start level event forwarding
             let engine_for_levels = state_ref.audio_engine.clone();
-            std::thread::spawn(move || {
-                loop {
-                    if let Ok(engine) = engine_for_levels.try_lock() {
-                        while let Some(event) = engine.try_recv_event() {
-                            match event {
-                                AudioEngineEvent::LevelUpdate { input_rms, input_peak, output_rms, output_peak } => {
-                                    let _ = app_handle.emit("audio-levels", serde_json::json!({
-                                        "inputRms": input_rms,
-                                        "inputPeak": input_peak,
-                                        "outputRms": output_rms,
-                                        "outputPeak": output_peak,
-                                    }));
-                                }
-                                _ => {}
-                            }
+            std::thread::spawn(move || loop {
+                if let Ok(engine) = engine_for_levels.try_lock() {
+                    while let Some(event) = engine.try_recv_event() {
+                        if let AudioEngineEvent::LevelUpdate {
+                                input_rms,
+                                input_peak,
+                                output_rms,
+                                output_peak,
+                            } = event {
+                            let _ = app_handle.emit(
+                                "audio-levels",
+                                serde_json::json!({
+                                    "inputRms": input_rms,
+                                    "inputPeak": input_peak,
+                                    "outputRms": output_rms,
+                                    "outputPeak": output_peak,
+                                }),
+                            );
                         }
                     }
-                    std::thread::sleep(std::time::Duration::from_millis(16));
                 }
+                std::thread::sleep(std::time::Duration::from_millis(16));
             });
 
             Ok(())

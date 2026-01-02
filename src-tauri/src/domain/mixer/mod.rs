@@ -1,7 +1,7 @@
 //! Audio mixer domain logic
 
-mod mixer_config;
 mod channel;
+mod mixer_config;
 
-pub use mixer_config::*;
 pub use channel::*;
+pub use mixer_config::*;

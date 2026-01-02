@@ -5,7 +5,10 @@
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use crossbeam_channel::{bounded, Receiver, Sender};
-use ringbuf::{HeapRb, traits::{Consumer, Producer, Split}};
+use ringbuf::{
+    traits::{Consumer, Producer, Split},
+    HeapRb,
+};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
@@ -31,10 +34,7 @@ pub enum AudioEngineCommand {
     /// Stop mixing
     Stop,
     /// Play an audio buffer (from a sound file)
-    PlaySound {
-        id: String,
-        samples: Vec<f32>,
-    },
+    PlaySound { id: String, samples: Vec<f32> },
     /// Stop a playing sound
     StopSound { id: String },
     /// Set microphone volume (0.0 - 2.0)
@@ -199,7 +199,9 @@ fn run_engine_thread(
     let audio_state = Arc::new(Mutex::new(AudioState::default()));
 
     // Ring buffer for passing audio from input to output
-    let ring_buffer = Arc::new(Mutex::new(None::<(ringbuf::HeapProd<f32>, ringbuf::HeapCons<f32>)>));
+    let ring_buffer = Arc::new(Mutex::new(
+        None::<(ringbuf::HeapProd<f32>, ringbuf::HeapCons<f32>)>,
+    ));
 
     // Atomic volume controls (for lock-free access in callbacks)
     let mic_volume = Arc::new(AtomicU32::new(f32::to_bits(1.0)));
@@ -225,9 +227,10 @@ fn run_engine_thread(
                         let input_dev = match find_device(&host, &input_device, true) {
                             Some(d) => d,
                             None => {
-                                let _ = event_tx.send(AudioEngineEvent::Error(
-                                    format!("Input device not found: {}", input_device)
-                                ));
+                                let _ = event_tx.send(AudioEngineEvent::Error(format!(
+                                    "Input device not found: {}",
+                                    input_device
+                                )));
                                 continue;
                             }
                         };
@@ -235,9 +238,10 @@ fn run_engine_thread(
                         let output_dev = match find_device(&host, &output_device, false) {
                             Some(d) => d,
                             None => {
-                                let _ = event_tx.send(AudioEngineEvent::Error(
-                                    format!("Output device not found: {}", output_device)
-                                ));
+                                let _ = event_tx.send(AudioEngineEvent::Error(format!(
+                                    "Output device not found: {}",
+                                    output_device
+                                )));
                                 continue;
                             }
                         };
@@ -271,7 +275,8 @@ fn run_engine_thread(
                             &config,
                             move |data: &[f32], _: &cpal::InputCallbackInfo| {
                                 let muted = mic_muted_clone.load(Ordering::Relaxed);
-                                let volume = f32::from_bits(mic_volume_clone.load(Ordering::Relaxed));
+                                let volume =
+                                    f32::from_bits(mic_volume_clone.load(Ordering::Relaxed));
 
                                 // Calculate RMS for input level
                                 let mut sum_squares = 0.0f32;
@@ -299,9 +304,10 @@ fn run_engine_thread(
                         let input_s = match input_result {
                             Ok(s) => s,
                             Err(e) => {
-                                let _ = event_tx.send(AudioEngineEvent::Error(
-                                    format!("Failed to create input stream: {}", e)
-                                ));
+                                let _ = event_tx.send(AudioEngineEvent::Error(format!(
+                                    "Failed to create input stream: {}",
+                                    e
+                                )));
                                 continue;
                             }
                         };
@@ -316,7 +322,8 @@ fn run_engine_thread(
                         let output_result = output_dev.build_output_stream(
                             &config,
                             move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
-                                let master_vol = f32::from_bits(master_volume_clone.load(Ordering::Relaxed));
+                                let master_vol =
+                                    f32::from_bits(master_volume_clone.load(Ordering::Relaxed));
 
                                 // First, fill with mic input from ring buffer
                                 if let Ok(mut cons) = consumer_clone.try_lock() {
@@ -338,8 +345,10 @@ fn run_engine_thread(
                                         let remaining = sound.samples.len() - sound.position;
                                         let to_mix = remaining.min(data.len());
 
-                                        for (i, sample) in data.iter_mut().take(to_mix).enumerate() {
-                                            *sample = (*sample + sound.samples[sound.position + i]).clamp(-1.0, 1.0);
+                                        for (i, sample) in data.iter_mut().take(to_mix).enumerate()
+                                        {
+                                            *sample = (*sample + sound.samples[sound.position + i])
+                                                .clamp(-1.0, 1.0);
                                         }
 
                                         sound.position += to_mix;
@@ -365,7 +374,8 @@ fn run_engine_thread(
                                 }
                                 if !data.is_empty() {
                                     let rms = (sum_squares / data.len() as f32).sqrt();
-                                    output_level_for_callback.store(rms.to_bits(), Ordering::Relaxed);
+                                    output_level_for_callback
+                                        .store(rms.to_bits(), Ordering::Relaxed);
                                 }
                             },
                             move |err| {
@@ -377,25 +387,28 @@ fn run_engine_thread(
                         let output_s = match output_result {
                             Ok(s) => s,
                             Err(e) => {
-                                let _ = event_tx.send(AudioEngineEvent::Error(
-                                    format!("Failed to create output stream: {}", e)
-                                ));
+                                let _ = event_tx.send(AudioEngineEvent::Error(format!(
+                                    "Failed to create output stream: {}",
+                                    e
+                                )));
                                 continue;
                             }
                         };
 
                         // Start streams
                         if let Err(e) = input_s.play() {
-                            let _ = event_tx.send(AudioEngineEvent::Error(
-                                format!("Failed to start input: {}", e)
-                            ));
+                            let _ = event_tx.send(AudioEngineEvent::Error(format!(
+                                "Failed to start input: {}",
+                                e
+                            )));
                             continue;
                         }
 
                         if let Err(e) = output_s.play() {
-                            let _ = event_tx.send(AudioEngineEvent::Error(
-                                format!("Failed to start output: {}", e)
-                            ));
+                            let _ = event_tx.send(AudioEngineEvent::Error(format!(
+                                "Failed to start output: {}",
+                                e
+                            )));
                             continue;
                         }
 
@@ -405,7 +418,11 @@ fn run_engine_thread(
 
                         is_running.store(true, Ordering::SeqCst);
                         let _ = event_tx.send(AudioEngineEvent::Started);
-                        tracing::info!("Audio engine started: {} -> {}", input_device, output_device);
+                        tracing::info!(
+                            "Audio engine started: {} -> {}",
+                            input_device,
+                            output_device
+                        );
 
                         // Start level monitoring thread
                         let input_level_monitor = input_level.clone();
@@ -419,8 +436,10 @@ fn run_engine_thread(
                             let decay_rate = 0.05; // ~20dB/sec at 30Hz
 
                             while is_running_monitor.load(Ordering::Relaxed) {
-                                let input_rms = f32::from_bits(input_level_monitor.load(Ordering::Relaxed));
-                                let output_rms = f32::from_bits(output_level_monitor.load(Ordering::Relaxed));
+                                let input_rms =
+                                    f32::from_bits(input_level_monitor.load(Ordering::Relaxed));
+                                let output_rms =
+                                    f32::from_bits(output_level_monitor.load(Ordering::Relaxed));
 
                                 // Update peaks
                                 if input_rms > input_peak {
@@ -442,7 +461,9 @@ fn run_engine_thread(
                                     output_peak,
                                 });
 
-                                std::thread::sleep(std::time::Duration::from_millis(LEVEL_UPDATE_INTERVAL_MS));
+                                std::thread::sleep(std::time::Duration::from_millis(
+                                    LEVEL_UPDATE_INTERVAL_MS,
+                                ));
                             }
                         });
                     }
@@ -477,10 +498,13 @@ fn run_engine_thread(
 
                     AudioEngineCommand::PlaySound { id, samples } => {
                         if let Ok(mut state) = audio_state.lock() {
-                            state.playing_sounds.insert(id, PlayingSound {
-                                samples,
-                                position: 0,
-                            });
+                            state.playing_sounds.insert(
+                                id,
+                                PlayingSound {
+                                    samples,
+                                    position: 0,
+                                },
+                            );
                         }
                     }
 
@@ -495,7 +519,8 @@ fn run_engine_thread(
                     }
 
                     AudioEngineCommand::SetMasterVolume(volume) => {
-                        master_volume.store(f32::to_bits(volume.clamp(0.0, 2.0)), Ordering::Relaxed);
+                        master_volume
+                            .store(f32::to_bits(volume.clamp(0.0, 2.0)), Ordering::Relaxed);
                     }
 
                     AudioEngineCommand::SetMicMuted(muted) => {

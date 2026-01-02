@@ -3,7 +3,9 @@
 use crate::adapters::CpalDeviceManager;
 use crate::application::audio_engine::AudioEngineCommand;
 use crate::application::AppState;
-use crate::domain::{AppSettings, AudioDevice, AudioSettings, ChannelType, DeviceType, MixerChannel, MixerConfig};
+use crate::domain::{
+    AppSettings, AudioDevice, AudioSettings, ChannelType, DeviceType, MixerChannel, MixerConfig,
+};
 use crate::ports::DeviceManager;
 use serde::{Deserialize, Serialize};
 use tauri::State;
@@ -254,7 +256,10 @@ pub async fn save_settings(
 
     // Persist to store
     let store = app.store(SETTINGS_STORE).map_err(|e| e.to_string())?;
-    store.set(SETTINGS_KEY, serde_json::to_value(&settings).map_err(|e| e.to_string())?);
+    store.set(
+        SETTINGS_KEY,
+        serde_json::to_value(&settings).map_err(|e| e.to_string())?,
+    );
     store.save().map_err(|e| e.to_string())?;
 
     tracing::info!("Settings saved");
@@ -274,20 +279,24 @@ pub async fn load_settings(
 
     // Explicitly reload from disk to ensure we have the latest data
     if let Err(e) = store.reload() {
-        tracing::warn!("Could not reload settings from disk (may be first run): {}", e);
+        tracing::warn!(
+            "Could not reload settings from disk (may be first run): {}",
+            e
+        );
     }
 
     if let Some(value) = store.get(SETTINGS_KEY) {
         tracing::info!("Found saved settings: {:?}", value);
-        let settings: AppSettingsDto = serde_json::from_value(value.clone())
-            .map_err(|e| {
-                tracing::error!("Failed to parse settings: {}", e);
-                e.to_string()
-            })?;
+        let settings: AppSettingsDto = serde_json::from_value(value.clone()).map_err(|e| {
+            tracing::error!("Failed to parse settings: {}", e);
+            e.to_string()
+        })?;
 
-        tracing::info!("Loaded settings - input: {:?}, output: {:?}",
+        tracing::info!(
+            "Loaded settings - input: {:?}, output: {:?}",
             settings.audio.input_device_id,
-            settings.audio.output_device_id);
+            settings.audio.output_device_id
+        );
 
         // Update in-memory state
         {
@@ -326,7 +335,10 @@ pub async fn set_input_device(
     let store = app.store(SETTINGS_STORE).map_err(|e| e.to_string())?;
     // Ensure store is reloaded before updating to avoid overwriting other settings
     let _ = store.reload();
-    store.set(SETTINGS_KEY, serde_json::to_value(&dto).map_err(|e| e.to_string())?);
+    store.set(
+        SETTINGS_KEY,
+        serde_json::to_value(&dto).map_err(|e| e.to_string())?,
+    );
     store.save().map_err(|e| {
         tracing::error!("Failed to save settings: {}", e);
         e.to_string()
@@ -358,7 +370,10 @@ pub async fn set_output_device(
     let store = app.store(SETTINGS_STORE).map_err(|e| e.to_string())?;
     // Ensure store is reloaded before updating to avoid overwriting other settings
     let _ = store.reload();
-    store.set(SETTINGS_KEY, serde_json::to_value(&dto).map_err(|e| e.to_string())?);
+    store.set(
+        SETTINGS_KEY,
+        serde_json::to_value(&dto).map_err(|e| e.to_string())?,
+    );
     store.save().map_err(|e| {
         tracing::error!("Failed to save settings: {}", e);
         e.to_string()
@@ -390,7 +405,10 @@ pub async fn set_preview_device(
     let store = app.store(SETTINGS_STORE).map_err(|e| e.to_string())?;
     // Ensure store is reloaded before updating to avoid overwriting other settings
     let _ = store.reload();
-    store.set(SETTINGS_KEY, serde_json::to_value(&dto).map_err(|e| e.to_string())?);
+    store.set(
+        SETTINGS_KEY,
+        serde_json::to_value(&dto).map_err(|e| e.to_string())?,
+    );
     store.save().map_err(|e| {
         tracing::error!("Failed to save settings: {}", e);
         e.to_string()
@@ -413,10 +431,7 @@ pub async fn get_mixer_config(state: State<'_, AppState>) -> Result<MixerConfigD
 
 /// Set master volume
 #[tauri::command]
-pub async fn set_master_volume(
-    state: State<'_, AppState>,
-    volume: f32,
-) -> Result<(), String> {
+pub async fn set_master_volume(state: State<'_, AppState>, volume: f32) -> Result<(), String> {
     let clamped_volume = volume.clamp(0.0, 1.0);
 
     // Update mixer config
@@ -474,10 +489,7 @@ pub async fn add_audio_file_channel(
 
 /// Remove a channel
 #[tauri::command]
-pub async fn remove_channel(
-    state: State<'_, AppState>,
-    channel_id: String,
-) -> Result<(), String> {
+pub async fn remove_channel(state: State<'_, AppState>, channel_id: String) -> Result<(), String> {
     let mut config = state.mixer_config.write().await;
     config
         .remove_channel(&channel_id)
@@ -585,7 +597,7 @@ pub struct SoundFileDto {
     pub id: String,
     pub name: String,
     pub path: String,
-    pub duration: f64,      // Duration in seconds
+    pub duration: f64, // Duration in seconds
     pub sample_rate: u32,
     pub channels: u16,
 }
@@ -633,18 +645,32 @@ pub async fn load_sound_file(path: String) -> Result<SoundFileDto, String> {
 
     let sample_rate = decoder.sample_rate();
     let channels = decoder.channels();
-    tracing::info!("[load_sound_file] Audio info: {}Hz, {} channels", sample_rate, channels);
+    tracing::info!(
+        "[load_sound_file] Audio info: {}Hz, {} channels",
+        sample_rate,
+        channels
+    );
 
     // Get duration in seconds
-    let duration = decoder.total_duration()
+    let duration = decoder
+        .total_duration()
         .map(|d| d.as_secs_f64())
         .unwrap_or(0.0);
     tracing::info!("[load_sound_file] Duration: {:.2}s", duration);
 
     // Generate unique ID
-    let id = format!("sound_{}", &uuid::Uuid::new_v4().to_string().replace("-", "")[..8]);
+    let id = format!(
+        "sound_{}",
+        &uuid::Uuid::new_v4().to_string().replace("-", "")[..8]
+    );
 
-    tracing::info!("[load_sound_file] Success: {} ({:.1}s, {}Hz, {}ch)", name, duration, sample_rate, channels);
+    tracing::info!(
+        "[load_sound_file] Success: {} ({:.1}s, {}Hz, {}ch)",
+        name,
+        duration,
+        sample_rate,
+        channels
+    );
 
     Ok(SoundFileDto {
         id,
@@ -671,8 +697,8 @@ pub async fn play_sound(
     let file = File::open(&path).map_err(|e| format!("Failed to open file: {}", e))?;
     let reader = BufReader::new(file);
 
-    let decoder = rodio::Decoder::new(reader)
-        .map_err(|e| format!("Failed to decode audio file: {}", e))?;
+    let decoder =
+        rodio::Decoder::new(reader).map_err(|e| format!("Failed to decode audio file: {}", e))?;
 
     // Get format info
     let sample_rate = decoder.sample_rate();
@@ -692,8 +718,13 @@ pub async fn play_sound(
         .send_command(AudioEngineCommand::PlaySound { id, samples })
         .map_err(|e| format!("Failed to play sound: {}", e))?;
 
-    tracing::info!("Playing sound: {} ({} samples, {}Hz, {} ch)",
-        path, samples_len, sample_rate, channels);
+    tracing::info!(
+        "Playing sound: {} ({} samples, {}Hz, {} ch)",
+        path,
+        samples_len,
+        sample_rate,
+        channels
+    );
 
     Ok(())
 }
@@ -742,10 +773,7 @@ pub async fn get_preview_state(state: State<'_, AppState>) -> Result<Option<Stri
 
 /// Stop a playing sound
 #[tauri::command]
-pub async fn stop_sound(
-    state: State<'_, AppState>,
-    id: String,
-) -> Result<(), String> {
+pub async fn stop_sound(state: State<'_, AppState>, id: String) -> Result<(), String> {
     let engine = state.audio_engine.lock().await;
     engine
         .send_command(AudioEngineCommand::StopSound { id })
@@ -756,10 +784,7 @@ pub async fn stop_sound(
 
 /// Set microphone volume (0.0 - 2.0)
 #[tauri::command]
-pub async fn set_mic_volume(
-    state: State<'_, AppState>,
-    volume: f32,
-) -> Result<(), String> {
+pub async fn set_mic_volume(state: State<'_, AppState>, volume: f32) -> Result<(), String> {
     let engine = state.audio_engine.lock().await;
     engine
         .send_command(AudioEngineCommand::SetMicVolume(volume))
@@ -770,10 +795,7 @@ pub async fn set_mic_volume(
 
 /// Mute/unmute microphone
 #[tauri::command]
-pub async fn set_mic_muted(
-    state: State<'_, AppState>,
-    muted: bool,
-) -> Result<(), String> {
+pub async fn set_mic_muted(state: State<'_, AppState>, muted: bool) -> Result<(), String> {
     let engine = state.audio_engine.lock().await;
     engine
         .send_command(AudioEngineCommand::SetMicMuted(muted))
@@ -791,10 +813,7 @@ const SOUNDBOARD_KEY: &str = "pads";
 
 /// Save soundboard pads to persistent storage
 #[tauri::command]
-pub async fn save_soundboard(
-    app: tauri::AppHandle,
-    pads: serde_json::Value,
-) -> Result<(), String> {
+pub async fn save_soundboard(app: tauri::AppHandle, pads: serde_json::Value) -> Result<(), String> {
     let store = app.store(SOUNDBOARD_STORE).map_err(|e| e.to_string())?;
     store.set(SOUNDBOARD_KEY, pads);
     store.save().map_err(|e| e.to_string())?;
@@ -804,9 +823,7 @@ pub async fn save_soundboard(
 
 /// Load soundboard pads from persistent storage
 #[tauri::command]
-pub async fn load_soundboard(
-    app: tauri::AppHandle,
-) -> Result<Option<serde_json::Value>, String> {
+pub async fn load_soundboard(app: tauri::AppHandle) -> Result<Option<serde_json::Value>, String> {
     let store = app.store(SOUNDBOARD_STORE).map_err(|e| e.to_string())?;
     #[allow(clippy::map_clone)]
     let pads = store.get(SOUNDBOARD_KEY).map(|v| v.clone());
@@ -923,7 +940,7 @@ pub async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
             |downloaded, total| {
                 if let Some(total) = total {
                     let percent = (downloaded as f64 / total as f64 * 100.0) as u32;
-                    if percent % 25 == 0 {
+                    if percent.is_multiple_of(25) {
                         tracing::debug!(
                             downloaded_bytes = downloaded,
                             total_bytes = total,
@@ -995,9 +1012,7 @@ pub fn set_debug_mode(app: tauri::AppHandle, enabled: bool) -> Result<(), String
 /// Get Sentry DSN (runtime env var)
 #[tauri::command]
 pub fn get_sentry_dsn() -> Option<String> {
-    std::env::var("SENTRY_DSN")
-        .ok()
-        .filter(|s| !s.is_empty())
+    std::env::var("SENTRY_DSN").ok().filter(|s| !s.is_empty())
 }
 
 // ============================================================================
@@ -1020,13 +1035,27 @@ pub async fn check_vb_cable_installed() -> Result<VbCableStatus, String> {
     // First, log all output devices for debugging
     match manager.list_devices() {
         Ok(all_devices) => {
-            let output_devices: Vec<_> = all_devices.iter()
-                .filter(|d| matches!(d.device_type(), crate::domain::DeviceType::OutputPhysical | crate::domain::DeviceType::OutputVirtual))
+            let output_devices: Vec<_> = all_devices
+                .iter()
+                .filter(|d| {
+                    matches!(
+                        d.device_type(),
+                        crate::domain::DeviceType::OutputPhysical
+                            | crate::domain::DeviceType::OutputVirtual
+                    )
+                })
                 .collect();
-            tracing::info!("[check_vb_cable] Found {} output devices:", output_devices.len());
+            tracing::info!(
+                "[check_vb_cable] Found {} output devices:",
+                output_devices.len()
+            );
             for dev in &output_devices {
-                tracing::info!("[check_vb_cable]   - {} (type: {:?}, virtual: {})",
-                    dev.name(), dev.device_type(), dev.device_type().is_virtual());
+                tracing::info!(
+                    "[check_vb_cable]   - {} (type: {:?}, virtual: {})",
+                    dev.name(),
+                    dev.device_type(),
+                    dev.device_type().is_virtual()
+                );
             }
         }
         Err(e) => {
@@ -1036,7 +1065,10 @@ pub async fn check_vb_cable_installed() -> Result<VbCableStatus, String> {
 
     match manager.find_virtual_outputs() {
         Ok(devices) => {
-            tracing::info!("[check_vb_cable] Virtual output devices found: {}", devices.len());
+            tracing::info!(
+                "[check_vb_cable] Virtual output devices found: {}",
+                devices.len()
+            );
             for dev in &devices {
                 tracing::info!("[check_vb_cable]   Virtual: {}", dev.name());
             }
@@ -1048,7 +1080,9 @@ pub async fn check_vb_cable_installed() -> Result<VbCableStatus, String> {
                     device_name: Some(device.name().to_string()),
                 })
             } else {
-                tracing::info!("[check_vb_cable] No virtual output devices found - VB-Cable not installed");
+                tracing::info!(
+                    "[check_vb_cable] No virtual output devices found - VB-Cable not installed"
+                );
                 Ok(VbCableStatus {
                     installed: false,
                     device_name: None,
@@ -1069,8 +1103,8 @@ pub async fn check_vb_cable_installed() -> Result<VbCableStatus, String> {
 /// Returns Ok(()) on success, Err with message on failure
 #[tauri::command]
 pub async fn download_and_install_vb_cable(_app: tauri::AppHandle) -> Result<(), String> {
-
-    const VB_CABLE_URL: &str = "https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack43.zip";
+    const VB_CABLE_URL: &str =
+        "https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack43.zip";
 
     tracing::info!("Starting VB-Cable download");
 
@@ -1087,21 +1121,30 @@ pub async fn download_and_install_vb_cable(_app: tauri::AppHandle) -> Result<(),
         .map_err(|e| format!("Download failed: {}", e))?;
 
     if !response.status().is_success() {
-        return Err(format!("Download failed with status: {}", response.status()));
+        return Err(format!(
+            "Download failed with status: {}",
+            response.status()
+        ));
     }
 
-    let bytes = response.bytes().await.map_err(|e| format!("Failed to read response: {}", e))?;
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| format!("Failed to read response: {}", e))?;
 
     // Write ZIP to disk
     std::fs::write(&zip_path, &bytes).map_err(|e| format!("Failed to save ZIP: {}", e))?;
     tracing::info!(path = ?zip_path, "ZIP downloaded");
 
     // Extract ZIP
-    let zip_file = std::fs::File::open(&zip_path).map_err(|e| format!("Failed to open ZIP: {}", e))?;
+    let zip_file =
+        std::fs::File::open(&zip_path).map_err(|e| format!("Failed to open ZIP: {}", e))?;
     let mut archive = zip::ZipArchive::new(zip_file).map_err(|e| format!("Invalid ZIP: {}", e))?;
 
     for i in 0..archive.len() {
-        let mut file = archive.by_index(i).map_err(|e| format!("ZIP error: {}", e))?;
+        let mut file = archive
+            .by_index(i)
+            .map_err(|e| format!("ZIP error: {}", e))?;
         let outpath = temp_dir.join(file.name());
 
         if file.is_dir() {
@@ -1144,8 +1187,8 @@ fn run_installer(path: &std::path::Path) -> Result<(), String> {
 
     #[cfg(target_os = "windows")]
     {
-        use std::process::Command;
         use std::os::windows::process::CommandExt;
+        use std::process::Command;
 
         // CREATE_NO_WINDOW flag
         const CREATE_NO_WINDOW: u32 = 0x08000000;
