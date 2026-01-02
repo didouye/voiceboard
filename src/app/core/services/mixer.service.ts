@@ -36,7 +36,7 @@ export class MixerService {
   constructor(private tauri: TauriService) {}
 
   /**
-   * Initialize the mixer service
+   * Initialize the mixer service and auto-start if config is valid
    */
   async initialize(): Promise<void> {
     this._loading.set(true);
@@ -55,6 +55,20 @@ export class MixerService {
       this._devices.set(devices);
       this._virtualDriverInstalled.set(virtualDriver);
       this._isRunning.set(isMixing);
+
+      // Auto-start if not already running and config is valid
+      if (!isMixing) {
+        const settings = await this.tauri.loadSettings();
+        const hasInput = !!settings.audio.inputDeviceId;
+        const hasOutput = !!settings.audio.outputDeviceId;
+
+        if (hasInput && hasOutput) {
+          console.log('[MixerService] Auto-starting mixer...');
+          await this.start();
+        } else {
+          console.log('[MixerService] Cannot auto-start: missing input or output device');
+        }
+      }
     } catch (err) {
       this._error.set(err instanceof Error ? err.message : 'Initialization failed');
       console.error('Failed to initialize mixer:', err);
@@ -177,6 +191,24 @@ export class MixerService {
       this._isRunning.set(false);
     } catch (err) {
       this._error.set(err instanceof Error ? err.message : 'Failed to stop mixing');
+    }
+  }
+
+  /**
+   * Restart mixing silently if currently running
+   * Used when device configuration changes
+   */
+  async restartIfRunning(): Promise<void> {
+    if (this._isRunning()) {
+      console.log('[MixerService] Restarting mixer silently...');
+      try {
+        await this.tauri.stopMixing();
+        await this.tauri.startMixing();
+        console.log('[MixerService] Mixer restarted successfully');
+      } catch (err) {
+        this._error.set(err instanceof Error ? err.message : 'Failed to restart mixer');
+        this._isRunning.set(false);
+      }
     }
   }
 
