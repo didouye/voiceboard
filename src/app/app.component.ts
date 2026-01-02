@@ -1,10 +1,12 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { invoke } from '@tauri-apps/api/core';
 import { MixerComponent } from './features/mixer/mixer.component';
 import { ToastComponent } from './core/components/toast/toast.component';
 import { DebugConsoleComponent } from './core/components/debug-console/debug-console.component';
+import { SetupWizardComponent } from './core/components/setup-wizard/setup-wizard.component';
 import { ToastService } from './core/services/toast.service';
 import { DebugConsoleService } from './core/services/debug-console.service';
+import { SetupWizardService } from './core/services/setup-wizard.service';
 
 interface UpdateInfo {
   available: boolean;
@@ -15,9 +17,13 @@ interface UpdateInfo {
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [MixerComponent, ToastComponent, DebugConsoleComponent],
+  imports: [MixerComponent, ToastComponent, DebugConsoleComponent, SetupWizardComponent],
   template: `
-    <app-mixer />
+    @if (showSetupWizard()) {
+      <app-setup-wizard (completed)="onSetupCompleted($event)" />
+    } @else {
+      <app-mixer />
+    }
     <app-toast />
     <app-debug-console />
   `,
@@ -31,9 +37,39 @@ interface UpdateInfo {
 export class AppComponent implements OnInit {
   private toastService = inject(ToastService);
   private debugConsole = inject(DebugConsoleService);
+  private setupWizard = inject(SetupWizardService);
+
+  showSetupWizard = signal(false);
 
   async ngOnInit() {
+    // Check VB-Cable first (Windows only)
+    if (await this.isWindows()) {
+      const hasVbCable = await this.setupWizard.checkVbCable();
+      if (!hasVbCable && this.setupWizard.state().step !== 'skipped') {
+        this.showSetupWizard.set(true);
+        return; // Don't continue initialization
+      }
+    }
+
+    // Continue normal startup
     await this.checkForUpdate();
+  }
+
+  private async isWindows(): Promise<boolean> {
+    try {
+      const { platform } = await import('@tauri-apps/plugin-os');
+      return (await platform()) === 'windows';
+    } catch {
+      return false;
+    }
+  }
+
+  onSetupCompleted(installed: boolean) {
+    this.showSetupWizard.set(false);
+    if (!installed) {
+      this.debugConsole.log('warn', 'VB-Cable not installed - some features may be limited');
+    }
+    this.checkForUpdate();
   }
 
   private async checkForUpdate() {
