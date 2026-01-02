@@ -18,8 +18,15 @@
 - [x] Sound preview on system output with device selection
 - [x] Level visualization (VU meters) - Real-time audio levels display
 
+### To Do (Priority)
+- [ ] **VB-Audio Virtual Cable Bundling** (Windows)
+  - Detect if VB-Cable is installed during Voiceboard installation
+  - Download VB-Cable installer from official website if not present
+  - Launch VB-Cable installer automatically
+  - Guide user through virtual audio setup
+
 ### To Do
-- [ ] Virtual microphone output - Send mixed audio to Virtual Audio Driver
+- [ ] Virtual microphone output - Send mixed audio to VB-Cable
 - [ ] Mic monitoring on preview output - Hear your own microphone in preview
 - [ ] Unit and integration tests - Increase test coverage
 - [ ] Individual volume control per pad in UI

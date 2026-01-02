@@ -33,7 +33,7 @@ Download the latest release for your platform:
 
 ### Virtual Audio Driver (Required for virtual microphone output)
 
-- **Windows**: [VB-Audio Virtual Cable](https://vb-audio.com/Cable/) or [Virtual Audio Driver](https://github.com/VirtualDrivers/Virtual-Audio-Driver)
+- **Windows**: [VB-Audio Virtual Cable](https://vb-audio.com/Cable/) (free, will be bundled in future versions)
 - **macOS**: [BlackHole](https://existential.audio/blackhole/) (free) or [Loopback](https://rogueamoeba.com/loopback/)
 - **Linux**: PulseAudio/PipeWire virtual sink (built-in)
 
