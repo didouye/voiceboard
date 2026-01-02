@@ -66,6 +66,14 @@
   - Debug console UI (accessible via help icon in footer)
 
 ### To Do
+- [ ] **GitHub Pages Landing Page**
+  - Product presentation with features overview
+  - Download section with latest release
+  - OS detection to highlight matching download (Windows/macOS/Linux)
+  - Tailwind CSS for styling
+  - Responsive design (mobile-friendly)
+  - Auto-update download links from GitHub Releases API
+
 - [ ] **Windows Installer Improvements**
   - Bundled Virtual Audio Driver
 
