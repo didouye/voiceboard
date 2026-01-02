@@ -240,9 +240,16 @@ pub async fn get_virtual_outputs_by_priority() -> ApiResponse<Vec<AudioDeviceDto
 
     match manager.find_virtual_outputs_by_priority() {
         Ok(devices) => {
-            tracing::info!("[get_virtual_outputs_by_priority] Found {} virtual outputs", devices.len());
+            tracing::info!(
+                "[get_virtual_outputs_by_priority] Found {} virtual outputs",
+                devices.len()
+            );
             for (i, dev) in devices.iter().enumerate() {
-                tracing::info!("[get_virtual_outputs_by_priority]   {}: {}", i + 1, dev.name());
+                tracing::info!(
+                    "[get_virtual_outputs_by_priority]   {}: {}",
+                    i + 1,
+                    dev.name()
+                );
             }
             let dtos: Vec<AudioDeviceDto> = devices.into_iter().map(AudioDeviceDto::from).collect();
             ApiResponse::ok(dtos)
