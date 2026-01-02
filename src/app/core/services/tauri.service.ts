@@ -55,6 +55,28 @@ export class TauriService {
   }
 
   /**
+   * Get physical output devices (speakers, headphones - for preview/monitoring)
+   */
+  async getPhysicalOutputDevices(): Promise<AudioDevice[]> {
+    const response = await invoke<ApiResponse<AudioDevice[]>>('get_physical_output_devices');
+    if (!response.success || !response.data) {
+      throw new Error(response.error || 'Failed to get physical output devices');
+    }
+    return this.mapDevices(response.data);
+  }
+
+  /**
+   * Get virtual output devices sorted by priority (VB-Cable first)
+   */
+  async getVirtualOutputsByPriority(): Promise<AudioDevice[]> {
+    const response = await invoke<ApiResponse<AudioDevice[]>>('get_virtual_outputs_by_priority');
+    if (!response.success || !response.data) {
+      throw new Error(response.error || 'Failed to get virtual outputs by priority');
+    }
+    return this.mapDevices(response.data);
+  }
+
+  /**
    * Check if virtual audio driver is installed
    */
   async checkVirtualDriver(): Promise<boolean> {
