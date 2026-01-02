@@ -186,6 +186,11 @@ impl CpalDeviceManager {
     pub fn find_physical_inputs(&self) -> Result<Vec<AudioDevice>, DeviceManagerError> {
         self.list_devices_by_type(DeviceType::InputPhysical)
     }
+
+    /// Find physical output devices (speakers, headphones - for preview/monitoring)
+    pub fn find_physical_outputs(&self) -> Result<Vec<AudioDevice>, DeviceManagerError> {
+        self.list_devices_by_type(DeviceType::OutputPhysical)
+    }
 }
 
 impl Default for CpalDeviceManager {

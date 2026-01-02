@@ -219,6 +219,20 @@ pub async fn get_virtual_output_devices() -> ApiResponse<Vec<AudioDeviceDto>> {
     }
 }
 
+/// Get physical output devices (speakers, headphones - for preview/monitoring)
+#[tauri::command]
+pub async fn get_physical_output_devices() -> ApiResponse<Vec<AudioDeviceDto>> {
+    let manager = CpalDeviceManager::new();
+
+    match manager.find_physical_outputs() {
+        Ok(devices) => {
+            let dtos: Vec<AudioDeviceDto> = devices.into_iter().map(AudioDeviceDto::from).collect();
+            ApiResponse::ok(dtos)
+        }
+        Err(e) => ApiResponse::err(e.to_string()),
+    }
+}
+
 /// Check if virtual audio driver is installed
 #[tauri::command]
 pub async fn check_virtual_driver() -> ApiResponse<bool> {

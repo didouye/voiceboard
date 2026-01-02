@@ -38,6 +38,7 @@ use application::{
         get_input_devices,
         // Mixer configuration
         get_mixer_config,
+        get_physical_output_devices,
         get_preview_state,
         get_sentry_dsn,
         // Settings
@@ -161,6 +162,7 @@ pub fn run() {
             get_audio_devices,
             get_input_devices,
             get_virtual_output_devices,
+            get_physical_output_devices,
             check_virtual_driver,
             // Settings
             get_settings,
