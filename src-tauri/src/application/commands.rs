@@ -1039,3 +1039,106 @@ pub async fn check_vb_cable_installed() -> Result<VbCableStatus, String> {
         }
     }
 }
+
+/// Download and install VB-Cable
+/// Returns Ok(()) on success, Err with message on failure
+#[tauri::command]
+pub async fn download_and_install_vb_cable(_app: tauri::AppHandle) -> Result<(), String> {
+
+    const VB_CABLE_URL: &str = "https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack43.zip";
+
+    tracing::info!("Starting VB-Cable download");
+
+    // Get temp directory
+    let temp_dir = std::env::temp_dir().join("voiceboard").join("vbcable");
+    std::fs::create_dir_all(&temp_dir).map_err(|e| format!("Failed to create temp dir: {}", e))?;
+
+    let zip_path = temp_dir.join("VBCABLE_Driver_Pack.zip");
+
+    // Download ZIP file
+    tracing::info!(url = VB_CABLE_URL, "Downloading VB-Cable");
+    let response = reqwest::get(VB_CABLE_URL)
+        .await
+        .map_err(|e| format!("Download failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("Download failed with status: {}", response.status()));
+    }
+
+    let bytes = response.bytes().await.map_err(|e| format!("Failed to read response: {}", e))?;
+
+    // Write ZIP to disk
+    std::fs::write(&zip_path, &bytes).map_err(|e| format!("Failed to save ZIP: {}", e))?;
+    tracing::info!(path = ?zip_path, "ZIP downloaded");
+
+    // Extract ZIP
+    let zip_file = std::fs::File::open(&zip_path).map_err(|e| format!("Failed to open ZIP: {}", e))?;
+    let mut archive = zip::ZipArchive::new(zip_file).map_err(|e| format!("Invalid ZIP: {}", e))?;
+
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i).map_err(|e| format!("ZIP error: {}", e))?;
+        let outpath = temp_dir.join(file.name());
+
+        if file.is_dir() {
+            std::fs::create_dir_all(&outpath).ok();
+        } else {
+            if let Some(parent) = outpath.parent() {
+                std::fs::create_dir_all(parent).ok();
+            }
+            let mut outfile = std::fs::File::create(&outpath)
+                .map_err(|e| format!("Failed to create file: {}", e))?;
+            std::io::copy(&mut file, &mut outfile)
+                .map_err(|e| format!("Failed to extract file: {}", e))?;
+        }
+    }
+    tracing::info!("ZIP extracted");
+
+    // Find and run installer
+    let installer_path = temp_dir.join("VBCABLE_Setup_x64.exe");
+    if !installer_path.exists() {
+        // Try alternative name
+        let alt_path = temp_dir.join("VBCABLE_Setup.exe");
+        if alt_path.exists() {
+            run_installer(&alt_path)?;
+        } else {
+            return Err("Installer not found in ZIP".to_string());
+        }
+    } else {
+        run_installer(&installer_path)?;
+    }
+
+    // Cleanup
+    let _ = std::fs::remove_dir_all(&temp_dir);
+
+    tracing::info!("VB-Cable installation completed");
+    Ok(())
+}
+
+fn run_installer(path: &std::path::Path) -> Result<(), String> {
+    tracing::info!(path = ?path, "Running VB-Cable installer");
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+        use std::os::windows::process::CommandExt;
+
+        // CREATE_NO_WINDOW flag
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+        let status = Command::new(path)
+            .creation_flags(CREATE_NO_WINDOW)
+            .status()
+            .map_err(|e| format!("Failed to run installer: {}", e))?;
+
+        if !status.success() {
+            return Err(format!("Installer exited with code: {:?}", status.code()));
+        }
+
+        Ok(())
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("VB-Cable installation is only supported on Windows".to_string())
+    }
+}
