@@ -1,5 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { invoke } from '@tauri-apps/api/core';
+import { getVersion } from '@tauri-apps/api/app';
 import { MixerComponent } from './features/mixer/mixer.component';
 import { ToastComponent } from './core/components/toast/toast.component';
 import { DebugConsoleComponent } from './core/components/debug-console/debug-console.component';
@@ -42,17 +43,40 @@ export class AppComponent implements OnInit {
   showSetupWizard = signal(false);
 
   async ngOnInit() {
+    // Log startup info
+    await this.logStartupInfo();
+
     // Check VB-Cable first (Windows only)
-    if (await this.isWindows()) {
+    const isWin = await this.isWindows();
+    this.debugConsole.log('info', `Platform check: isWindows=${isWin}`);
+
+    if (isWin) {
+      this.debugConsole.log('info', 'Checking VB-Cable installation...');
       const hasVbCable = await this.setupWizard.checkVbCable();
+      this.debugConsole.log('info', `VB-Cable check result: installed=${hasVbCable}`);
+
       if (!hasVbCable && this.setupWizard.state().step !== 'skipped') {
+        this.debugConsole.log('info', 'Showing setup wizard (VB-Cable not found)');
         this.showSetupWizard.set(true);
         return; // Don't continue initialization
       }
+    } else {
+      this.debugConsole.log('info', 'Skipping VB-Cable check (not Windows)');
     }
 
     // Continue normal startup
     await this.checkForUpdate();
+  }
+
+  private async logStartupInfo() {
+    try {
+      const version = await getVersion();
+      const { platform } = await import('@tauri-apps/plugin-os');
+      const platformName = await platform();
+      this.debugConsole.log('info', `Voiceboard v${version} starting on ${platformName}`);
+    } catch (error) {
+      this.debugConsole.log('warn', 'Could not get app info');
+    }
   }
 
   private async isWindows(): Promise<boolean> {
