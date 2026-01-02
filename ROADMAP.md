@@ -55,10 +55,13 @@
   - Release tracking with version tags
   - Debug console UI (accessible via help icon in footer)
 
-- [ ] **Auto-Update Debugging**
-  - Add detailed logging for update process
-  - Send update errors to Sentry
-  - Investigate "Update failed" error
+### Done (Phase 2 continued)
+- [x] **Auto-Update Signing**
+  - Generated signing keypair for update verification
+  - Configured pubkey in tauri.conf.json
+  - CI generates signed artifacts with .sig files
+  - latest.json includes signatures for macOS and Windows
+  - Fixed "Update failed" error (was caused by missing signatures)
 
 ### To Do
 - [ ] **Windows Installer Improvements**
