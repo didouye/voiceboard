@@ -23,49 +23,17 @@ import { AudioDevice, AppSettings } from '../../core/models';
             <span class="label-icon">🎤</span>
             <span class="label-text">Input Device (Microphone)</span>
           </label>
-          <select
-            (change)="onInputDeviceChange($event)"
-            class="device-select"
-          >
-            <option value="" [selected]="!selectedInputId()">-- Select Microphone --</option>
-            @for (device of inputDevices(); track device.id) {
-              <option [value]="device.id" [selected]="device.id === selectedInputId()">
-                {{ device.name }}
-                @if (device.isDefault) { (Default) }
-              </option>
-            }
-          </select>
           @if (inputDevices().length === 0) {
-            <p class="no-devices">No input devices found</p>
-          }
-        </div>
-
-        <!-- Output Device Selection -->
-        <div class="device-group">
-          <label>
-            <span class="label-icon">🔊</span>
-            <span class="label-text">Output Device (Virtual Microphone)</span>
-          </label>
-          <select
-            (change)="onOutputDeviceChange($event)"
-            class="device-select"
-          >
-            <option value="" [selected]="!selectedOutputId()">-- Select Virtual Device --</option>
-            @for (device of outputDevices(); track device.id) {
-              <option [value]="device.id" [selected]="device.id === selectedOutputId()">
-                {{ device.name }}
-                @if (device.isDefault) { (Default) }
-              </option>
-            }
-          </select>
-          @if (outputDevices().length === 0) {
-            <div class="warning">
-              <span class="warning-icon">⚠️</span>
-              <span>No virtual audio device found.</span>
-              <a href="https://github.com/VirtualDrivers/Virtual-Audio-Driver" target="_blank">
-                Install Virtual Audio Driver
-              </a>
-            </div>
+            <div class="no-device-warning">No input device available</div>
+          } @else {
+            <select (change)="onInputDeviceChange($event)" class="device-select">
+              <option value="" [selected]="!selectedInputId()">-- Select Microphone --</option>
+              @for (device of inputDevices(); track device.id) {
+                <option [value]="device.id" [selected]="device.id === selectedInputId()">
+                  {{ device.name }} @if (device.isDefault) { (Default) }
+                </option>
+              }
+            </select>
           }
         </div>
 
@@ -75,25 +43,46 @@ import { AudioDevice, AppSettings } from '../../core/models';
             <span class="label-icon">🎧</span>
             <span class="label-text">Preview Output (Monitoring)</span>
           </label>
-          <select
-            (change)="onPreviewDeviceChange($event)"
-            class="device-select"
-          >
+          <select (change)="onPreviewDeviceChange($event)" class="device-select">
             <option value="" [selected]="!selectedPreviewId()">-- System Default --</option>
-            @for (device of outputDevices(); track device.id) {
+            @for (device of physicalOutputDevices(); track device.id) {
               <option [value]="device.id" [selected]="device.id === selectedPreviewId()">
-                {{ device.name }}
-                @if (device.isDefault) { (Default) }
+                {{ device.name }} @if (device.isDefault) { (Default) }
               </option>
             }
           </select>
         </div>
 
+        <!-- Virtual Output Selection (only if multiple) -->
+        @if (showVirtualOutputSelector()) {
+          <div class="device-group">
+            <label>
+              <span class="label-icon">🔊</span>
+              <span class="label-text">Virtual Output</span>
+            </label>
+            <select (change)="onOutputDeviceChange($event)" class="device-select">
+              @for (device of virtualOutputDevices(); track device.id) {
+                <option [value]="device.id" [selected]="device.id === selectedOutputId()">
+                  {{ device.name }}
+                </option>
+              }
+            </select>
+          </div>
+        }
+
         <!-- Status -->
         <div class="status-section">
-          <div class="status-item" [class.ready]="isConfigured()">
+          <div class="status-item" [class.ready]="isConfigured()" [class.error]="inputDevices().length === 0">
             <span class="status-dot"></span>
-            <span>{{ isConfigured() ? 'Ready to mix' : 'Select both devices to start' }}</span>
+            <span>
+              @if (inputDevices().length === 0) {
+                No input device
+              } @else if (isConfigured()) {
+                Ready to mix
+              } @else {
+                Select devices to start
+              }
+            </span>
           </div>
         </div>
 
@@ -176,6 +165,15 @@ import { AudioDevice, AppSettings } from '../../core/models';
       margin: 8px 0 0;
     }
 
+    .no-device-warning {
+      padding: 12px 15px;
+      background: rgba(231, 76, 60, 0.1);
+      border: 1px solid rgba(231, 76, 60, 0.3);
+      border-radius: 8px;
+      color: #e74c3c;
+      font-size: 0.9rem;
+    }
+
     .warning {
       display: flex;
       align-items: center;
@@ -223,6 +221,14 @@ import { AudioDevice, AppSettings } from '../../core/models';
       color: #2ecc71;
     }
 
+    .status-item.error .status-dot {
+      background: #e74c3c;
+    }
+
+    .status-item.error {
+      color: #e74c3c;
+    }
+
     .btn-refresh {
       width: 100%;
       padding: 12px;
@@ -245,14 +251,16 @@ import { AudioDevice, AppSettings } from '../../core/models';
 export class DeviceSelectorComponent implements OnInit {
   // State
   private _inputDevices = signal<AudioDevice[]>([]);
-  private _outputDevices = signal<AudioDevice[]>([]);
+  private _virtualOutputDevices = signal<AudioDevice[]>([]);
+  private _physicalOutputDevices = signal<AudioDevice[]>([]);
   private _settings = signal<AppSettings | null>(null);
   private _loading = signal(true);
   private _error = signal<string | null>(null);
 
   // Public signals
   readonly inputDevices = this._inputDevices.asReadonly();
-  readonly outputDevices = this._outputDevices.asReadonly();
+  readonly virtualOutputDevices = this._virtualOutputDevices.asReadonly();
+  readonly physicalOutputDevices = this._physicalOutputDevices.asReadonly();
   readonly loading = this._loading.asReadonly();
   readonly error = this._error.asReadonly();
 
@@ -260,6 +268,7 @@ export class DeviceSelectorComponent implements OnInit {
   readonly selectedInputId = computed(() => this._settings()?.audio.inputDeviceId ?? '');
   readonly selectedOutputId = computed(() => this._settings()?.audio.outputDeviceId ?? '');
   readonly selectedPreviewId = computed(() => this._settings()?.audio.previewDeviceId ?? '');
+  readonly showVirtualOutputSelector = computed(() => this._virtualOutputDevices().length > 1);
   readonly isConfigured = computed(() => {
     const settings = this._settings();
     return !!(settings?.audio.inputDeviceId && settings?.audio.outputDeviceId);
@@ -276,37 +285,23 @@ export class DeviceSelectorComponent implements OnInit {
     this._error.set(null);
 
     try {
-      console.log('[DeviceSelector] Loading devices and settings...');
-
-      const [inputDevices, allDevices, settings] = await Promise.all([
+      const [inputDevices, physicalOutputs, virtualOutputs, settings] = await Promise.all([
         this.tauri.getInputDevices(),
-        this.tauri.getAudioDevices(),
+        this.tauri.getPhysicalOutputDevices(),
+        this.tauri.getVirtualOutputsByPriority(),
         this.tauri.loadSettings()
       ]);
 
-      console.log('[DeviceSelector] Loaded settings:', settings);
-      console.log('[DeviceSelector] Input device from settings:', settings.audio.inputDeviceId);
-      console.log('[DeviceSelector] Output device from settings:', settings.audio.outputDeviceId);
-
       this._inputDevices.set(inputDevices);
-
-      // Filter output devices (we want physical outputs + virtual outputs)
-      // For sending to virtual mic, we need output devices
-      const outputDevices = allDevices.filter(d =>
-        d.deviceType === 'OutputVirtual' || d.deviceType === 'OutputPhysical'
-      );
-      this._outputDevices.set(outputDevices);
-
-      console.log('[DeviceSelector] Input devices available:', inputDevices.map(d => d.id));
-      console.log('[DeviceSelector] Output devices available:', outputDevices.map(d => d.id));
-
+      this._physicalOutputDevices.set(physicalOutputs);
+      this._virtualOutputDevices.set(virtualOutputs);
       this._settings.set(settings);
 
-      console.log('[DeviceSelector] Selected input:', this.selectedInputId());
-      console.log('[DeviceSelector] Selected output:', this.selectedOutputId());
+      console.log('[DeviceSelector] Input devices:', inputDevices.length);
+      console.log('[DeviceSelector] Physical outputs:', physicalOutputs.length);
+      console.log('[DeviceSelector] Virtual outputs:', virtualOutputs.length);
     } catch (err) {
       this._error.set(err instanceof Error ? err.message : 'Failed to load devices');
-      console.error('Failed to load devices:', err);
     } finally {
       this._loading.set(false);
     }
