@@ -119,11 +119,12 @@ pub fn run() {
                 if let Ok(engine) = engine_for_levels.try_lock() {
                     while let Some(event) = engine.try_recv_event() {
                         if let AudioEngineEvent::LevelUpdate {
-                                input_rms,
-                                input_peak,
-                                output_rms,
-                                output_peak,
-                            } = event {
+                            input_rms,
+                            input_peak,
+                            output_rms,
+                            output_peak,
+                        } = event
+                        {
                             let _ = app_handle.emit(
                                 "audio-levels",
                                 serde_json::json!({

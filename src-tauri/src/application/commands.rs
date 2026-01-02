@@ -1026,15 +1026,15 @@ pub struct VbCableStatus {
     pub device_name: Option<String>,
 }
 
-/// Check if VB-Cable or any virtual audio device is installed
+/// Check if VB-Cable is specifically installed (not just any virtual device)
 #[tauri::command]
 pub async fn check_vb_cable_installed() -> Result<VbCableStatus, String> {
     tracing::info!("[check_vb_cable] Starting VB-Cable detection");
     let manager = CpalDeviceManager::new();
 
-    // First, log all output devices for debugging
     match manager.list_devices() {
         Ok(all_devices) => {
+            // Log all output devices for debugging
             let output_devices: Vec<_> = all_devices
                 .iter()
                 .filter(|d| {
@@ -1050,38 +1050,29 @@ pub async fn check_vb_cable_installed() -> Result<VbCableStatus, String> {
                 output_devices.len()
             );
             for dev in &output_devices {
+                let is_vb_cable = CpalDeviceManager::is_vb_cable_device(dev.name());
                 tracing::info!(
-                    "[check_vb_cable]   - {} (type: {:?}, virtual: {})",
+                    "[check_vb_cable]   - {} (virtual: {}, vb-cable: {})",
                     dev.name(),
-                    dev.device_type(),
-                    dev.device_type().is_virtual()
+                    dev.device_type().is_virtual(),
+                    is_vb_cable
                 );
             }
-        }
-        Err(e) => {
-            tracing::warn!("[check_vb_cable] Failed to list all devices: {}", e);
-        }
-    }
 
-    match manager.find_virtual_outputs() {
-        Ok(devices) => {
-            tracing::info!(
-                "[check_vb_cable] Virtual output devices found: {}",
-                devices.len()
-            );
-            for dev in &devices {
-                tracing::info!("[check_vb_cable]   Virtual: {}", dev.name());
-            }
+            // Find specifically VB-Cable device (not just any virtual device)
+            let vb_cable_device = all_devices
+                .iter()
+                .find(|d| CpalDeviceManager::is_vb_cable_device(d.name()));
 
-            if let Some(device) = devices.first() {
-                tracing::info!("[check_vb_cable] VB-Cable detected: {}", device.name());
+            if let Some(device) = vb_cable_device {
+                tracing::info!("[check_vb_cable] VB-Cable found: {}", device.name());
                 Ok(VbCableStatus {
                     installed: true,
                     device_name: Some(device.name().to_string()),
                 })
             } else {
                 tracing::info!(
-                    "[check_vb_cable] No virtual output devices found - VB-Cable not installed"
+                    "[check_vb_cable] VB-Cable NOT found (other virtual devices may exist)"
                 );
                 Ok(VbCableStatus {
                     installed: false,
@@ -1090,7 +1081,7 @@ pub async fn check_vb_cable_installed() -> Result<VbCableStatus, String> {
             }
         }
         Err(e) => {
-            tracing::warn!(error = %e, "[check_vb_cable] Failed to check virtual devices");
+            tracing::warn!(error = %e, "[check_vb_cable] Failed to list devices");
             Ok(VbCableStatus {
                 installed: false,
                 device_name: None,
@@ -1104,7 +1095,7 @@ pub async fn check_vb_cable_installed() -> Result<VbCableStatus, String> {
 #[tauri::command]
 pub async fn download_and_install_vb_cable(_app: tauri::AppHandle) -> Result<(), String> {
     const VB_CABLE_URL: &str =
-        "https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack43.zip";
+        "https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack45.zip";
 
     tracing::info!("Starting VB-Cable download");
 

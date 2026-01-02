@@ -7,11 +7,17 @@ use crate::ports::{DeviceManager, DeviceManagerError};
 const VIRTUAL_DEVICE_PATTERNS: &[&str] = &[
     "virtual audio",
     "vb-audio",
-    "cable",
     "voicemeeter",
     "blackhole",
     "loopback",
     "virtual cable",
+];
+
+/// Patterns that specifically identify VB-Cable (not other virtual devices)
+const VB_CABLE_PATTERNS: &[&str] = &[
+    "cable output (vb-audio",
+    "cable input (vb-audio",
+    "vb-audio virtual cable",
 ];
 
 /// Device manager adapter using CPAL
@@ -30,6 +36,14 @@ impl CpalDeviceManager {
     fn is_virtual_device(name: &str) -> bool {
         let name_lower = name.to_lowercase();
         VIRTUAL_DEVICE_PATTERNS
+            .iter()
+            .any(|pattern| name_lower.contains(pattern))
+    }
+
+    /// Check if a device name specifically matches VB-Cable
+    pub fn is_vb_cable_device(name: &str) -> bool {
+        let name_lower = name.to_lowercase();
+        VB_CABLE_PATTERNS
             .iter()
             .any(|pattern| name_lower.contains(pattern))
     }
