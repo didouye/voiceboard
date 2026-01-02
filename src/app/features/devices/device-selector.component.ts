@@ -2,6 +2,7 @@ import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TauriService } from '../../core/services/tauri.service';
+import { MixerService } from '../../core/services';
 import { AudioDevice, AppSettings } from '../../core/models';
 
 @Component({
@@ -274,7 +275,7 @@ export class DeviceSelectorComponent implements OnInit {
     return !!(settings?.audio.inputDeviceId && settings?.audio.outputDeviceId);
   });
 
-  constructor(private tauri: TauriService) {}
+  constructor(private tauri: TauriService, private mixer: MixerService) {}
 
   ngOnInit(): void {
     this.loadData();
@@ -300,6 +301,9 @@ export class DeviceSelectorComponent implements OnInit {
       console.log('[DeviceSelector] Input devices:', inputDevices.length);
       console.log('[DeviceSelector] Physical outputs:', physicalOutputs.length);
       console.log('[DeviceSelector] Virtual outputs:', virtualOutputs.length);
+
+      // Auto-select devices if needed
+      await this.autoSelectDevices();
     } catch (err) {
       this._error.set(err instanceof Error ? err.message : 'Failed to load devices');
     } finally {
@@ -309,6 +313,44 @@ export class DeviceSelectorComponent implements OnInit {
 
   async refreshDevices(): Promise<void> {
     await this.loadData();
+  }
+
+  /**
+   * Auto-select devices if not already configured
+   */
+  private async autoSelectDevices(): Promise<void> {
+    const settings = this._settings();
+    if (!settings) return;
+
+    let needsSave = false;
+
+    // Auto-select input if not set
+    if (!settings.audio.inputDeviceId) {
+      const defaultInput = this._inputDevices().find(d => d.isDefault);
+      if (defaultInput) {
+        console.log('[DeviceSelector] Auto-selecting input:', defaultInput.name);
+        await this.tauri.setInputDevice(defaultInput.id);
+        settings.audio.inputDeviceId = defaultInput.id;
+        needsSave = true;
+      }
+    }
+
+    // Auto-select virtual output if not set (or if saved one doesn't exist)
+    const virtualOutputs = this._virtualOutputDevices();
+    if (virtualOutputs.length > 0) {
+      const savedOutputExists = virtualOutputs.some(d => d.id === settings.audio.outputDeviceId);
+      if (!settings.audio.outputDeviceId || !savedOutputExists) {
+        const firstVirtual = virtualOutputs[0]; // Already sorted by priority
+        console.log('[DeviceSelector] Auto-selecting virtual output:', firstVirtual.name);
+        await this.tauri.setOutputDevice(firstVirtual.id);
+        settings.audio.outputDeviceId = firstVirtual.id;
+        needsSave = true;
+      }
+    }
+
+    if (needsSave) {
+      this._settings.set({ ...settings });
+    }
   }
 
   async onInputDeviceChange(event: Event): Promise<void> {
@@ -326,6 +368,9 @@ export class DeviceSelectorComponent implements OnInit {
           audio: { ...settings.audio, inputDeviceId: deviceId }
         });
       }
+
+      // Silent restart if mixer is running
+      await this.mixer.restartIfRunning();
     } catch (err) {
       console.error('Failed to set input device:', err);
     }
@@ -346,6 +391,9 @@ export class DeviceSelectorComponent implements OnInit {
           audio: { ...settings.audio, outputDeviceId: deviceId }
         });
       }
+
+      // Silent restart if mixer is running
+      await this.mixer.restartIfRunning();
     } catch (err) {
       console.error('Failed to set output device:', err);
     }
