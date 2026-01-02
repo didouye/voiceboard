@@ -1,6 +1,8 @@
 # Voiceboard Roadmap
 
-## Phase 1 - Core Application (MVP)
+> **Last updated:** January 2026
+
+## Phase 1 - Core Application (MVP) - 75% Complete
 
 ### Done
 - [x] Hexagonal architecture (DDD, Ports & Adapters)
@@ -9,23 +11,23 @@
 - [x] Audio file decoding (MP3, OGG, WAV, FLAC) via Rodio
 - [x] Mic volume/master volume and mic mute
 - [x] Settings and soundboard persistence
-- [x] Soundboard with 12 pads and keyboard shortcuts
-- [x] Device selector (input/output)
+- [x] Soundboard with 12 pads and keyboard shortcuts (1-9, 0, -, =)
+- [x] Device selector (input/output/preview)
 - [x] Master control with volume and start/stop button
 - [x] Modern UI with dark theme
 - [x] Sound preview on system output with device selection
+- [x] Level visualization (VU meters) - Real-time audio levels display
 
 ### To Do
-- [ ] Virtual microphone output - Implement WASAPI to send audio to Virtual Audio Driver
-- [x] Level visualization (VU meters) - AudioEngine emits `LevelUpdate`, connect to UI
-- [ ] Mic monitoring on preview output - Switch next to VU meter to hear own microphone
-- [ ] Unit and integration tests
+- [ ] Virtual microphone output - Send mixed audio to Virtual Audio Driver
+- [ ] Mic monitoring on preview output - Hear your own microphone in preview
+- [ ] Unit and integration tests - Increase test coverage
 - [ ] Individual volume control per pad in UI
 - [ ] Bulk import - Import multiple audio files at once
 
 ---
 
-## Phase 2 - Distribution & CI/CD
+## Phase 2 - Distribution & CI/CD - 80% Complete
 
 ### Done
 - [x] **GitHub Actions CI**
@@ -45,6 +47,7 @@
   - Check for updates on startup
   - Toast notification with "Update now" button
   - Auto-download and restart
+  - Cryptographic signing for update verification (macOS/Windows)
 
 ### In Progress
 - [ ] **Error Tracking & Debugging (Sentry)**
@@ -55,21 +58,13 @@
   - Release tracking with version tags
   - Debug console UI (accessible via help icon in footer)
 
-### Done (Phase 2 continued)
-- [x] **Auto-Update Signing**
-  - Generated signing keypair for update verification
-  - Configured pubkey in tauri.conf.json
-  - CI generates signed artifacts with .sig files
-  - latest.json includes signatures for macOS and Windows
-  - Fixed "Update failed" error (was caused by missing signatures)
-
 ### To Do
 - [ ] **Windows Installer Improvements**
   - Bundled Virtual Audio Driver
 
-- [ ] **Linux Support**
-  - Virtual audio device (PulseAudio/PipeWire)
-  - Additional packages (.deb, .rpm)
+- [ ] **Linux Improvements**
+  - Fix update signature for Linux
+  - Virtual audio device setup guide (PulseAudio/PipeWire)
 
 ---
 
@@ -225,24 +220,26 @@
 
 ---
 
-## Phase 7 - Code Signing & Security
+## Phase 7 - Code Signing & Security - 33% Complete
+
+### Done
+- [x] **Signed Update Manifests**
+  - Generated signing keypair
+  - Sign artifacts during CI build
+  - Signatures included in latest.json
+  - Updater pubkey verification configured
 
 ### To Do
 - [ ] **Windows Code Signing**
-  - Obtain code signing certificate
+  - Obtain code signing certificate (EV recommended)
   - Sign executables and installers
   - Eliminate SmartScreen warnings
 
 - [ ] **macOS Code Signing & Notarization**
-  - Obtain Apple Developer certificate
+  - Obtain Apple Developer certificate ($99/year)
   - Sign app bundle
   - Notarize with Apple
   - Eliminate Gatekeeper warnings
-
-- [ ] **Signed Update Manifests**
-  - Generate signing keypair
-  - Sign latest.json manifests
-  - Configure updater pubkey verification
 
 ---
 
