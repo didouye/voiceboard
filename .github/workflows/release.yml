@@ -21,12 +21,17 @@ jobs:
       - name: Generate version
         id: version
         run: |
-          # Read version from tauri.conf.json (CalVer: YY.MM.PATCH)
-          APP_VERSION=$(grep -o '"version": "[^"]*"' src-tauri/tauri.conf.json | head -1 | cut -d'"' -f4)
-          # Release tag same as app version for consistency
+          # CalVer format: YY.MM.BUILD (BUILD = GitHub run_number for uniqueness)
+          # Read YY.MM from tauri.conf.json, append run_number as BUILD
+          BASE_VERSION=$(grep -o '"version": "[^"]*"' src-tauri/tauri.conf.json | head -1 | cut -d'"' -f4)
+          # Extract YY.MM (first two components)
+          YY_MM=$(echo "$BASE_VERSION" | cut -d'.' -f1-2)
+          # Final version: YY.MM.RUN_NUMBER
+          APP_VERSION="${YY_MM}.${{ github.run_number }}"
           RELEASE_TAG="$APP_VERSION"
           echo "app_version=$APP_VERSION" >> $GITHUB_OUTPUT
           echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
+          echo "Base version: $BASE_VERSION"
           echo "App version: $APP_VERSION"
           echo "Release tag: $RELEASE_TAG"
 
