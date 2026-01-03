@@ -50,6 +50,7 @@ use application::{
         load_settings,
         // Sound playback
         load_sound_file,
+        load_multiple_sound_files,
         load_soundboard,
         play_sound,
         preview_sound,
@@ -231,6 +232,7 @@ pub fn run() {
             is_mixing,
             // Sound playback
             load_sound_file,
+            load_multiple_sound_files,
             play_sound,
             stop_sound,
             preview_sound,

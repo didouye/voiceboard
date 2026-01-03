@@ -5910,6 +5910,7 @@ dependencies = [
  "anyhow",
  "cpal",
  "crossbeam-channel",
+ "futures",
  "mockall",
  "reqwest",
  "ringbuf",

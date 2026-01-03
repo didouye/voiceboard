@@ -35,6 +35,7 @@ ringbuf = "0.4"                  # Lock-free ring buffer for audio streaming
 
 # Async runtime
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "macros"] }
+futures = "0.3"                  # Async utilities (join_all, etc.)
 
 # Error handling
 thiserror = "2"
