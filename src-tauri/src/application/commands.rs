@@ -141,6 +141,7 @@ impl From<AudioSettingsDto> for AudioSettings {
             master_volume: dto.master_volume,
             sample_rate: dto.sample_rate,
             buffer_size: dto.buffer_size,
+            mic_monitoring: false, // Default for backward compatibility
         }
     }
 }

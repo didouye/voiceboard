@@ -17,6 +17,8 @@ pub struct AudioSettings {
     pub sample_rate: u32,
     /// Buffer size in frames
     pub buffer_size: u32,
+    /// Enable mic monitoring on preview output
+    pub mic_monitoring: bool,
 }
 
 impl AudioSettings {
@@ -28,6 +30,7 @@ impl AudioSettings {
             master_volume: 1.0,
             sample_rate: 48000,
             buffer_size: 1024,
+            mic_monitoring: false,
         }
     }
 }
