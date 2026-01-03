@@ -25,7 +25,7 @@
   - Setup wizard guides user through installation
 
 ### To Do
-- [ ] Mic monitoring on preview output - Hear your own microphone in preview
+- [x] Mic monitoring on preview output - Hear your own microphone in preview
 - [ ] Unit and integration tests - Increase test coverage
 - [ ] Individual volume control per pad in UI
 - [ ] Bulk import - Import multiple audio files at once
