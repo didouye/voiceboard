@@ -617,31 +617,66 @@ fn run_engine_thread(
 
                         let mut monitoring_s: Option<cpal::Stream> = None;
                         if let Some(monitoring_dev) = find_device(&host, &monitoring_dev_name, false) {
-                            // Use same config as main output - both should support it
-                            // since we negotiated a common config for input/output
                             let consumer_monitoring_clone = consumer_monitoring.clone();
                             let event_tx_mon = event_tx.clone();
 
-                            // Log monitoring device info
-                            if let Ok(mon_config) = monitoring_dev.default_output_config() {
-                                let _ = event_tx.send(AudioEngineEvent::Info(format!(
-                                    "Monitoring '{}': {:?}, {}ch, {}Hz (using {}Hz)",
-                                    monitoring_dev_name,
-                                    mon_config.sample_format(),
-                                    mon_config.channels(),
-                                    mon_config.sample_rate().0,
-                                    config.sample_rate.0
-                                )));
-                            }
+                            // Use monitoring device's default config (usually 2ch stereo)
+                            // We'll duplicate mono samples to stereo if needed
+                            let mon_default_config = if let Ok(c) = monitoring_dev.default_output_config() {
+                                c
+                            } else {
+                                let _ = event_tx.send(AudioEngineEvent::Info(
+                                    "Failed to get monitoring config, skipping monitoring".to_string()
+                                ));
+                                // Skip monitoring setup but continue with engine startup
+                                cpal::SupportedStreamConfig::new(
+                                    2,
+                                    cpal::SampleRate(48000),
+                                    cpal::SupportedBufferSize::Range { min: 256, max: 4096 },
+                                    cpal::SampleFormat::F32,
+                                )
+                            };
+
+                            let mon_channels = mon_default_config.channels();
+                            let mon_sample_rate = mon_default_config.sample_rate();
+
+                            let _ = event_tx.send(AudioEngineEvent::Info(format!(
+                                "Monitoring '{}': {}ch, {}Hz (input data at {}Hz)",
+                                monitoring_dev_name,
+                                mon_channels,
+                                mon_sample_rate.0,
+                                config.sample_rate.0
+                            )));
+
+                            // Build monitoring stream config matching the device
+                            let mon_stream_config = cpal::StreamConfig {
+                                channels: mon_channels,
+                                sample_rate: mon_sample_rate,
+                                buffer_size: cpal::BufferSize::Default,
+                            };
 
                             let monitoring_result = monitoring_dev.build_output_stream(
-                                &config,
+                                &mon_stream_config,
                                 move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
-                                    // Simply read the pre-mixed output from main callback
-                                    // This contains: mic + sounds + master volume (already applied)
+                                    // Read from monitoring ring buffer (mono samples)
+                                    // Duplicate to stereo if device expects 2 channels
                                     if let Ok(mut cons) = consumer_monitoring_clone.try_lock() {
-                                        for sample in data.iter_mut() {
-                                            *sample = cons.try_pop().unwrap_or(0.0);
+                                        if mon_channels == 2 {
+                                            // Stereo: duplicate each mono sample to L and R
+                                            for chunk in data.chunks_mut(2) {
+                                                let sample = cons.try_pop().unwrap_or(0.0);
+                                                if chunk.len() >= 2 {
+                                                    chunk[0] = sample;
+                                                    chunk[1] = sample;
+                                                } else if !chunk.is_empty() {
+                                                    chunk[0] = sample;
+                                                }
+                                            }
+                                        } else {
+                                            // Mono or other: just copy directly
+                                            for sample in data.iter_mut() {
+                                                *sample = cons.try_pop().unwrap_or(0.0);
+                                            }
                                         }
                                     } else {
                                         for sample in data.iter_mut() {
