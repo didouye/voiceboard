@@ -272,6 +272,11 @@
   - Configurable from application settings
   - Start minimized to system tray option
 
+- [ ] **Minimize to System Tray**
+  - Close button minimizes to system tray instead of quitting
+  - Tray icon with context menu (Show/Hide, Quit)
+  - Double-click tray icon to restore window
+
 - [ ] **Error Recovery**
   - Automatic reconnection when audio devices are disconnected/reconnected
   - Graceful handling of device changes during mixing
