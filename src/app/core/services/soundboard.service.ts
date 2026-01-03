@@ -175,6 +175,29 @@ export class SoundboardService {
   }
 
   /**
+   * Reorganize pads: sort sounds alphabetically and compact them (no gaps).
+   * All sounds are moved to the beginning, empty pads are at the end.
+   */
+  private reorganizePads(): void {
+    const pads = this._pads();
+
+    // Collect all sounds and sort them alphabetically by name
+    const sounds = pads
+      .filter(p => p.sound !== null)
+      .map(p => p.sound!)
+      .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+
+    // Reassign sounds to pads in order
+    this._pads.update(currentPads => {
+      return currentPads.map((pad, index) => ({
+        ...pad,
+        sound: index < sounds.length ? sounds[index] : null,
+        isPlaying: false // Reset playing state when reorganizing
+      }));
+    });
+  }
+
+  /**
    * Import a sound file to a specific pad
    */
   async importSound(padId: string): Promise<void> {
@@ -208,20 +231,23 @@ export class SoundboardService {
       const soundFile = await this.tauri.loadSoundFile(path);
       console.log('[Soundboard] Sound file loaded:', soundFile);
 
-      // Update the pad with the sound
+      // Add the sound to the pad temporarily
       this._pads.update(pads => pads.map(pad =>
         pad.id === padId
           ? { ...pad, sound: soundFile }
           : pad
       ));
-      console.log('[Soundboard] Pad updated with sound');
+
+      // Reorganize: sort alphabetically and compact (no gaps)
+      this.reorganizePads();
+      console.log('[Soundboard] Pads reorganized');
+
+      // Ensure there's always an empty pad available
+      this.ensureEmptyPadAvailable();
 
       // Persist the change
       await this.saveState();
       console.log('[Soundboard] State saved');
-
-      // Ensure there's always an empty pad available
-      this.ensureEmptyPadAvailable();
     } catch (err) {
       console.error('[Soundboard] Import sound error:', err);
       console.error('[Soundboard] Error type:', typeof err);
@@ -274,25 +300,18 @@ export class SoundboardService {
       return { imported: 0, errors: [] };
     }
 
-    // Sort paths alphabetically by filename
-    const sortedPaths = [...paths].sort((a, b) => {
-      const nameA = a.split('/').pop()?.toLowerCase() || a;
-      const nameB = b.split('/').pop()?.toLowerCase() || b;
-      return nameA.localeCompare(nameB);
-    });
-
     // Load all files in parallel
-    const results = await this.tauri.loadMultipleSoundFiles(sortedPaths);
+    const results = await this.tauri.loadMultipleSoundFiles(paths);
 
     // Separate successes and errors
-    const successfulSounds: { sound: SoundFile; originalPath: string }[] = [];
+    const successfulSounds: SoundFile[] = [];
     const errors: string[] = [];
 
     results.forEach((result, index) => {
       if ('ok' in result) {
-        successfulSounds.push({ sound: result.ok, originalPath: sortedPaths[index] });
+        successfulSounds.push(result.ok);
       } else {
-        const fileName = sortedPaths[index].split('/').pop() || sortedPaths[index];
+        const fileName = paths[index].split('/').pop() || paths[index];
         errors.push(`${fileName}: ${result.err}`);
       }
     });
@@ -304,7 +323,7 @@ export class SoundboardService {
     // Ensure we have enough empty pads
     this.ensurePadsForImport(successfulSounds.length);
 
-    // Find empty pads and assign sounds
+    // Assign sounds to empty pads temporarily
     const pads = this._pads();
     const emptyPadIds: string[] = [];
     for (const pad of pads) {
@@ -313,18 +332,20 @@ export class SoundboardService {
       }
     }
 
-    // Assign sounds to empty pads
     this._pads.update(currentPads => {
       const updatedPads = [...currentPads];
-      successfulSounds.forEach((item, index) => {
+      successfulSounds.forEach((sound, index) => {
         const padId = emptyPadIds[index];
         const padIndex = updatedPads.findIndex(p => p.id === padId);
         if (padIndex !== -1) {
-          updatedPads[padIndex] = { ...updatedPads[padIndex], sound: item.sound };
+          updatedPads[padIndex] = { ...updatedPads[padIndex], sound };
         }
       });
       return updatedPads;
     });
+
+    // Reorganize: sort all sounds alphabetically and compact (no gaps)
+    this.reorganizePads();
 
     // Ensure there's still an empty pad available after import
     this.ensureEmptyPadAvailable();
@@ -479,6 +500,8 @@ export class SoundboardService {
         ? { ...pad, sound: null, isPlaying: false }
         : pad
     ));
+    // Reorganize to compact pads (no gaps) and maintain alphabetical order
+    this.reorganizePads();
     this.cleanupEmptyRows();
     this.saveState();
   }
