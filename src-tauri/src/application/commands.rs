@@ -117,6 +117,7 @@ pub struct AudioSettingsDto {
     pub master_volume: f32,
     pub sample_rate: u32,
     pub buffer_size: u32,
+    pub mic_monitoring: bool,
 }
 
 impl From<&AudioSettings> for AudioSettingsDto {
@@ -128,6 +129,7 @@ impl From<&AudioSettings> for AudioSettingsDto {
             master_volume: settings.master_volume,
             sample_rate: settings.sample_rate,
             buffer_size: settings.buffer_size,
+            mic_monitoring: settings.mic_monitoring,
         }
     }
 }
@@ -141,7 +143,7 @@ impl From<AudioSettingsDto> for AudioSettings {
             master_volume: dto.master_volume,
             sample_rate: dto.sample_rate,
             buffer_size: dto.buffer_size,
-            mic_monitoring: false, // Default for backward compatibility
+            mic_monitoring: dto.mic_monitoring,
         }
     }
 }
