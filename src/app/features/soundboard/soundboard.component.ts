@@ -1,7 +1,8 @@
-import { Component, HostListener, signal } from '@angular/core';
+import { Component, HostListener, signal, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { SoundboardService } from '../../core/services/soundboard.service';
 import { SoundPadComponent } from './sound-pad/sound-pad.component';
+import { listen, TauriEvent } from '@tauri-apps/api/event';
 
 // Default hotkeys for first 12 pads: 1-9, 0, -, =
 const DEFAULT_HOTKEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '='];
@@ -30,12 +31,7 @@ const DEFAULT_HOTKEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', 
         </div>
       }
 
-      <div
-        class="pads-container"
-        (dragover)="onDragOver($event)"
-        (dragleave)="onDragLeave($event)"
-        (drop)="onDrop($event)"
-      >
+      <div class="pads-container">
         <div class="pads-grid">
           @for (pad of soundboard.pads(); track pad.id; let i = $index) {
             <app-sound-pad
@@ -203,13 +199,75 @@ const DEFAULT_HOTKEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', 
     }
   `]
 })
-export class SoundboardComponent {
+export class SoundboardComponent implements OnInit, OnDestroy {
   constructor(public soundboard: SoundboardService) {}
 
   isDragging = signal(false);
   dragFileCount = signal(0);
 
   private readonly AUDIO_EXTENSIONS = ['mp3', 'ogg', 'wav', 'flac'];
+  private unlistenDragEnter?: () => void;
+  private unlistenDragOver?: () => void;
+  private unlistenDragLeave?: () => void;
+  private unlistenDragDrop?: () => void;
+
+  async ngOnInit(): Promise<void> {
+    await this.initDragDropListeners();
+  }
+
+  ngOnDestroy(): void {
+    this.unlistenDragEnter?.();
+    this.unlistenDragOver?.();
+    this.unlistenDragLeave?.();
+    this.unlistenDragDrop?.();
+  }
+
+  private async initDragDropListeners(): Promise<void> {
+    // Listen to Tauri drag events
+    this.unlistenDragEnter = await listen<{ paths: string[]; position: { x: number; y: number } }>(
+      TauriEvent.DRAG_ENTER,
+      (event) => {
+        const audioPaths = event.payload.paths.filter(path => {
+          const ext = path.split('.').pop()?.toLowerCase();
+          return ext && this.AUDIO_EXTENSIONS.includes(ext);
+        });
+        if (audioPaths.length > 0) {
+          this.dragFileCount.set(audioPaths.length);
+          this.isDragging.set(true);
+        }
+      }
+    );
+
+    this.unlistenDragOver = await listen(TauriEvent.DRAG_OVER, () => {
+      // Keep overlay visible during drag over
+    });
+
+    this.unlistenDragLeave = await listen(TauriEvent.DRAG_LEAVE, () => {
+      this.isDragging.set(false);
+      this.dragFileCount.set(0);
+    });
+
+    this.unlistenDragDrop = await listen<{ paths: string[]; position: { x: number; y: number } }>(
+      TauriEvent.DRAG_DROP,
+      async (event) => {
+        this.isDragging.set(false);
+        this.dragFileCount.set(0);
+
+        const audioPaths = event.payload.paths.filter(path => {
+          const ext = path.split('.').pop()?.toLowerCase();
+          return ext && this.AUDIO_EXTENSIONS.includes(ext);
+        });
+
+        if (audioPaths.length === 0) return;
+
+        const result = await this.soundboard.importSoundsFromPaths(audioPaths);
+
+        if (result.errors.length > 0) {
+          console.warn(`Imported ${result.imported} files. Failed: ${result.errors.join(', ')}`);
+        }
+      }
+    );
+  }
 
   @HostListener('window:keydown', ['$event'])
   handleKeydown(event: KeyboardEvent): void {
@@ -264,71 +322,4 @@ export class SoundboardComponent {
     }
   }
 
-  onDragOver(event: DragEvent): void {
-    event.preventDefault();
-    event.stopPropagation();
-
-    if (!event.dataTransfer) return;
-
-    // Check if dragging files
-    if (event.dataTransfer.types.includes('Files')) {
-      event.dataTransfer.dropEffect = 'copy';
-
-      // Count audio files
-      const items = Array.from(event.dataTransfer.items);
-      const audioCount = items.filter(item => {
-        if (item.kind !== 'file') return false;
-        const type = item.type.toLowerCase();
-        return type.startsWith('audio/') ||
-               this.AUDIO_EXTENSIONS.some(ext => type.includes(ext));
-      }).length;
-
-      // If we can't determine from MIME, use total count
-      const count = audioCount > 0 ? audioCount : items.filter(i => i.kind === 'file').length;
-
-      this.dragFileCount.set(count);
-      this.isDragging.set(true);
-    }
-  }
-
-  onDragLeave(event: DragEvent): void {
-    event.preventDefault();
-    event.stopPropagation();
-
-    // Only hide overlay if leaving the container (not entering a child)
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    const x = event.clientX;
-    const y = event.clientY;
-
-    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
-      this.isDragging.set(false);
-      this.dragFileCount.set(0);
-    }
-  }
-
-  async onDrop(event: DragEvent): Promise<void> {
-    event.preventDefault();
-    event.stopPropagation();
-
-    this.isDragging.set(false);
-    this.dragFileCount.set(0);
-
-    if (!event.dataTransfer) return;
-
-    const files = Array.from(event.dataTransfer.files);
-    const audioPaths = files
-      .filter(file => {
-        const ext = file.name.split('.').pop()?.toLowerCase();
-        return ext && this.AUDIO_EXTENSIONS.includes(ext);
-      })
-      .map(file => file.path);
-
-    if (audioPaths.length === 0) return;
-
-    const result = await this.soundboard.importSoundsFromPaths(audioPaths);
-
-    if (result.errors.length > 0) {
-      console.warn(`Imported ${result.imported} files. Failed: ${result.errors.join(', ')}`);
-    }
-  }
 }
