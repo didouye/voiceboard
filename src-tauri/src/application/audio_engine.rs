@@ -392,7 +392,7 @@ fn run_engine_thread(
                             None => {
                                 // Fallback: try input's default config
                                 let _ = event_tx.send(AudioEngineEvent::Info(
-                                    "No common config found, trying input default".to_string()
+                                    "No common config found, trying input default".to_string(),
                                 ));
                                 input_default.into()
                             }
@@ -646,26 +646,33 @@ fn run_engine_thread(
                         };
 
                         let mut monitoring_s: Option<cpal::Stream> = None;
-                        if let Some(monitoring_dev) = find_device(&host, &monitoring_dev_name, false) {
+                        if let Some(monitoring_dev) =
+                            find_device(&host, &monitoring_dev_name, false)
+                        {
                             let consumer_monitoring_clone = consumer_monitoring.clone();
                             let event_tx_mon = event_tx.clone();
 
                             // Use monitoring device's default config (usually 2ch stereo)
                             // We'll duplicate mono samples to stereo if needed
-                            let mon_default_config = if let Ok(c) = monitoring_dev.default_output_config() {
-                                c
-                            } else {
-                                let _ = event_tx.send(AudioEngineEvent::Info(
-                                    "Failed to get monitoring config, skipping monitoring".to_string()
-                                ));
-                                // Skip monitoring setup but continue with engine startup
-                                cpal::SupportedStreamConfig::new(
-                                    2,
-                                    cpal::SampleRate(48000),
-                                    cpal::SupportedBufferSize::Range { min: 256, max: 4096 },
-                                    cpal::SampleFormat::F32,
-                                )
-                            };
+                            let mon_default_config =
+                                if let Ok(c) = monitoring_dev.default_output_config() {
+                                    c
+                                } else {
+                                    let _ = event_tx.send(AudioEngineEvent::Info(
+                                        "Failed to get monitoring config, skipping monitoring"
+                                            .to_string(),
+                                    ));
+                                    // Skip monitoring setup but continue with engine startup
+                                    cpal::SupportedStreamConfig::new(
+                                        2,
+                                        cpal::SampleRate(48000),
+                                        cpal::SupportedBufferSize::Range {
+                                            min: 256,
+                                            max: 4096,
+                                        },
+                                        cpal::SampleFormat::F32,
+                                    )
+                                };
 
                             let mon_channels = mon_default_config.channels();
                             // Use device's native sample rate to avoid driver resampling issues

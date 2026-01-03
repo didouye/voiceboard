@@ -28,7 +28,7 @@
 - [x] Mic monitoring on preview output - Hear your own microphone in preview
 - [ ] Unit and integration tests - Increase test coverage
 - [ ] Individual volume control per pad in UI
-- [ ] Bulk import - Import multiple audio files at once
+- [x] Bulk import - Import multiple audio files at once (with drag & drop and dynamic pad rows)
 - [ ] **Speed Playback**
   - Button on each pad (next to preview button)
   - Play sound at different speeds (accelerated/slowed)

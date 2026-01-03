@@ -629,7 +629,11 @@ pub async fn start_mixing(state: State<'_, AppState>) -> Result<(), String> {
         .clone()
         .ok_or_else(|| "No output device selected".to_string())?;
     let sample_rate = settings.audio.sample_rate;
-    let preview_device = settings.audio.preview_device_id.clone().unwrap_or_else(|| "default".to_string());
+    let preview_device = settings
+        .audio
+        .preview_device_id
+        .clone()
+        .unwrap_or_else(|| "default".to_string());
     let mic_monitoring = settings.audio.mic_monitoring;
     drop(settings);
 
@@ -711,7 +715,10 @@ pub async fn load_sound_file(path: String) -> Result<SoundFileDto, String> {
 pub async fn load_multiple_sound_files(paths: Vec<String>) -> Vec<Result<SoundFileDto, String>> {
     use futures::future::join_all;
 
-    let futures: Vec<_> = paths.iter().map(|path| load_sound_file_internal(path)).collect();
+    let futures: Vec<_> = paths
+        .iter()
+        .map(|path| load_sound_file_internal(path))
+        .collect();
     join_all(futures).await
 }
 
@@ -739,8 +746,8 @@ async fn load_sound_file_internal(path: &str) -> Result<SoundFileDto, String> {
     let file = File::open(path).map_err(|e| format!("Failed to open file: {}", e))?;
     let reader = BufReader::new(file);
 
-    let decoder = rodio::Decoder::new(reader)
-        .map_err(|e| format!("Failed to decode audio file: {}", e))?;
+    let decoder =
+        rodio::Decoder::new(reader).map_err(|e| format!("Failed to decode audio file: {}", e))?;
 
     let sample_rate = decoder.sample_rate();
     let channels = decoder.channels();
