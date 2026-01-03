@@ -52,6 +52,19 @@ import { AudioDevice, AppSettings } from '../../core/models';
               </option>
             }
           </select>
+
+          <!-- Mic Monitoring Toggle -->
+          <div class="monitoring-toggle">
+            <label class="toggle-label">
+              <span class="toggle-icon">🎤</span>
+              <span class="toggle-text">Mic Monitoring</span>
+              <div class="toggle-switch"
+                   [class.active]="micMonitoring()"
+                   (click)="toggleMicMonitoring()">
+                <div class="toggle-slider"></div>
+              </div>
+            </label>
+          </div>
         </div>
 
         <!-- Virtual Output Selection (only if multiple) -->
@@ -247,6 +260,57 @@ import { AudioDevice, AppSettings } from '../../core/models';
       color: #fff;
       background: rgba(255, 255, 255, 0.05);
     }
+
+    .monitoring-toggle {
+      margin-top: 12px;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 8px;
+    }
+
+    .toggle-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+
+    .toggle-icon {
+      font-size: 1rem;
+    }
+
+    .toggle-text {
+      color: #ccc;
+      flex: 1;
+    }
+
+    .toggle-switch {
+      width: 48px;
+      height: 24px;
+      background: #333;
+      border-radius: 12px;
+      position: relative;
+      transition: background 0.2s;
+    }
+
+    .toggle-switch.active {
+      background: #7b2cbf;
+    }
+
+    .toggle-slider {
+      width: 20px;
+      height: 20px;
+      background: #fff;
+      border-radius: 50%;
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      transition: transform 0.2s;
+    }
+
+    .toggle-switch.active .toggle-slider {
+      transform: translateX(24px);
+    }
   `]
 })
 export class DeviceSelectorComponent implements OnInit {
@@ -269,6 +333,7 @@ export class DeviceSelectorComponent implements OnInit {
   readonly selectedInputId = computed(() => this._settings()?.audio.inputDeviceId ?? '');
   readonly selectedOutputId = computed(() => this._settings()?.audio.outputDeviceId ?? '');
   readonly selectedPreviewId = computed(() => this._settings()?.audio.previewDeviceId ?? '');
+  readonly micMonitoring = computed(() => this._settings()?.audio.micMonitoring ?? false);
   readonly showVirtualOutputSelector = computed(() => this._virtualOutputDevices().length > 1);
   readonly isConfigured = computed(() => {
     const settings = this._settings();
@@ -416,6 +481,26 @@ export class DeviceSelectorComponent implements OnInit {
       }
     } catch (err) {
       console.error('Failed to set preview device:', err);
+    }
+  }
+
+  async toggleMicMonitoring(): Promise<void> {
+    const currentValue = this.micMonitoring();
+    const newValue = !currentValue;
+
+    try {
+      await this.tauri.setMicMonitoring(newValue);
+
+      // Update local state
+      const settings = this._settings();
+      if (settings) {
+        this._settings.set({
+          ...settings,
+          audio: { ...settings.audio, micMonitoring: newValue }
+        });
+      }
+    } catch (err) {
+      console.error('Failed to set mic monitoring:', err);
     }
   }
 }
