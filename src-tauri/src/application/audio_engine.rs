@@ -436,8 +436,9 @@ fn run_engine_thread(
                         // Debug counter for input callback
                         let input_callback_count = Arc::new(AtomicU32::new(0));
                         let input_callback_count_clone = input_callback_count.clone();
+                        let input_ch = input_channels;
 
-                        // Build input stream (may be mono)
+                        // Build input stream (may be mono or stereo)
                         let input_result = input_dev.build_input_stream(
                             &input_config,
                             move |data: &[f32], _: &cpal::InputCallbackInfo| {
@@ -446,9 +447,10 @@ fn run_engine_thread(
                                 if count < 5 || count.is_multiple_of(1000) {
                                     let max_sample = data.iter().fold(0.0f32, |a, &b| a.max(b.abs()));
                                     tracing::info!(
-                                        "[AudioEngine] Input callback #{}: {} samples, max amplitude: {:.6}",
+                                        "[AudioEngine] Input callback #{}: {} samples, {}ch, max amplitude: {:.6}",
                                         count,
                                         data.len(),
+                                        input_ch,
                                         max_sample
                                     );
                                 }
@@ -460,17 +462,28 @@ fn run_engine_thread(
                                 // Calculate RMS for input level
                                 let mut sum_squares = 0.0f32;
 
+                                // Convert multi-channel input to mono (one sample per frame)
+                                // This ensures ring buffer carries mono samples regardless of input channel count
+                                let num_frames = data.len() / input_ch as usize;
+
                                 if let Ok(mut prod) = producer_clone.try_lock() {
-                                    for &sample in data {
-                                        let processed = if muted { 0.0 } else { sample * volume };
+                                    for frame in 0..num_frames {
+                                        // Average all channels to produce mono sample
+                                        let mut sum = 0.0f32;
+                                        for ch in 0..input_ch as usize {
+                                            let idx = frame * input_ch as usize + ch;
+                                            sum += data.get(idx).copied().unwrap_or(0.0);
+                                        }
+                                        let mono_sample = sum / input_ch as f32;
+                                        let processed = if muted { 0.0 } else { mono_sample * volume };
                                         sum_squares += processed * processed;
                                         let _ = prod.try_push(processed);
                                     }
                                 }
 
                                 // Store RMS level (will be read by level monitoring thread)
-                                if !data.is_empty() {
-                                    let rms = (sum_squares / data.len() as f32).sqrt();
+                                if num_frames > 0 {
+                                    let rms = (sum_squares / num_frames as f32).sqrt();
                                     input_level_clone.store(rms.to_bits(), Ordering::Relaxed);
                                 }
                             },
