@@ -488,6 +488,7 @@ fn run_engine_thread(
                         let output_level_for_callback = output_level.clone();
                         let producer_monitoring_for_output = producer_monitoring.clone();
                         let mic_monitoring_for_output = mic_monitoring.clone();
+                        let engine_channels = config.channels;
 
                         // Debug counter for output callback
                         let output_callback_count = Arc::new(AtomicU32::new(0));
@@ -546,9 +547,29 @@ fn run_engine_thread(
 
                                 // Write to monitoring buffer BEFORE adding mic to main output
                                 // Monitoring gets: sounds + (mic if mic_monitoring enabled)
+                                // Push MONO samples only (one per frame, not per channel)
                                 if let Ok(mut prod_mon) = producer_monitoring_for_output.try_lock() {
-                                    for (i, &sound_sample) in data.iter().enumerate() {
-                                        let mic_sample = mic_samples.get(i).copied().unwrap_or(0.0);
+                                    let num_frames = data_len / engine_channels as usize;
+
+                                    for frame in 0..num_frames {
+                                        // Get sound sample for this frame (average L+R if stereo)
+                                        let sound_sample = if engine_channels == 2 {
+                                            let l = data[frame * 2];
+                                            let r = data[frame * 2 + 1];
+                                            (l + r) * 0.5
+                                        } else {
+                                            data[frame]
+                                        };
+
+                                        // Get mic sample for this frame (average L+R if stereo)
+                                        let mic_sample = if engine_channels == 2 {
+                                            let l = mic_samples.get(frame * 2).copied().unwrap_or(0.0);
+                                            let r = mic_samples.get(frame * 2 + 1).copied().unwrap_or(0.0);
+                                            (l + r) * 0.5
+                                        } else {
+                                            mic_samples.get(frame).copied().unwrap_or(0.0)
+                                        };
+
                                         let monitoring_sample = if mic_mon_enabled {
                                             (sound_sample + mic_sample) * master_vol
                                         } else {
@@ -638,47 +659,94 @@ fn run_engine_thread(
                             };
 
                             let mon_channels = mon_default_config.channels();
+                            // Use device's native sample rate to avoid driver resampling issues
                             let mon_sample_rate = mon_default_config.sample_rate();
+                            let engine_sample_rate = config.sample_rate.0 as f64;
+                            let mon_sample_rate_value = mon_sample_rate.0 as f64;
+
+                            // Calculate resample ratio: how many engine samples per monitoring sample
+                            // ratio < 1.0: monitoring rate higher, need to interpolate
+                            // ratio > 1.0: monitoring rate lower, need to skip samples
+                            let resample_ratio = engine_sample_rate / mon_sample_rate_value;
 
                             let _ = event_tx.send(AudioEngineEvent::Info(format!(
-                                "Monitoring '{}': {}ch, {}Hz (input data at {}Hz)",
+                                "Monitoring '{}': {}ch, {}Hz (engine at {}Hz, ratio {:.4})",
                                 monitoring_dev_name,
                                 mon_channels,
                                 mon_sample_rate.0,
-                                config.sample_rate.0
+                                config.sample_rate.0,
+                                resample_ratio
                             )));
 
-                            // Build monitoring stream config matching the device
+                            // Build monitoring stream config: device channels + device native sample rate
                             let mon_stream_config = cpal::StreamConfig {
                                 channels: mon_channels,
                                 sample_rate: mon_sample_rate,
                                 buffer_size: cpal::BufferSize::Default,
                             };
 
+                            // Resampling state: fractional position and sample history
+                            // Stored as (fractional_pos: f64, prev_sample: f32, curr_sample: f32)
+                            let resample_state = Arc::new(Mutex::new((0.0f64, 0.0f32, 0.0f32)));
+                            let resample_state_clone = resample_state.clone();
+
+                            // Counter for monitoring callback logging
+                            let mon_callback_count = Arc::new(AtomicU32::new(0));
+                            let mon_callback_count_clone = mon_callback_count.clone();
+
                             let monitoring_result = monitoring_dev.build_output_stream(
                                 &mon_stream_config,
                                 move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
-                                    // Read from monitoring ring buffer (mono samples)
-                                    // Duplicate to stereo if device expects 2 channels
-                                    if let Ok(mut cons) = consumer_monitoring_clone.try_lock() {
-                                        if mon_channels == 2 {
-                                            // Stereo: duplicate each mono sample to L and R
-                                            for chunk in data.chunks_mut(2) {
-                                                let sample = cons.try_pop().unwrap_or(0.0);
-                                                if chunk.len() >= 2 {
-                                                    chunk[0] = sample;
-                                                    chunk[1] = sample;
-                                                } else if !chunk.is_empty() {
-                                                    chunk[0] = sample;
-                                                }
+                                    let count = mon_callback_count_clone.fetch_add(1, Ordering::Relaxed);
+
+                                    // Log first few callbacks to debug
+                                    if count < 5 {
+                                        tracing::info!(
+                                            "[AudioEngine] Monitoring callback #{}: {} samples ({}ch), ratio {:.4}",
+                                            count,
+                                            data.len(),
+                                            mon_channels,
+                                            resample_ratio
+                                        );
+                                    }
+
+                                    // Read from monitoring ring buffer with resampling
+                                    // Ring buffer contains mono samples at engine rate
+                                    // Output at monitoring device's native rate with linear interpolation
+                                    if let (Ok(mut cons), Ok(mut state)) = (
+                                        consumer_monitoring_clone.try_lock(),
+                                        resample_state_clone.try_lock(),
+                                    ) {
+                                        let (ref mut frac_pos, ref mut prev_sample, ref mut curr_sample) = *state;
+
+                                        // Calculate number of output frames
+                                        let num_frames = data.len() / mon_channels as usize;
+
+                                        for frame in 0..num_frames {
+                                            // Linear interpolation between prev and curr sample
+                                            let t = *frac_pos as f32;
+                                            let sample = *prev_sample + (*curr_sample - *prev_sample) * t;
+
+                                            // Write to output (mono or stereo)
+                                            if mon_channels == 2 {
+                                                data[frame * 2] = sample;
+                                                data[frame * 2 + 1] = sample;
+                                            } else {
+                                                data[frame] = sample;
                                             }
-                                        } else {
-                                            // Mono or other: just copy directly
-                                            for sample in data.iter_mut() {
-                                                *sample = cons.try_pop().unwrap_or(0.0);
+
+                                            // Advance position by resample ratio
+                                            *frac_pos += resample_ratio;
+
+                                            // When we've moved past current sample, shift history and pop new
+                                            while *frac_pos >= 1.0 {
+                                                *frac_pos -= 1.0;
+                                                *prev_sample = *curr_sample;
+                                                *curr_sample = cons.try_pop().unwrap_or(0.0);
                                             }
                                         }
                                     } else {
+                                        // Couldn't acquire locks, output silence
                                         for sample in data.iter_mut() {
                                             *sample = 0.0;
                                         }
