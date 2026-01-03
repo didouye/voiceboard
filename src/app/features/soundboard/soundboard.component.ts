@@ -20,7 +20,6 @@ const DEFAULT_HOTKEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', 
               Stop All ({{ soundboard.playingCount() }})
             </button>
           }
-          <button class="btn-add-pads" (click)="soundboard.addPads(4)">+ Add Pads</button>
         </div>
       </div>
 
@@ -44,6 +43,17 @@ const DEFAULT_HOTKEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', 
             (remove)="soundboard.removeSound(pad.id)"
           />
         }
+      </div>
+
+      <div class="soundboard-footer">
+        <button
+          class="btn-import-multiple"
+          (click)="importMultiple()"
+          [disabled]="soundboard.loading()"
+        >
+          <span class="icon">📁</span>
+          Import Multiple
+        </button>
       </div>
     </div>
   `,
@@ -87,22 +97,6 @@ const DEFAULT_HOTKEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', 
       background: #c0392b;
     }
 
-    .btn-add-pads {
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      color: #aaa;
-      padding: 8px 16px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 0.85rem;
-      transition: all 0.2s;
-    }
-
-    .btn-add-pads:hover {
-      background: rgba(255, 255, 255, 0.15);
-      color: #fff;
-    }
-
     .error-message {
       background: rgba(231, 76, 60, 0.2);
       border: 1px solid #e74c3c;
@@ -130,6 +124,41 @@ const DEFAULT_HOTKEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', 
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
       gap: 12px;
+    }
+
+    .soundboard-footer {
+      display: flex;
+      justify-content: center;
+      margin-top: 16px;
+    }
+
+    .btn-import-multiple {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px dashed rgba(255, 255, 255, 0.3);
+      color: #aaa;
+      padding: 10px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+
+    .btn-import-multiple:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.5);
+      color: #fff;
+    }
+
+    .btn-import-multiple:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-import-multiple .icon {
+      font-size: 1.1rem;
     }
 
     @media (max-width: 600px) {
@@ -180,5 +209,18 @@ export class SoundboardComponent {
       return pads[padIndex].hotkey || DEFAULT_HOTKEYS[padIndex];
     }
     return undefined;
+  }
+
+  /**
+   * Handle Import Multiple button click
+   */
+  async importMultiple(): Promise<void> {
+    const result = await this.soundboard.importMultipleSounds();
+
+    if (result.errors.length > 0) {
+      const errorMessage = `Imported ${result.imported} files.\nFailed (${result.errors.length}):\n${result.errors.join('\n')}`;
+      console.warn(errorMessage);
+      // TODO: Show toast notification instead of console
+    }
   }
 }
