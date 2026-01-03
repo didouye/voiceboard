@@ -26,7 +26,7 @@
 
 ### To Do
 - [x] Mic monitoring on preview output - Hear your own microphone in preview
-- [ ] Unit and integration tests - Increase test coverage
+- [x] Unit tests - 284 tests covering domain layer (100%), adapters, and application layer
 - [ ] Individual volume control per pad in UI
 - [x] Bulk import - Import multiple audio files at once (with drag & drop and dynamic pad rows)
 - [ ] **Speed Playback**
@@ -278,6 +278,13 @@
   - Support microphones with different sample rates (44.1kHz, 48kHz, 96kHz)
   - Automatic resampling when input and output devices have different sample rates
   - Currently requires matching sample rates between input device and VB-Cable
+
+### Code Quality
+- [ ] **Test Coverage 95%**
+  - Increase coverage from 26% to 95%
+  - Mock cpal traits for hardware-independent tests
+  - Add Tauri integration tests for commands
+  - Refactor code to separate testable logic from I/O
 
 ### Quality of Life
 - [ ] **Launch at Startup**
