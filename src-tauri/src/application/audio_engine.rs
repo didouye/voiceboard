@@ -56,6 +56,8 @@ pub enum AudioEngineEvent {
     Stopped,
     /// Error occurred
     Error(String),
+    /// Info message (for debugging)
+    Info(String),
     /// Audio level update (for UI meters)
     LevelUpdate {
         input_rms: f32,
@@ -216,8 +218,8 @@ fn run_engine_thread(
                     AudioEngineCommand::Start {
                         input_device,
                         output_device,
-                        sample_rate,
-                        channels,
+                        sample_rate: _,
+                        channels: _,
                     } => {
                         // Stop any existing streams
                         input_stream = None;
@@ -247,15 +249,15 @@ fn run_engine_thread(
                         };
 
                         // Get default configs from devices (more reliable on Windows)
-                        let input_config = match input_dev.default_input_config() {
+                        let input_default = match input_dev.default_input_config() {
                             Ok(c) => {
-                                tracing::info!(
-                                    "[AudioEngine] Input device '{}' default config: {:?} format, {} channels, {}Hz",
+                                let _ = event_tx.send(AudioEngineEvent::Info(format!(
+                                    "Input '{}': {:?}, {}ch, {}Hz",
                                     input_device,
                                     c.sample_format(),
                                     c.channels(),
                                     c.sample_rate().0
-                                );
+                                )));
                                 c
                             }
                             Err(e) => {
@@ -267,15 +269,15 @@ fn run_engine_thread(
                             }
                         };
 
-                        let output_config = match output_dev.default_output_config() {
+                        let output_default = match output_dev.default_output_config() {
                             Ok(c) => {
-                                tracing::info!(
-                                    "[AudioEngine] Output device '{}' default config: {:?} format, {} channels, {}Hz",
+                                let _ = event_tx.send(AudioEngineEvent::Info(format!(
+                                    "Output '{}': {:?}, {}ch, {}Hz",
                                     output_device,
                                     c.sample_format(),
                                     c.channels(),
                                     c.sample_rate().0
-                                );
+                                )));
                                 c
                             }
                             Err(e) => {
@@ -287,16 +289,26 @@ fn run_engine_thread(
                             }
                         };
 
-                        // Use the input device's default config for both streams
-                        // This ensures compatibility with WASAPI on Windows
-                        let config: cpal::StreamConfig = input_config.clone().into();
-                        tracing::info!(
-                            "[AudioEngine] Using config: {} channels, {}Hz (requested was {} channels, {}Hz)",
+                        // Use the OUTPUT device's config for BOTH streams
+                        // This ensures data flows correctly through the ring buffer
+                        // The output (VB-Cable) is the critical device, input must adapt
+                        let config: cpal::StreamConfig = output_default.into();
+                        let _ = event_tx.send(AudioEngineEvent::Info(format!(
+                            "Using unified config: {}ch, {}Hz",
                             config.channels,
-                            config.sample_rate.0,
-                            channels,
-                            sample_rate
-                        );
+                            config.sample_rate.0
+                        )));
+
+                        // Check if input supports this config
+                        if input_default.channels() != config.channels
+                            || input_default.sample_rate().0 != config.sample_rate.0
+                        {
+                            let _ = event_tx.send(AudioEngineEvent::Info(format!(
+                                "Note: Input default differs ({}ch, {}Hz), forcing output config",
+                                input_default.channels(),
+                                input_default.sample_rate().0
+                            )));
+                        }
 
                         // Create ring buffer for audio pass-through
                         let rb = HeapRb::<f32>::new(RING_BUFFER_SIZE);
@@ -305,21 +317,6 @@ fn run_engine_thread(
                         // Store producer in Arc<Mutex> for input callback
                         let producer = Arc::new(Mutex::new(producer));
                         let consumer = Arc::new(Mutex::new(consumer));
-
-                        // For output, we need to check if the config is compatible
-                        // If not, we'll use the output device's default config
-                        let output_stream_config: cpal::StreamConfig = if output_config.channels() == config.channels
-                            && output_config.sample_rate() == config.sample_rate
-                        {
-                            config.clone()
-                        } else {
-                            tracing::warn!(
-                                "[AudioEngine] Output device config differs, using its default: {} channels, {}Hz",
-                                output_config.channels(),
-                                output_config.sample_rate().0
-                            );
-                            output_config.into()
-                        };
 
                         // Atomic level values for lock-free reading
                         let input_level = Arc::new(AtomicU32::new(0));
@@ -401,7 +398,7 @@ fn run_engine_thread(
 
                         // Build output stream
                         let output_result = output_dev.build_output_stream(
-                            &output_stream_config,
+                            &config,
                             move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
                                 // Log first few callbacks to verify stream is working
                                 let count = output_callback_count_clone.fetch_add(1, Ordering::Relaxed);

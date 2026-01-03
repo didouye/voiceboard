@@ -167,6 +167,16 @@ pub fn run() {
                                     }),
                                 );
                             }
+                            AudioEngineEvent::Info(msg) => {
+                                tracing::info!("[AudioEngine] {}", msg);
+                                let _ = app_handle.emit(
+                                    "audio-engine-log",
+                                    serde_json::json!({
+                                        "level": "info",
+                                        "message": msg
+                                    }),
+                                );
+                            }
                         }
                     }
                 }
