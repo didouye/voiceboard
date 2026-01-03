@@ -289,24 +289,24 @@ fn run_engine_thread(
                             }
                         };
 
-                        // Use the OUTPUT device's config for BOTH streams
-                        // This ensures data flows correctly through the ring buffer
-                        // The output (VB-Cable) is the critical device, input must adapt
-                        let config: cpal::StreamConfig = output_default.into();
+                        // Use the INPUT device's config for BOTH streams
+                        // Physical input devices (microphones) are usually less flexible than
+                        // virtual devices like VB-Cable, which typically support multiple sample rates
+                        let config: cpal::StreamConfig = input_default.into();
                         let _ = event_tx.send(AudioEngineEvent::Info(format!(
-                            "Using unified config: {}ch, {}Hz",
+                            "Using unified config: {}ch, {}Hz (from input device)",
                             config.channels,
                             config.sample_rate.0
                         )));
 
-                        // Check if input supports this config
-                        if input_default.channels() != config.channels
-                            || input_default.sample_rate().0 != config.sample_rate.0
+                        // Note if output default differs (VB-Cable should still accept input's config)
+                        if output_default.channels() != config.channels
+                            || output_default.sample_rate().0 != config.sample_rate.0
                         {
                             let _ = event_tx.send(AudioEngineEvent::Info(format!(
-                                "Note: Input default differs ({}ch, {}Hz), forcing output config",
-                                input_default.channels(),
-                                input_default.sample_rate().0
+                                "Note: Output default differs ({}ch, {}Hz), VB-Cable should adapt",
+                                output_default.channels(),
+                                output_default.sample_rate().0
                             )));
                         }
 
