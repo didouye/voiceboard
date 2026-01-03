@@ -633,8 +633,20 @@ pub async fn start_mixing(state: State<'_, AppState>) -> Result<(), String> {
     let mic_monitoring = settings.audio.mic_monitoring;
     drop(settings);
 
-    // Send start command to audio engine
+    // Send monitoring device BEFORE start (so it's available when stream is created)
     let engine = state.audio_engine.lock().await;
+    engine
+        .send_command(AudioEngineCommand::SetMonitoringDevice(preview_device))
+        .ok();
+
+    // Restore mic monitoring state BEFORE start
+    if mic_monitoring {
+        engine
+            .send_command(AudioEngineCommand::SetMicMonitoring(true))
+            .ok();
+    }
+
+    // Send start command to audio engine
     engine
         .send_command(AudioEngineCommand::Start {
             input_device,
@@ -643,18 +655,6 @@ pub async fn start_mixing(state: State<'_, AppState>) -> Result<(), String> {
             channels: 2, // Stereo
         })
         .map_err(|e| format!("Failed to start audio engine: {}", e))?;
-
-    // Send monitoring device to audio engine
-    engine
-        .send_command(AudioEngineCommand::SetMonitoringDevice(preview_device))
-        .ok();
-
-    // Restore mic monitoring state
-    if mic_monitoring {
-        engine
-            .send_command(AudioEngineCommand::SetMicMonitoring(true))
-            .ok();
-    }
 
     let mut is_mixing = state.is_mixing.write().await;
     *is_mixing = true;
@@ -790,6 +790,11 @@ pub async fn play_sound(
     use std::fs::File;
     use std::io::BufReader;
 
+    // Get engine sample rate from settings
+    let settings = state.settings.read().await;
+    let target_sample_rate = settings.audio.sample_rate;
+    drop(settings);
+
     // Decode the audio file
     let file = File::open(&path).map_err(|e| format!("Failed to open file: {}", e))?;
     let reader = BufReader::new(file);
@@ -798,16 +803,68 @@ pub async fn play_sound(
         rodio::Decoder::new(reader).map_err(|e| format!("Failed to decode audio file: {}", e))?;
 
     // Get format info
-    let sample_rate = decoder.sample_rate();
+    let source_sample_rate = decoder.sample_rate();
     let channels = decoder.channels();
 
     // Collect all samples as f32
-    let samples: Vec<f32> = decoder.convert_samples::<f32>().collect();
-    let samples_len = samples.len();
+    let mut samples: Vec<f32> = decoder.convert_samples::<f32>().collect();
+    let original_len = samples.len();
 
     if samples.is_empty() {
         return Err("Audio file contains no samples".to_string());
     }
+
+    // Convert stereo to mono if needed (average channels)
+    if channels == 2 {
+        let mono_samples: Vec<f32> = samples
+            .chunks(2)
+            .map(|chunk| {
+                if chunk.len() == 2 {
+                    (chunk[0] + chunk[1]) / 2.0
+                } else {
+                    chunk[0]
+                }
+            })
+            .collect();
+        samples = mono_samples;
+    }
+
+    // Resample if source sample rate differs from target
+    if source_sample_rate != target_sample_rate {
+        let ratio = target_sample_rate as f64 / source_sample_rate as f64;
+        let new_len = (samples.len() as f64 * ratio) as usize;
+        let mut resampled = Vec::with_capacity(new_len);
+
+        for i in 0..new_len {
+            let src_pos = i as f64 / ratio;
+            let src_idx = src_pos.floor() as usize;
+            let frac = src_pos - src_idx as f64;
+
+            let sample = if src_idx + 1 < samples.len() {
+                // Linear interpolation
+                let s0 = samples[src_idx] as f64;
+                let s1 = samples[src_idx + 1] as f64;
+                (s0 + (s1 - s0) * frac) as f32
+            } else if src_idx < samples.len() {
+                samples[src_idx]
+            } else {
+                0.0
+            };
+
+            resampled.push(sample);
+        }
+
+        tracing::info!(
+            "Resampled sound from {}Hz to {}Hz ({} -> {} samples)",
+            source_sample_rate,
+            target_sample_rate,
+            samples.len(),
+            resampled.len()
+        );
+        samples = resampled;
+    }
+
+    let samples_len = samples.len();
 
     // Send to audio engine
     let engine = state.audio_engine.lock().await;
@@ -816,10 +873,12 @@ pub async fn play_sound(
         .map_err(|e| format!("Failed to play sound: {}", e))?;
 
     tracing::info!(
-        "Playing sound: {} ({} samples, {}Hz, {} ch)",
+        "Playing sound: {} ({} samples original, {} final, {}Hz -> {}Hz, {} ch)",
         path,
+        original_len,
         samples_len,
-        sample_rate,
+        source_sample_rate,
+        target_sample_rate,
         channels
     );
 
