@@ -100,6 +100,11 @@
   - Icons and visuals for pads
   - Drag & drop to reorganize pads
 
+- [ ] **Sound Organization**
+  - Folders/categories to organize sounds
+  - Drag & drop sounds into folders
+  - Folder navigation in UI
+
 ---
 
 ## Phase 4 - Cloud & Collaboration
@@ -287,6 +292,21 @@
 - [ ] **Performance Optimizations**
   - Reduce CPU usage during idle
   - Optimize ring buffer size based on latency requirements
+
+### Advanced Features
+- [ ] **Team Synchronized Sound Playback**
+  - Alternative to sending sounds through virtual microphone
+  - Avoids issues with noise/echo cancellation systems (Krisp, Discord, etc.)
+  - Desktop sends command to cloud server instead of audio
+  - Server relays command to all team members
+  - Sound plays locally on each member's device
+  - Benefits: better audio quality (no voice codec compression), bypasses noise gates
+
+- [ ] **Noise & Echo Cancellation**
+  - Implement noise reduction similar to Krisp
+  - Research open-source alternatives (RNNoise, Speex, etc.)
+  - Real-time processing in audio pipeline
+  - Configurable sensitivity/aggressiveness
 
 ---
 
