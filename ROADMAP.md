@@ -2,7 +2,7 @@
 
 > **Last updated:** January 2026
 
-## Phase 1 - Core Application (MVP) - 75% Complete
+## Phase 1 - Core Application (MVP) - 95% Complete
 
 ### Done
 - [x] Hexagonal architecture (DDD, Ports & Adapters)
@@ -17,16 +17,14 @@
 - [x] Modern UI with dark theme
 - [x] Sound preview on system output with device selection
 - [x] Level visualization (VU meters) - Real-time audio levels display
-
-### To Do (Priority)
-- [ ] **VB-Audio Virtual Cable Bundling** (Windows)
-  - Detect if VB-Cable is installed during Voiceboard installation
+- [x] Virtual microphone output - Send mixed audio to VB-Cable
+- [x] **VB-Audio Virtual Cable Setup** (Windows)
+  - Detect if VB-Cable is installed on startup
   - Download VB-Cable installer from official website if not present
-  - Launch VB-Cable installer automatically
-  - Guide user through virtual audio setup
+  - Launch VB-Cable installer with UAC elevation
+  - Setup wizard guides user through installation
 
 ### To Do
-- [ ] Virtual microphone output - Send mixed audio to VB-Cable
 - [ ] Mic monitoring on preview output - Hear your own microphone in preview
 - [ ] Unit and integration tests - Increase test coverage
 - [ ] Individual volume control per pad in UI
@@ -34,7 +32,7 @@
 
 ---
 
-## Phase 2 - Distribution & CI/CD - 80% Complete
+## Phase 2 - Distribution & CI/CD - 90% Complete
 
 ### Done
 - [x] **GitHub Actions CI**
@@ -56,14 +54,19 @@
   - Auto-download and restart
   - Cryptographic signing for update verification (macOS/Windows)
 
+- [x] **Debug Console**
+  - Debug console UI (accessible via menu or keyboard shortcut)
+  - Toggle debug mode from application menu
+  - Display backend audio engine logs in real-time
+  - Log export functionality
+
 ### In Progress
-- [ ] **Error Tracking & Debugging (Sentry)**
+- [ ] **Error Tracking (Sentry)**
   - Integrate Sentry SDK in Rust backend
   - Integrate Sentry SDK in Angular frontend
   - Capture panics and errors
   - Source maps for frontend errors
   - Release tracking with version tags
-  - Debug console UI (accessible via help icon in footer)
 
 ### To Do
 - [ ] **GitHub Pages Landing Page**
