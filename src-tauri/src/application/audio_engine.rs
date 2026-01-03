@@ -43,6 +43,10 @@ pub enum AudioEngineCommand {
     SetMasterVolume(f32),
     /// Mute/unmute microphone
     SetMicMuted(bool),
+    /// Enable/disable mic monitoring
+    SetMicMonitoring(bool),
+    /// Set monitoring output device
+    SetMonitoringDevice(String),
     /// Shutdown the engine
     Shutdown,
 }

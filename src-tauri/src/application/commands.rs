@@ -475,11 +475,10 @@ pub async fn set_mic_monitoring(
     }
 
     // Send to audio engine
-    // TODO: Uncomment when AudioEngineCommand::SetMicMonitoring is added in Task 4
-    // let engine = state.audio_engine.lock().await;
-    // engine
-    //     .send_command(AudioEngineCommand::SetMicMonitoring(enabled))
-    //     .map_err(|e| format!("Failed to set mic monitoring: {}", e))?;
+    let engine = state.audio_engine.lock().await;
+    engine
+        .send_command(AudioEngineCommand::SetMicMonitoring(enabled))
+        .map_err(|e| format!("Failed to set mic monitoring: {}", e))?;
 
     // Auto-save settings
     let settings = state.settings.read().await;
