@@ -298,6 +298,30 @@ export class TauriService {
   }
 
   /**
+   * Load multiple audio files in parallel
+   * Returns an array of results (success with SoundFile or error string)
+   */
+  async loadMultipleSoundFiles(paths: string[]): Promise<Array<{ ok: SoundFile } | { err: string }>> {
+    const results = await invoke<Array<{ Ok?: any; Err?: string }>>('load_multiple_sound_files', { paths });
+    return results.map(r => {
+      if (r.Ok) {
+        return {
+          ok: {
+            id: r.Ok.id,
+            name: r.Ok.name,
+            path: r.Ok.path,
+            duration: r.Ok.duration,
+            sampleRate: r.Ok.sample_rate,
+            channels: r.Ok.channels
+          }
+        };
+      } else {
+        return { err: r.Err || 'Unknown error' };
+      }
+    });
+  }
+
+  /**
    * Play a sound file (mixed with microphone)
    */
   async playSound(id: string, path: string): Promise<void> {
