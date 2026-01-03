@@ -628,6 +628,8 @@ pub async fn start_mixing(state: State<'_, AppState>) -> Result<(), String> {
         .clone()
         .ok_or_else(|| "No output device selected".to_string())?;
     let sample_rate = settings.audio.sample_rate;
+    let preview_device = settings.audio.preview_device_id.clone().unwrap_or_else(|| "default".to_string());
+    let mic_monitoring = settings.audio.mic_monitoring;
     drop(settings);
 
     // Send start command to audio engine
@@ -640,6 +642,18 @@ pub async fn start_mixing(state: State<'_, AppState>) -> Result<(), String> {
             channels: 2, // Stereo
         })
         .map_err(|e| format!("Failed to start audio engine: {}", e))?;
+
+    // Send monitoring device to audio engine
+    engine
+        .send_command(AudioEngineCommand::SetMonitoringDevice(preview_device))
+        .ok();
+
+    // Restore mic monitoring state
+    if mic_monitoring {
+        engine
+            .send_command(AudioEngineCommand::SetMicMonitoring(true))
+            .ok();
+    }
 
     let mut is_mixing = state.is_mixing.write().await;
     *is_mixing = true;
