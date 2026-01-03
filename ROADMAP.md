@@ -29,6 +29,11 @@
 - [ ] Unit and integration tests - Increase test coverage
 - [ ] Individual volume control per pad in UI
 - [ ] Bulk import - Import multiple audio files at once
+- [ ] **Speed Playback**
+  - Button on each pad (next to preview button)
+  - Play sound at different speeds (accelerated/slowed)
+  - Outputs to both virtual output and monitoring
+  - Speed options: 0.5x, 0.75x, 1x, 1.25x, 1.5x, 2x
 
 ---
 
