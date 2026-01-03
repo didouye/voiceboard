@@ -267,6 +267,11 @@
   - Currently requires matching sample rates between input device and VB-Cable
 
 ### Quality of Life
+- [ ] **Launch at Startup**
+  - Option to start Voiceboard automatically when Windows/macOS boots
+  - Configurable from application settings
+  - Start minimized to system tray option
+
 - [ ] **Error Recovery**
   - Automatic reconnection when audio devices are disconnected/reconnected
   - Graceful handling of device changes during mixing
