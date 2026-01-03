@@ -15,6 +15,7 @@ interface SavedPad {
   sound: SoundFile | null;
   color: string;
   hotkey?: string;
+  volume?: number; // Optional for backwards compatibility
 }
 
 @Injectable({
@@ -68,7 +69,8 @@ export class SoundboardService {
       id: `pad-${i}`,
       sound: null,
       color: PAD_COLORS[i % PAD_COLORS.length],
-      isPlaying: false
+      isPlaying: false,
+      volume: 1.0
     }));
   }
 
@@ -79,10 +81,11 @@ export class SoundboardService {
     try {
       const saved = await this.tauri.loadSoundboardState();
       if (saved && saved.length > 0) {
-        // Restore pads, ensuring isPlaying is false
+        // Restore pads, ensuring isPlaying is false and volume has default
         const restoredPads: SoundPad[] = saved.map(p => ({
           ...p,
-          isPlaying: false
+          isPlaying: false,
+          volume: p.volume ?? 1.0 // Default for backwards compatibility
         }));
         this._pads.set(restoredPads);
         console.log(`Loaded ${saved.filter(p => p.sound).length} sounds from storage`);
@@ -107,7 +110,8 @@ export class SoundboardService {
         id: p.id,
         sound: p.sound,
         color: p.color,
-        hotkey: p.hotkey
+        hotkey: p.hotkey,
+        volume: p.volume
       }));
       await this.tauri.saveSoundboardState(padsToSave);
     } catch (err) {
@@ -125,7 +129,8 @@ export class SoundboardService {
       id: `pad-${startIndex + i}`,
       sound: null,
       color: PAD_COLORS[(startIndex + i) % PAD_COLORS.length],
-      isPlaying: false
+      isPlaying: false,
+      volume: 1.0
     }));
     this._pads.set([...current, ...newPads]);
     this.saveState();
@@ -392,8 +397,8 @@ export class SoundboardService {
         p.id === padId ? { ...p, isPlaying: true } : p
       ));
 
-      // Play the sound
-      await this.tauri.playSound(pad.sound.id, pad.sound.path);
+      // Play the sound with pad volume
+      await this.tauri.playSound(pad.sound.id, pad.sound.path, pad.volume);
 
       // Auto-stop after duration (with small buffer)
       setTimeout(() => {
@@ -433,6 +438,17 @@ export class SoundboardService {
   async stopAll(): Promise<void> {
     const playingPads = this._pads().filter(p => p.isPlaying);
     await Promise.all(playingPads.map(p => this.stopSound(p.id)));
+  }
+
+  /**
+   * Set volume for a pad (0.0-2.0, where 1.0 = 100%)
+   */
+  setPadVolume(padId: string, volume: number): void {
+    const clampedVolume = Math.max(0, Math.min(2, volume));
+    this._pads.update(pads => pads.map(p =>
+      p.id === padId ? { ...p, volume: clampedVolume } : p
+    ));
+    this.saveState();
   }
 
   /**

@@ -48,3 +48,72 @@ impl Default for AppState {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::AudioSettings;
+
+    #[tokio::test]
+    async fn test_app_state_new() {
+        let state = AppState::new();
+
+        // Verify initial state
+        assert!(!*state.is_mixing.read().await);
+        assert!(state.preview_engine.lock().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_app_state_default() {
+        let state = AppState::default();
+
+        assert!(!*state.is_mixing.read().await);
+    }
+
+    #[tokio::test]
+    async fn test_app_state_with_settings() {
+        let settings = AppSettings {
+            audio: AudioSettings {
+                master_volume: 0.75,
+                ..Default::default()
+            },
+            start_minimized: true,
+            auto_start_mixing: false,
+        };
+
+        let state = AppState::with_settings(settings);
+
+        // Verify settings were applied
+        let config = state.mixer_config.read().await;
+        assert_eq!(config.master_volume, 0.75);
+
+        let loaded_settings = state.settings.read().await;
+        assert!(loaded_settings.start_minimized);
+    }
+
+    #[tokio::test]
+    async fn test_app_state_mixer_config_default() {
+        let state = AppState::new();
+        let config = state.mixer_config.read().await;
+
+        assert_eq!(config.master_volume, 1.0);
+        assert!(config.channels.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_app_state_settings_default() {
+        let state = AppState::new();
+        let settings = state.settings.read().await;
+
+        assert!(!settings.start_minimized);
+        assert!(!settings.auto_start_mixing);
+    }
+
+    #[tokio::test]
+    async fn test_app_state_audio_engine_not_running() {
+        let state = AppState::new();
+        let engine = state.audio_engine.lock().await;
+
+        assert!(!engine.is_running());
+    }
+}

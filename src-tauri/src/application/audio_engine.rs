@@ -33,8 +33,12 @@ pub enum AudioEngineCommand {
     },
     /// Stop mixing
     Stop,
-    /// Play an audio buffer (from a sound file)
-    PlaySound { id: String, samples: Vec<f32> },
+    /// Play an audio buffer (from a sound file) with volume (0.0 - 2.0)
+    PlaySound {
+        id: String,
+        samples: Vec<f32>,
+        volume: f32,
+    },
     /// Stop a playing sound
     StopSound { id: String },
     /// Set microphone volume (0.0 - 2.0)
@@ -75,6 +79,8 @@ pub enum AudioEngineEvent {
 struct PlayingSound {
     samples: Vec<f32>,
     position: usize,
+    /// Volume for this sound (0.0 - 2.0)
+    volume: f32,
 }
 
 /// Shared state for audio processing
@@ -559,7 +565,8 @@ fn run_engine_thread(
                                         let frames_to_mix = remaining.min(num_frames);
 
                                         for frame in 0..frames_to_mix {
-                                            let mono_sample = sound.samples[sound.position + frame];
+                                            // Apply per-sound volume
+                                            let mono_sample = sound.samples[sound.position + frame] * sound.volume;
 
                                             // Duplicate mono sample to all output channels
                                             for ch in 0..output_ch as usize {
@@ -943,13 +950,18 @@ fn run_engine_thread(
                         tracing::info!("Audio engine stopped");
                     }
 
-                    AudioEngineCommand::PlaySound { id, samples } => {
+                    AudioEngineCommand::PlaySound {
+                        id,
+                        samples,
+                        volume,
+                    } => {
                         if let Ok(mut state) = audio_state.lock() {
                             state.playing_sounds.insert(
                                 id,
                                 PlayingSound {
                                     samples,
                                     position: 0,
+                                    volume: volume.clamp(0.0, 2.0),
                                 },
                             );
                         }
@@ -1120,9 +1132,11 @@ mod tests {
         let sound = PlayingSound {
             samples: samples.clone(),
             position: 0,
+            volume: 1.0,
         };
         assert_eq!(sound.samples.len(), 5);
         assert_eq!(sound.position, 0);
+        assert_eq!(sound.volume, 1.0);
     }
 
     #[test]
@@ -1130,6 +1144,7 @@ mod tests {
         let mut sound = PlayingSound {
             samples: vec![0.1, 0.2, 0.3, 0.4, 0.5],
             position: 0,
+            volume: 1.0,
         };
 
         // Simulate playback advancing
@@ -1146,6 +1161,7 @@ mod tests {
         let sound = PlayingSound {
             samples: vec![0.1, 0.2, 0.3],
             position: 3,
+            volume: 0.5,
         };
         assert!(sound.position >= sound.samples.len());
     }
@@ -1158,11 +1174,18 @@ mod tests {
         let cmd = AudioEngineCommand::PlaySound {
             id: "test-sound".to_string(),
             samples: samples.clone(),
+            volume: 0.8,
         };
 
-        if let AudioEngineCommand::PlaySound { id, samples: s } = cmd {
+        if let AudioEngineCommand::PlaySound {
+            id,
+            samples: s,
+            volume,
+        } = cmd
+        {
             assert_eq!(id, "test-sound");
             assert_eq!(s.len(), 3);
+            assert_eq!(volume, 0.8);
         } else {
             panic!("Expected PlaySound command");
         }

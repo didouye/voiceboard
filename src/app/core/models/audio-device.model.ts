@@ -69,4 +69,6 @@ export interface SoundPad {
   color: string;
   hotkey?: string;
   isPlaying: boolean;
+  /** Volume level (0.0-2.0, default 1.0 = 100%) */
+  volume: number;
 }

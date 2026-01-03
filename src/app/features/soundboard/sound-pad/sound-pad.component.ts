@@ -1,12 +1,13 @@
-import { Component, Input, Output, EventEmitter } from '@angular/core';
+import { Component, Input, Output, EventEmitter, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { SoundPad } from '../../../core/models';
 import { SoundboardService } from '../../../core/services/soundboard.service';
 
 @Component({
   selector: 'app-sound-pad',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   template: `
     <div
       class="sound-pad"
@@ -34,6 +35,12 @@ import { SoundboardService } from '../../../core/services/soundboard.service';
           </div>
         }
         <div class="action-buttons">
+          <button class="action-btn volume-btn"
+                  [class.adjusted]="pad.volume !== 1.0"
+                  (click)="toggleVolumePopup($event)"
+                  title="Volume ({{ Math.round(pad.volume * 100) }}%)">
+            🔊
+          </button>
           <button class="action-btn preview-btn"
                   [class.active]="isPreviewing"
                   (click)="onPreview($event)"
@@ -44,6 +51,29 @@ import { SoundboardService } from '../../../core/services/soundboard.service';
             ×
           </button>
         </div>
+
+        <!-- Volume Popup -->
+        @if (showVolumePopup) {
+          <div class="volume-popup" (click)="$event.stopPropagation()">
+            <div class="volume-header">
+              <span>Volume</span>
+              <span class="volume-value">{{ Math.round(pad.volume * 100) }}%</span>
+            </div>
+            <input type="range"
+                   class="volume-slider"
+                   [ngModel]="pad.volume"
+                   (ngModelChange)="onVolumeChange($event)"
+                   min="0"
+                   max="2"
+                   step="0.05">
+            <div class="volume-marks">
+              <span>0%</span>
+              <span>100%</span>
+              <span>200%</span>
+            </div>
+            <button class="reset-btn" (click)="resetVolume()">Reset to 100%</button>
+          </div>
+        }
       } @else {
         <div class="empty-pad">
           <span class="plus-icon">+</span>
@@ -61,7 +91,7 @@ import { SoundboardService } from '../../../core/services/soundboard.service';
       border-radius: 12px;
       cursor: pointer;
       position: relative;
-      overflow: hidden;
+      overflow: visible;
       transition: all 0.2s ease;
       display: flex;
       align-items: center;
@@ -183,6 +213,14 @@ import { SoundboardService } from '../../../core/services/soundboard.service';
       transition: background 0.2s;
     }
 
+    .volume-btn:hover {
+      background: #3498db;
+    }
+
+    .volume-btn.adjusted {
+      background: #f39c12;
+    }
+
     .preview-btn:hover {
       background: #27ae60;
     }
@@ -249,6 +287,97 @@ import { SoundboardService } from '../../../core/services/soundboard.service';
     .sound-pad.has-sound .hotkey-badge {
       background: rgba(0, 0, 0, 0.4);
     }
+
+    /* Volume Popup Styles */
+    .volume-popup {
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1a1a2e;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      padding: 12px;
+      min-width: 160px;
+      z-index: 100;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      margin-top: 4px;
+    }
+
+    .volume-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 0.75rem;
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .volume-value {
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .volume-slider {
+      width: 100%;
+      height: 6px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .volume-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      background: #fff;
+      border-radius: 50%;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+
+    .volume-slider::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+
+    .volume-slider::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      background: #fff;
+      border-radius: 50%;
+      cursor: pointer;
+      border: none;
+    }
+
+    .volume-marks {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.6rem;
+      color: rgba(255, 255, 255, 0.4);
+      margin-top: 4px;
+    }
+
+    .reset-btn {
+      width: 100%;
+      margin-top: 8px;
+      padding: 4px 8px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 0.7rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .reset-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+      color: #fff;
+    }
   `]
 })
 export class SoundPadComponent {
@@ -261,8 +390,20 @@ export class SoundPadComponent {
   @Output() preview = new EventEmitter<void>();
   @Output() import = new EventEmitter<void>();
   @Output() remove = new EventEmitter<void>();
+  @Output() volumeChange = new EventEmitter<number>();
+
+  showVolumePopup = false;
+  Math = Math; // Expose Math to template
 
   constructor(private soundboardService: SoundboardService) {}
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    // Close popup when clicking outside
+    if (this.showVolumePopup) {
+      this.showVolumePopup = false;
+    }
+  }
 
   onClick(event: MouseEvent): void {
     if (this.pad.sound) {
@@ -287,6 +428,19 @@ export class SoundPadComponent {
   onRemove(event: MouseEvent): void {
     event.stopPropagation();
     this.remove.emit();
+  }
+
+  toggleVolumePopup(event: MouseEvent): void {
+    event.stopPropagation();
+    this.showVolumePopup = !this.showVolumePopup;
+  }
+
+  onVolumeChange(volume: number): void {
+    this.volumeChange.emit(volume);
+  }
+
+  resetVolume(): void {
+    this.volumeChange.emit(1.0);
   }
 
   formatDuration(seconds: number): string {
