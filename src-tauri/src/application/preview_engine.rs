@@ -81,7 +81,7 @@ impl Drop for PreviewEngine {
 fn find_output_device(name: &str) -> Option<cpal::Device> {
     let host = cpal::default_host();
 
-    if name == "default" || name.is_empty() {
+    if is_default_device(name) {
         return host.default_output_device();
     }
 
@@ -97,6 +97,11 @@ fn find_output_device(name: &str) -> Option<cpal::Device> {
 
     // Fallback to default
     host.default_output_device()
+}
+
+/// Check if a device name refers to the default device
+fn is_default_device(name: &str) -> bool {
+    name == "default" || name.is_empty()
 }
 
 /// The main preview thread
@@ -236,4 +241,106 @@ fn run_preview_thread(
             }
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ==================== PreviewCommand Tests ====================
+
+    #[test]
+    fn test_preview_command_play_creation() {
+        let cmd = PreviewCommand::Play {
+            path: "/sounds/test.mp3".to_string(),
+            device_name: "Speakers".to_string(),
+            pad_id: "pad-1".to_string(),
+        };
+
+        if let PreviewCommand::Play {
+            path,
+            device_name,
+            pad_id,
+        } = cmd
+        {
+            assert_eq!(path, "/sounds/test.mp3");
+            assert_eq!(device_name, "Speakers");
+            assert_eq!(pad_id, "pad-1");
+        } else {
+            panic!("Expected Play command");
+        }
+    }
+
+    #[test]
+    fn test_preview_command_stop() {
+        let cmd = PreviewCommand::Stop;
+        assert!(matches!(cmd, PreviewCommand::Stop));
+    }
+
+    #[test]
+    fn test_preview_command_shutdown() {
+        let cmd = PreviewCommand::Shutdown;
+        assert!(matches!(cmd, PreviewCommand::Shutdown));
+    }
+
+    #[test]
+    fn test_preview_command_debug_format() {
+        let cmd = PreviewCommand::Stop;
+        let debug_str = format!("{:?}", cmd);
+        assert_eq!(debug_str, "Stop");
+    }
+
+    #[test]
+    fn test_preview_command_play_debug_format() {
+        let cmd = PreviewCommand::Play {
+            path: "test.mp3".to_string(),
+            device_name: "default".to_string(),
+            pad_id: "p1".to_string(),
+        };
+        let debug_str = format!("{:?}", cmd);
+        assert!(debug_str.contains("Play"));
+        assert!(debug_str.contains("test.mp3"));
+    }
+
+    // ==================== Helper Function Tests ====================
+
+    #[test]
+    fn test_is_default_device_with_default() {
+        assert!(is_default_device("default"));
+    }
+
+    #[test]
+    fn test_is_default_device_with_empty() {
+        assert!(is_default_device(""));
+    }
+
+    #[test]
+    fn test_is_default_device_with_specific_name() {
+        assert!(!is_default_device("Speakers"));
+        assert!(!is_default_device("MacBook Pro Speakers"));
+        assert!(!is_default_device("VB-Cable"));
+    }
+
+    #[test]
+    fn test_is_default_device_case_sensitive() {
+        // "default" is the exact match, "Default" is not
+        assert!(is_default_device("default"));
+        assert!(!is_default_device("Default"));
+        assert!(!is_default_device("DEFAULT"));
+    }
+
+    // ==================== Integration Test Notes ====================
+    //
+    // The following functionality requires Tauri AppHandle and cannot be
+    // unit tested without mocking:
+    //
+    // - PreviewEngine::new() - requires AppHandle
+    // - PreviewEngine::send_command() - requires running engine
+    // - PreviewEngine::current_pad_id() - requires running engine
+    // - PreviewEngine::shutdown() - requires running engine
+    // - find_output_device() - requires cpal audio system
+    // - run_preview_thread() - requires AppHandle and cpal
+    //
+    // These should be tested via integration tests with a real Tauri app
+    // or by implementing a mock AppHandle trait.
 }
