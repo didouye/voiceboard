@@ -200,6 +200,7 @@ fn run_engine_thread(
     // Active streams (kept alive while running)
     let mut input_stream: Option<cpal::Stream> = None;
     let mut output_stream: Option<cpal::Stream> = None;
+    let mut monitoring_stream: Option<cpal::Stream> = None;
 
     // Shared state for audio processing
     let audio_state = Arc::new(Mutex::new(AudioState::default()));
@@ -213,6 +214,10 @@ fn run_engine_thread(
     let mic_volume = Arc::new(AtomicU32::new(f32::to_bits(1.0)));
     let master_volume = Arc::new(AtomicU32::new(f32::to_bits(1.0)));
     let mic_muted = Arc::new(AtomicBool::new(false));
+
+    // Monitoring state
+    let mic_monitoring = Arc::new(AtomicBool::new(false));
+    let monitoring_device_name = Arc::new(Mutex::new(String::from("default")));
 
     loop {
         // Process commands
@@ -401,6 +406,12 @@ fn run_engine_thread(
                         let producer = Arc::new(Mutex::new(producer));
                         let consumer = Arc::new(Mutex::new(consumer));
 
+                        // Create second ring buffer for monitoring output
+                        let rb_monitoring = HeapRb::<f32>::new(RING_BUFFER_SIZE);
+                        let (producer_monitoring, consumer_monitoring) = rb_monitoring.split();
+                        let producer_monitoring = Arc::new(Mutex::new(producer_monitoring));
+                        let consumer_monitoring = Arc::new(Mutex::new(consumer_monitoring));
+
                         // Atomic level values for lock-free reading
                         let input_level = Arc::new(AtomicU32::new(0));
                         let output_level = Arc::new(AtomicU32::new(0));
@@ -410,6 +421,8 @@ fn run_engine_thread(
                         let producer_clone = producer.clone();
                         let mic_volume_clone = mic_volume.clone();
                         let mic_muted_clone = mic_muted.clone();
+                        let producer_monitoring_clone = producer_monitoring.clone();
+                        let mic_monitoring_clone = mic_monitoring.clone();
 
                         // Debug counter for input callback
                         let input_callback_count = Arc::new(AtomicU32::new(0));
@@ -434,6 +447,7 @@ fn run_engine_thread(
                                 let muted = mic_muted_clone.load(Ordering::Relaxed);
                                 let volume =
                                     f32::from_bits(mic_volume_clone.load(Ordering::Relaxed));
+                                let monitoring_enabled = mic_monitoring_clone.load(Ordering::Relaxed);
 
                                 // Calculate RMS for input level
                                 let mut sum_squares = 0.0f32;
@@ -443,6 +457,16 @@ fn run_engine_thread(
                                         let processed = if muted { 0.0 } else { sample * volume };
                                         sum_squares += processed * processed;
                                         let _ = prod.try_push(processed);
+                                    }
+                                }
+
+                                // Also write to monitoring ring buffer when monitoring is enabled
+                                if monitoring_enabled {
+                                    if let Ok(mut prod_mon) = producer_monitoring_clone.try_lock() {
+                                        for &sample in data {
+                                            let processed = if muted { 0.0 } else { sample * volume };
+                                            let _ = prod_mon.try_push(processed);
+                                        }
                                     }
                                 }
 
@@ -571,6 +595,89 @@ fn run_engine_thread(
                             }
                         };
 
+                        // Build monitoring output stream
+                        let monitoring_dev_name = {
+                            let name = monitoring_device_name.lock().unwrap();
+                            name.clone()
+                        };
+
+                        let mut monitoring_s: Option<cpal::Stream> = None;
+                        if let Some(monitoring_dev) = find_device(&host, &monitoring_dev_name, false) {
+                            let consumer_monitoring_clone = consumer_monitoring.clone();
+                            let master_volume_monitoring = master_volume.clone();
+                            let audio_state_monitoring = audio_state.clone();
+                            let mic_monitoring_for_output = mic_monitoring.clone();
+
+                            let monitoring_result = monitoring_dev.build_output_stream(
+                                &config,
+                                move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
+                                    let master_vol = f32::from_bits(master_volume_monitoring.load(Ordering::Relaxed));
+                                    let monitoring_enabled = mic_monitoring_for_output.load(Ordering::Relaxed);
+
+                                    // Fill with mic input from monitoring ring buffer (if enabled)
+                                    if monitoring_enabled {
+                                        if let Ok(mut cons) = consumer_monitoring_clone.try_lock() {
+                                            for sample in data.iter_mut() {
+                                                *sample = cons.try_pop().unwrap_or(0.0);
+                                            }
+                                        } else {
+                                            for sample in data.iter_mut() {
+                                                *sample = 0.0;
+                                            }
+                                        }
+                                    } else {
+                                        for sample in data.iter_mut() {
+                                            *sample = 0.0;
+                                        }
+                                    }
+
+                                    // Mix in playing sounds (always play on monitoring)
+                                    if let Ok(mut state) = audio_state_monitoring.try_lock() {
+                                        for (_id, sound) in state.playing_sounds.iter_mut() {
+                                            let remaining = sound.samples.len() - sound.position;
+                                            let to_mix = remaining.min(data.len());
+
+                                            for (i, sample) in data.iter_mut().take(to_mix).enumerate() {
+                                                if sound.position + i < sound.samples.len() {
+                                                    *sample = (*sample + sound.samples[sound.position + i]).clamp(-1.0, 1.0);
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // Apply master volume
+                                    for sample in data.iter_mut() {
+                                        *sample = (*sample * master_vol).clamp(-1.0, 1.0);
+                                    }
+                                },
+                                move |err| {
+                                    tracing::error!("Monitoring stream error: {}", err);
+                                },
+                                None,
+                            );
+
+                            match monitoring_result {
+                                Ok(s) => {
+                                    monitoring_s = Some(s);
+                                    let _ = event_tx.send(AudioEngineEvent::Info(format!(
+                                        "Monitoring stream created on: {}",
+                                        monitoring_dev_name
+                                    )));
+                                }
+                                Err(e) => {
+                                    let _ = event_tx.send(AudioEngineEvent::Info(format!(
+                                        "Failed to create monitoring stream: {} (non-fatal)",
+                                        e
+                                    )));
+                                }
+                            }
+                        } else {
+                            let _ = event_tx.send(AudioEngineEvent::Info(format!(
+                                "Monitoring device not found: {} (non-fatal)",
+                                monitoring_dev_name
+                            )));
+                        }
+
                         // Start streams
                         if let Err(e) = input_s.play() {
                             let _ = event_tx.send(AudioEngineEvent::Error(format!(
@@ -588,9 +695,25 @@ fn run_engine_thread(
                             continue;
                         }
 
+                        // Start monitoring stream if it was created
+                        if let Some(ref mon_s) = monitoring_s {
+                            if let Err(e) = mon_s.play() {
+                                let _ = event_tx.send(AudioEngineEvent::Info(format!(
+                                    "Failed to start monitoring stream: {} (non-fatal)",
+                                    e
+                                )));
+                            } else {
+                                let _ = event_tx.send(AudioEngineEvent::Info(format!(
+                                    "Monitoring stream started on: {}",
+                                    monitoring_dev_name
+                                )));
+                            }
+                        }
+
                         // Store streams to keep them alive
                         input_stream = Some(input_s);
                         output_stream = Some(output_s);
+                        monitoring_stream = monitoring_s;
 
                         is_running.store(true, Ordering::SeqCst);
                         let _ = event_tx.send(AudioEngineEvent::Started);
@@ -652,10 +775,14 @@ fn run_engine_thread(
                         if let Some(ref stream) = output_stream {
                             let _ = stream.pause();
                         }
+                        if let Some(ref stream) = monitoring_stream {
+                            let _ = stream.pause();
+                        }
 
                         // Drop the streams
                         input_stream = None;
                         output_stream = None;
+                        monitoring_stream = None;
 
                         // Clear the ring buffer to prevent any leftover audio
                         if let Ok(mut rb) = ring_buffer.lock() {
@@ -703,6 +830,18 @@ fn run_engine_thread(
                         mic_muted.store(muted, Ordering::Relaxed);
                     }
 
+                    AudioEngineCommand::SetMicMonitoring(enabled) => {
+                        mic_monitoring.store(enabled, Ordering::Relaxed);
+                        tracing::info!("Mic monitoring set to: {}", enabled);
+                    }
+
+                    AudioEngineCommand::SetMonitoringDevice(device_name) => {
+                        if let Ok(mut name) = monitoring_device_name.lock() {
+                            *name = device_name.clone();
+                        }
+                        tracing::info!("Monitoring device set to: {}", device_name);
+                    }
+
                     AudioEngineCommand::Shutdown => {
                         // Pause streams before dropping
                         if let Some(ref stream) = input_stream {
@@ -711,9 +850,13 @@ fn run_engine_thread(
                         if let Some(ref stream) = output_stream {
                             let _ = stream.pause();
                         }
+                        if let Some(ref stream) = monitoring_stream {
+                            let _ = stream.pause();
+                        }
 
                         drop(input_stream);
                         drop(output_stream);
+                        drop(monitoring_stream);
                         is_running.store(false, Ordering::SeqCst);
                         tracing::info!("Audio engine shutdown");
                         return;
