@@ -269,7 +269,7 @@ fn run_engine_thread(
                             }
                         };
 
-                        let output_default = match output_dev.default_output_config() {
+                        let _output_default = match output_dev.default_output_config() {
                             Ok(c) => {
                                 let _ = event_tx.send(AudioEngineEvent::Info(format!(
                                     "Output '{}': {:?}, {}ch, {}Hz",
@@ -289,26 +289,105 @@ fn run_engine_thread(
                             }
                         };
 
-                        // Use the INPUT device's config for BOTH streams
-                        // Physical input devices (microphones) are usually less flexible than
-                        // virtual devices like VB-Cable, which typically support multiple sample rates
-                        let config: cpal::StreamConfig = input_default.into();
-                        let _ = event_tx.send(AudioEngineEvent::Info(format!(
-                            "Using unified config: {}ch, {}Hz (from input device)",
-                            config.channels,
-                            config.sample_rate.0
-                        )));
+                        // Find a common configuration supported by both devices
+                        // Try to find a sample rate that works for both
+                        let common_sample_rates = [48000u32, 44100, 96000, 22050, 16000];
 
-                        // Note if output default differs (VB-Cable should still accept input's config)
-                        if output_default.channels() != config.channels
-                            || output_default.sample_rate().0 != config.sample_rate.0
-                        {
+                        let mut found_config: Option<cpal::StreamConfig> = None;
+
+                        // Get supported configs for input
+                        let input_configs: Vec<_> = input_dev
+                            .supported_input_configs()
+                            .map(|c| c.collect())
+                            .unwrap_or_default();
+
+                        // Get supported configs for output
+                        let output_configs: Vec<_> = output_dev
+                            .supported_output_configs()
+                            .map(|c| c.collect())
+                            .unwrap_or_default();
+
+                        // Log supported configs
+                        let _ = event_tx.send(AudioEngineEvent::Info(format!(
+                            "Input supported: {} configs",
+                            input_configs.len()
+                        )));
+                        for cfg in &input_configs {
                             let _ = event_tx.send(AudioEngineEvent::Info(format!(
-                                "Note: Output default differs ({}ch, {}Hz), VB-Cable should adapt",
-                                output_default.channels(),
-                                output_default.sample_rate().0
+                                "  Input: {}ch, {}Hz-{}Hz, {:?}",
+                                cfg.channels(),
+                                cfg.min_sample_rate().0,
+                                cfg.max_sample_rate().0,
+                                cfg.sample_format()
                             )));
                         }
+
+                        let _ = event_tx.send(AudioEngineEvent::Info(format!(
+                            "Output supported: {} configs",
+                            output_configs.len()
+                        )));
+                        for cfg in &output_configs {
+                            let _ = event_tx.send(AudioEngineEvent::Info(format!(
+                                "  Output: {}ch, {}Hz-{}Hz, {:?}",
+                                cfg.channels(),
+                                cfg.min_sample_rate().0,
+                                cfg.max_sample_rate().0,
+                                cfg.sample_format()
+                            )));
+                        }
+
+                        // Find common sample rate
+                        'outer: for &rate in &common_sample_rates {
+                            let sr = cpal::SampleRate(rate);
+
+                            // Check if input supports this rate with 2 channels
+                            let input_supports = input_configs.iter().any(|c| {
+                                c.channels() >= 1
+                                    && sr >= c.min_sample_rate()
+                                    && sr <= c.max_sample_rate()
+                            });
+
+                            // Check if output supports this rate
+                            let output_supports = output_configs.iter().any(|c| {
+                                c.channels() >= 1
+                                    && sr >= c.min_sample_rate()
+                                    && sr <= c.max_sample_rate()
+                            });
+
+                            if input_supports && output_supports {
+                                // Find the right number of channels (prefer stereo)
+                                let channels = if input_configs.iter().any(|c| c.channels() == 2)
+                                    && output_configs.iter().any(|c| c.channels() >= 2)
+                                {
+                                    2
+                                } else {
+                                    1
+                                };
+
+                                found_config = Some(cpal::StreamConfig {
+                                    channels,
+                                    sample_rate: sr,
+                                    buffer_size: cpal::BufferSize::Default,
+                                });
+
+                                let _ = event_tx.send(AudioEngineEvent::Info(format!(
+                                    "Found common config: {}ch, {}Hz",
+                                    channels, rate
+                                )));
+                                break 'outer;
+                            }
+                        }
+
+                        let config = match found_config {
+                            Some(c) => c,
+                            None => {
+                                // Fallback: try input's default config
+                                let _ = event_tx.send(AudioEngineEvent::Info(
+                                    "No common config found, trying input default".to_string()
+                                ));
+                                input_default.into()
+                            }
+                        };
 
                         // Create ring buffer for audio pass-through
                         let rb = HeapRb::<f32>::new(RING_BUFFER_SIZE);
