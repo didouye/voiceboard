@@ -117,6 +117,7 @@ pub struct AudioSettingsDto {
     pub master_volume: f32,
     pub sample_rate: u32,
     pub buffer_size: u32,
+    #[serde(default)]
     pub mic_monitoring: bool,
 }
 

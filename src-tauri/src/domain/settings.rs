@@ -18,6 +18,7 @@ pub struct AudioSettings {
     /// Buffer size in frames
     pub buffer_size: u32,
     /// Enable mic monitoring on preview output
+    #[serde(default)]
     pub mic_monitoring: bool,
 }
 
