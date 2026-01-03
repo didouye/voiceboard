@@ -246,42 +246,57 @@ fn run_engine_thread(
                             }
                         };
 
-                        // Log device capabilities for debugging
-                        tracing::info!(
-                            "[AudioEngine] Input device: {} - requested config: {}Hz, {} channels",
-                            input_device,
-                            sample_rate,
-                            channels
-                        );
-                        if let Ok(configs) = input_dev.supported_input_configs() {
-                            for config in configs {
+                        // Get default configs from devices (more reliable on Windows)
+                        let input_config = match input_dev.default_input_config() {
+                            Ok(c) => {
                                 tracing::info!(
-                                    "[AudioEngine]   Supported: {:?} format, {} channels, {}Hz-{}Hz",
-                                    config.sample_format(),
-                                    config.channels(),
-                                    config.min_sample_rate().0,
-                                    config.max_sample_rate().0
+                                    "[AudioEngine] Input device '{}' default config: {:?} format, {} channels, {}Hz",
+                                    input_device,
+                                    c.sample_format(),
+                                    c.channels(),
+                                    c.sample_rate().0
                                 );
+                                c
                             }
-                        }
+                            Err(e) => {
+                                let _ = event_tx.send(AudioEngineEvent::Error(format!(
+                                    "Failed to get input config: {}",
+                                    e
+                                )));
+                                continue;
+                            }
+                        };
 
-                        tracing::info!(
-                            "[AudioEngine] Output device: {} - requested config: {}Hz, {} channels",
-                            output_device,
-                            sample_rate,
-                            channels
-                        );
-                        if let Ok(configs) = output_dev.supported_output_configs() {
-                            for config in configs {
+                        let output_config = match output_dev.default_output_config() {
+                            Ok(c) => {
                                 tracing::info!(
-                                    "[AudioEngine]   Supported: {:?} format, {} channels, {}Hz-{}Hz",
-                                    config.sample_format(),
-                                    config.channels(),
-                                    config.min_sample_rate().0,
-                                    config.max_sample_rate().0
+                                    "[AudioEngine] Output device '{}' default config: {:?} format, {} channels, {}Hz",
+                                    output_device,
+                                    c.sample_format(),
+                                    c.channels(),
+                                    c.sample_rate().0
                                 );
+                                c
                             }
-                        }
+                            Err(e) => {
+                                let _ = event_tx.send(AudioEngineEvent::Error(format!(
+                                    "Failed to get output config: {}",
+                                    e
+                                )));
+                                continue;
+                            }
+                        };
+
+                        // Use the input device's default config for both streams
+                        // This ensures compatibility with WASAPI on Windows
+                        let config: cpal::StreamConfig = input_config.clone().into();
+                        tracing::info!(
+                            "[AudioEngine] Using config: {} channels, {}Hz (requested was {} channels, {}Hz)",
+                            config.channels,
+                            config.sample_rate.0,
+                            channels,
+                            sample_rate
+                        );
 
                         // Create ring buffer for audio pass-through
                         let rb = HeapRb::<f32>::new(RING_BUFFER_SIZE);
@@ -291,10 +306,19 @@ fn run_engine_thread(
                         let producer = Arc::new(Mutex::new(producer));
                         let consumer = Arc::new(Mutex::new(consumer));
 
-                        let config = cpal::StreamConfig {
-                            channels,
-                            sample_rate: cpal::SampleRate(sample_rate),
-                            buffer_size: cpal::BufferSize::Default,
+                        // For output, we need to check if the config is compatible
+                        // If not, we'll use the output device's default config
+                        let output_stream_config: cpal::StreamConfig = if output_config.channels() == config.channels
+                            && output_config.sample_rate() == config.sample_rate
+                        {
+                            config.clone()
+                        } else {
+                            tracing::warn!(
+                                "[AudioEngine] Output device config differs, using its default: {} channels, {}Hz",
+                                output_config.channels(),
+                                output_config.sample_rate().0
+                            );
+                            output_config.into()
                         };
 
                         // Atomic level values for lock-free reading
@@ -377,7 +401,7 @@ fn run_engine_thread(
 
                         // Build output stream
                         let output_result = output_dev.build_output_stream(
-                            &config,
+                            &output_stream_config,
                             move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
                                 // Log first few callbacks to verify stream is working
                                 let count = output_callback_count_clone.fetch_add(1, Ordering::Relaxed);

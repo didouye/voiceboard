@@ -115,27 +115,58 @@ pub fn run() {
                 *preview = Some(preview_engine);
             }
 
-            // Start level event forwarding
-            let engine_for_levels = state_ref.audio_engine.clone();
+            // Start audio engine event forwarding
+            let engine_for_events = state_ref.audio_engine.clone();
             std::thread::spawn(move || loop {
-                if let Ok(engine) = engine_for_levels.try_lock() {
+                if let Ok(engine) = engine_for_events.try_lock() {
                     while let Some(event) = engine.try_recv_event() {
-                        if let AudioEngineEvent::LevelUpdate {
-                            input_rms,
-                            input_peak,
-                            output_rms,
-                            output_peak,
-                        } = event
-                        {
-                            let _ = app_handle.emit(
-                                "audio-levels",
-                                serde_json::json!({
-                                    "inputRms": input_rms,
-                                    "inputPeak": input_peak,
-                                    "outputRms": output_rms,
-                                    "outputPeak": output_peak,
-                                }),
-                            );
+                        match event {
+                            AudioEngineEvent::LevelUpdate {
+                                input_rms,
+                                input_peak,
+                                output_rms,
+                                output_peak,
+                            } => {
+                                let _ = app_handle.emit(
+                                    "audio-levels",
+                                    serde_json::json!({
+                                        "inputRms": input_rms,
+                                        "inputPeak": input_peak,
+                                        "outputRms": output_rms,
+                                        "outputPeak": output_peak,
+                                    }),
+                                );
+                            }
+                            AudioEngineEvent::Started => {
+                                tracing::info!("[AudioEngine] Engine started successfully");
+                                let _ = app_handle.emit(
+                                    "audio-engine-log",
+                                    serde_json::json!({
+                                        "level": "info",
+                                        "message": "Audio engine started successfully"
+                                    }),
+                                );
+                            }
+                            AudioEngineEvent::Stopped => {
+                                tracing::info!("[AudioEngine] Engine stopped");
+                                let _ = app_handle.emit(
+                                    "audio-engine-log",
+                                    serde_json::json!({
+                                        "level": "info",
+                                        "message": "Audio engine stopped"
+                                    }),
+                                );
+                            }
+                            AudioEngineEvent::Error(msg) => {
+                                tracing::error!("[AudioEngine] Error: {}", msg);
+                                let _ = app_handle.emit(
+                                    "audio-engine-log",
+                                    serde_json::json!({
+                                        "level": "error",
+                                        "message": format!("Audio engine error: {}", msg)
+                                    }),
+                                );
+                            }
                         }
                     }
                 }

@@ -70,6 +70,20 @@ export class DebugConsoleService {
     } catch {
       // Event listener not available
     }
+
+    // Listen for audio engine log events
+    try {
+      await listen<{ level: string; message: string }>('audio-engine-log', (event) => {
+        const level = this.parseLevel(event.payload.level);
+        this.addLog({
+          timestamp: new Date(),
+          level,
+          message: `[AudioEngine] ${event.payload.message}`,
+        });
+      });
+    } catch {
+      // Event listener not available
+    }
   }
 
   private parseLevel(level: string): LogEntry['level'] {
