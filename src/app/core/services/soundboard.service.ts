@@ -132,6 +132,49 @@ export class SoundboardService {
   }
 
   /**
+   * Ensure there's at least one empty pad available.
+   * If the last empty pad was just filled, add a new row of 4 pads.
+   */
+  private ensureEmptyPadAvailable(): void {
+    const pads = this._pads();
+    const hasEmptyPad = pads.some(p => p.sound === null);
+
+    if (!hasEmptyPad) {
+      this.addPads(4);
+    }
+  }
+
+  /**
+   * Remove empty rows from the end, keeping:
+   * - Minimum 12 pads (3 rows)
+   * - At least 1 empty pad
+   */
+  private cleanupEmptyRows(): void {
+    const pads = this._pads();
+    const minPads = 12;
+
+    if (pads.length <= minPads) return;
+
+    // Find the last pad with a sound
+    let lastFilledIndex = -1;
+    for (let i = pads.length - 1; i >= 0; i--) {
+      if (pads[i].sound !== null) {
+        lastFilledIndex = i;
+        break;
+      }
+    }
+
+    // Calculate how many pads to keep (round up to complete row of 4, plus ensure 1 empty)
+    const padsNeeded = lastFilledIndex + 1;
+    const rowsNeeded = Math.ceil((padsNeeded + 1) / 4); // +1 to ensure at least 1 empty pad
+    const padsToKeep = Math.max(minPads, rowsNeeded * 4);
+
+    if (pads.length > padsToKeep) {
+      this._pads.set(pads.slice(0, padsToKeep));
+    }
+  }
+
+  /**
    * Import a sound file to a specific pad
    */
   async importSound(padId: string): Promise<void> {
@@ -176,6 +219,9 @@ export class SoundboardService {
       // Persist the change
       await this.saveState();
       console.log('[Soundboard] State saved');
+
+      // Ensure there's always an empty pad available
+      this.ensureEmptyPadAvailable();
     } catch (err) {
       console.error('[Soundboard] Import sound error:', err);
       console.error('[Soundboard] Error type:', typeof err);
@@ -313,6 +359,7 @@ export class SoundboardService {
         ? { ...pad, sound: null, isPlaying: false }
         : pad
     ));
+    this.cleanupEmptyRows();
     this.saveState();
   }
 
