@@ -149,7 +149,8 @@ export class TauriService {
         previewDeviceId: s.audio.preview_device_id,
         masterVolume: s.audio.master_volume,
         sampleRate: s.audio.sample_rate,
-        bufferSize: s.audio.buffer_size
+        bufferSize: s.audio.buffer_size,
+        micMonitoring: s.audio.mic_monitoring ?? false
       },
       startMinimized: s.start_minimized,
       autoStartMixing: s.auto_start_mixing
@@ -167,7 +168,8 @@ export class TauriService {
         preview_device_id: s.audio.previewDeviceId,
         master_volume: s.audio.masterVolume,
         sample_rate: s.audio.sampleRate,
-        buffer_size: s.audio.bufferSize
+        buffer_size: s.audio.bufferSize,
+        mic_monitoring: s.audio.micMonitoring
       },
       start_minimized: s.startMinimized,
       auto_start_mixing: s.autoStartMixing
@@ -335,6 +337,13 @@ export class TauriService {
    */
   async setPreviewDevice(deviceId: string | null): Promise<void> {
     await invoke('set_preview_device', { deviceId });
+  }
+
+  /**
+   * Set mic monitoring enabled/disabled
+   */
+  async setMicMonitoring(enabled: boolean): Promise<void> {
+    await invoke('set_mic_monitoring', { enabled });
   }
 
   /**

@@ -33,6 +33,7 @@ export interface AudioSettings {
   masterVolume: number;
   sampleRate: number;
   bufferSize: number;
+  micMonitoring: boolean;
 }
 
 export interface AppSettings {
