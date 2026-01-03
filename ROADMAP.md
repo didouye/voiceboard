@@ -258,6 +258,25 @@
 
 ---
 
+## Phase 8 - Improvements & Compatibility
+
+### Audio Engine
+- [ ] **Sample Rate Resampling**
+  - Support microphones with different sample rates (44.1kHz, 48kHz, 96kHz)
+  - Automatic resampling when input and output devices have different sample rates
+  - Currently requires matching sample rates between input device and VB-Cable
+
+### Quality of Life
+- [ ] **Error Recovery**
+  - Automatic reconnection when audio devices are disconnected/reconnected
+  - Graceful handling of device changes during mixing
+
+- [ ] **Performance Optimizations**
+  - Reduce CPU usage during idle
+  - Optimize ring buffer size based on latency requirements
+
+---
+
 ## Priorities
 
 1. Finish Phase 1 (functional MVP)
@@ -266,3 +285,4 @@
 4. Phase 4 & 5 (cloud and bot - can be parallelized)
 5. Phase 6 (mobile remote - requires Phase 4 cloud infrastructure for remote mode)
 6. Phase 7 (code signing - when certificates are obtained)
+7. Phase 8 (improvements - ongoing)
