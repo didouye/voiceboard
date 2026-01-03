@@ -278,7 +278,7 @@ fn run_engine_thread(
                             }
                         };
 
-                        let _output_default = match output_dev.default_output_config() {
+                        let output_default = match output_dev.default_output_config() {
                             Ok(c) => {
                                 let _ = event_tx.send(AudioEngineEvent::Info(format!(
                                     "Output '{}': {:?}, {}ch, {}Hz",
@@ -302,7 +302,7 @@ fn run_engine_thread(
                         // Try to find a sample rate that works for both
                         let common_sample_rates = [48000u32, 44100, 96000, 22050, 16000];
 
-                        let mut found_config: Option<cpal::StreamConfig> = None;
+                        let mut found_config: Option<cpal::SampleRate> = None;
 
                         // Get supported configs for input
                         let input_configs: Vec<_> = input_dev
@@ -364,39 +364,49 @@ fn run_engine_thread(
                             });
 
                             if input_supports && output_supports {
-                                // Find the right number of channels (prefer stereo)
-                                let channels = if input_configs.iter().any(|c| c.channels() == 2)
-                                    && output_configs.iter().any(|c| c.channels() >= 2)
-                                {
-                                    2
-                                } else {
-                                    1
-                                };
-
-                                found_config = Some(cpal::StreamConfig {
-                                    channels,
-                                    sample_rate: sr,
-                                    buffer_size: cpal::BufferSize::Default,
-                                });
+                                // Use common sample rate, but allow different channel counts
+                                found_config = Some(sr);
 
                                 let _ = event_tx.send(AudioEngineEvent::Info(format!(
-                                    "Found common config: {}ch, {}Hz",
-                                    channels, rate
+                                    "Found common sample rate: {}Hz",
+                                    rate
                                 )));
                                 break 'outer;
                             }
                         }
 
-                        let config = match found_config {
-                            Some(c) => c,
+                        // Get sample rate (common or from input default)
+                        let sample_rate = match found_config {
+                            Some(sr) => sr,
                             None => {
-                                // Fallback: try input's default config
                                 let _ = event_tx.send(AudioEngineEvent::Info(
-                                    "No common config found, trying input default".to_string(),
+                                    "No common sample rate found, trying input default".to_string(),
                                 ));
-                                input_default.into()
+                                input_default.sample_rate()
                             }
                         };
+
+                        // Create separate configs for input and output
+                        // Input: use native channel count (may be mono)
+                        let input_channels = input_default.channels();
+                        let input_config = cpal::StreamConfig {
+                            channels: input_channels,
+                            sample_rate,
+                            buffer_size: cpal::BufferSize::Default,
+                        };
+
+                        // Output: use native channel count (usually stereo for VB-Cable)
+                        let output_channels = output_default.channels();
+                        let output_config = cpal::StreamConfig {
+                            channels: output_channels,
+                            sample_rate,
+                            buffer_size: cpal::BufferSize::Default,
+                        };
+
+                        let _ = event_tx.send(AudioEngineEvent::Info(format!(
+                            "Input config: {}ch, {}Hz | Output config: {}ch, {}Hz",
+                            input_channels, sample_rate.0, output_channels, sample_rate.0
+                        )));
 
                         // Create ring buffer for audio pass-through
                         let rb = HeapRb::<f32>::new(RING_BUFFER_SIZE);
@@ -427,9 +437,9 @@ fn run_engine_thread(
                         let input_callback_count = Arc::new(AtomicU32::new(0));
                         let input_callback_count_clone = input_callback_count.clone();
 
-                        // Build input stream
+                        // Build input stream (may be mono)
                         let input_result = input_dev.build_input_stream(
-                            &config,
+                            &input_config,
                             move |data: &[f32], _: &cpal::InputCallbackInfo| {
                                 // Log first few callbacks to verify stream is working
                                 let count = input_callback_count_clone.fetch_add(1, Ordering::Relaxed);
@@ -488,15 +498,17 @@ fn run_engine_thread(
                         let output_level_for_callback = output_level.clone();
                         let producer_monitoring_for_output = producer_monitoring.clone();
                         let mic_monitoring_for_output = mic_monitoring.clone();
-                        let engine_channels = config.channels;
+                        // Input may be mono, output may be stereo - we handle conversion in callback
+                        let _input_ch = input_channels;
+                        let output_ch = output_channels;
 
                         // Debug counter for output callback
                         let output_callback_count = Arc::new(AtomicU32::new(0));
                         let output_callback_count_clone = output_callback_count.clone();
 
-                        // Build output stream
+                        // Build output stream (uses output device's native config)
                         let output_result = output_dev.build_output_stream(
-                            &config,
+                            &output_config,
                             move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
                                 // Log first few callbacks to verify stream is working
                                 let count = output_callback_count_clone.fetch_add(1, Ordering::Relaxed);
@@ -505,27 +517,29 @@ fn run_engine_thread(
                                     f32::from_bits(master_volume_clone.load(Ordering::Relaxed));
                                 let mic_mon_enabled = mic_monitoring_for_output.load(Ordering::Relaxed);
 
-                                // Read mic samples and store temporarily
+                                // Calculate frames (output may be stereo, input may be mono)
                                 let data_len = data.len();
-                                let mut mic_samples = vec![0.0f32; data_len];
+                                let num_frames = data_len / output_ch as usize;
+
+                                // Read MONO mic samples from ring buffer (one per frame)
+                                // Ring buffer contains mono samples regardless of input channel count
+                                // (input callback already handles multi-channel input → mono)
+                                let mut mic_samples_mono = vec![0.0f32; num_frames];
                                 if let Ok(mut cons) = consumer_clone.try_lock() {
-                                    for sample in mic_samples.iter_mut() {
+                                    for sample in mic_samples_mono.iter_mut() {
                                         *sample = cons.try_pop().unwrap_or(0.0);
                                     }
                                 }
 
-                                // Start with zeros, then mix sounds
-                                // This way we can control mic separately for monitoring
+                                // Start with zeros
                                 for sample in data.iter_mut() {
                                     *sample = 0.0;
                                 }
 
-                                // Mix in playing sounds (this goes to BOTH outputs)
-                                // Sounds are stored as MONO, output may be stereo
-                                // We need to mix one mono sample per FRAME, not per sample
+                                // Mix in playing sounds (sounds are stored as MONO)
+                                // Duplicate mono sample to all output channels
                                 if let Ok(mut state) = audio_state_clone.try_lock() {
                                     let mut finished = Vec::new();
-                                    let num_frames = data_len / engine_channels as usize;
 
                                     for (id, sound) in state.playing_sounds.iter_mut() {
                                         let remaining = sound.samples.len() - sound.position;
@@ -535,8 +549,8 @@ fn run_engine_thread(
                                             let mono_sample = sound.samples[sound.position + frame];
 
                                             // Duplicate mono sample to all output channels
-                                            for ch in 0..engine_channels as usize {
-                                                let idx = frame * engine_channels as usize + ch;
+                                            for ch in 0..output_ch as usize {
+                                                let idx = frame * output_ch as usize + ch;
                                                 if idx < data_len {
                                                     data[idx] = (data[idx] + mono_sample).clamp(-1.0, 1.0);
                                                 }
@@ -556,28 +570,19 @@ fn run_engine_thread(
 
                                 // Write to monitoring buffer BEFORE adding mic to main output
                                 // Monitoring gets: sounds + (mic if mic_monitoring enabled)
-                                // Push MONO samples only (one per frame, not per channel)
+                                // Push MONO samples only (one per frame)
                                 if let Ok(mut prod_mon) = producer_monitoring_for_output.try_lock() {
-                                    let num_frames = data_len / engine_channels as usize;
-
                                     for frame in 0..num_frames {
-                                        // Get sound sample for this frame (average L+R if stereo)
-                                        let sound_sample = if engine_channels == 2 {
-                                            let l = data[frame * 2];
-                                            let r = data[frame * 2 + 1];
-                                            (l + r) * 0.5
-                                        } else {
-                                            data[frame]
-                                        };
+                                        // Get sound sample for this frame (average all channels to mono)
+                                        let mut sound_sum = 0.0f32;
+                                        for ch in 0..output_ch as usize {
+                                            let idx = frame * output_ch as usize + ch;
+                                            sound_sum += data.get(idx).copied().unwrap_or(0.0);
+                                        }
+                                        let sound_sample = sound_sum / output_ch as f32;
 
-                                        // Get mic sample for this frame (average L+R if stereo)
-                                        let mic_sample = if engine_channels == 2 {
-                                            let l = mic_samples.get(frame * 2).copied().unwrap_or(0.0);
-                                            let r = mic_samples.get(frame * 2 + 1).copied().unwrap_or(0.0);
-                                            (l + r) * 0.5
-                                        } else {
-                                            mic_samples.get(frame).copied().unwrap_or(0.0)
-                                        };
+                                        // Get mic sample (already mono)
+                                        let mic_sample = mic_samples_mono.get(frame).copied().unwrap_or(0.0);
 
                                         let monitoring_sample = if mic_mon_enabled {
                                             (sound_sample + mic_sample) * master_vol
@@ -588,10 +593,15 @@ fn run_engine_thread(
                                     }
                                 }
 
-                                // Add mic to main output (always)
-                                for (i, sample) in data.iter_mut().enumerate() {
-                                    let mic_sample = mic_samples.get(i).copied().unwrap_or(0.0);
-                                    *sample = (*sample + mic_sample).clamp(-1.0, 1.0);
+                                // Add mic to main output (duplicate mono to all channels)
+                                for frame in 0..num_frames {
+                                    let mic_sample = mic_samples_mono.get(frame).copied().unwrap_or(0.0);
+                                    for ch in 0..output_ch as usize {
+                                        let idx = frame * output_ch as usize + ch;
+                                        if idx < data_len {
+                                            data[idx] = (data[idx] + mic_sample).clamp(-1.0, 1.0);
+                                        }
+                                    }
                                 }
 
                                 // Apply master volume to main output
@@ -677,7 +687,7 @@ fn run_engine_thread(
                             let mon_channels = mon_default_config.channels();
                             // Use device's native sample rate to avoid driver resampling issues
                             let mon_sample_rate = mon_default_config.sample_rate();
-                            let engine_sample_rate = config.sample_rate.0 as f64;
+                            let engine_sample_rate = sample_rate.0 as f64;
                             let mon_sample_rate_value = mon_sample_rate.0 as f64;
 
                             // Calculate resample ratio: how many engine samples per monitoring sample
@@ -690,7 +700,7 @@ fn run_engine_thread(
                                 monitoring_dev_name,
                                 mon_channels,
                                 mon_sample_rate.0,
-                                config.sample_rate.0,
+                                sample_rate.0,
                                 resample_ratio
                             )));
 
