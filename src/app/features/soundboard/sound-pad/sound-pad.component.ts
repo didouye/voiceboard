@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, HostListener } from '@angular/core';
+import { Component, Input, Output, EventEmitter, HostListener, HostBinding } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { SoundPad } from '../../../core/models';
@@ -83,6 +83,15 @@ import { SoundboardService } from '../../../core/services/soundboard.service';
     </div>
   `,
   styles: [`
+    :host {
+      position: relative;
+      z-index: 1;
+    }
+
+    :host.popup-open {
+      z-index: 100;
+    }
+
     .sound-pad {
       --pad-color: #7b2cbf;
       aspect-ratio: 1;
@@ -392,7 +401,7 @@ export class SoundPadComponent {
   @Output() remove = new EventEmitter<void>();
   @Output() volumeChange = new EventEmitter<number>();
 
-  showVolumePopup = false;
+  @HostBinding('class.popup-open') showVolumePopup = false;
   Math = Math; // Expose Math to template
 
   constructor(private soundboardService: SoundboardService) {}
