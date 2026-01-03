@@ -62,3 +62,54 @@ pub trait VirtualAudioOutput: AudioOutput {
     /// Get the virtual device name as it appears in the system
     fn virtual_device_name(&self) -> &str;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_audio_output_error_device_not_found() {
+        let error = AudioOutputError::DeviceNotFound("VB-Cable".to_string());
+        assert_eq!(format!("{}", error), "Device not found: VB-Cable");
+    }
+
+    #[test]
+    fn test_audio_output_error_open_error() {
+        let error = AudioOutputError::OpenError("Stream init failed".to_string());
+        assert_eq!(
+            format!("{}", error),
+            "Failed to open device: Stream init failed"
+        );
+    }
+
+    #[test]
+    fn test_audio_output_error_stream_error() {
+        let error = AudioOutputError::StreamError("Write failed".to_string());
+        assert_eq!(format!("{}", error), "Stream error: Write failed");
+    }
+
+    #[test]
+    fn test_audio_output_error_buffer_underrun() {
+        let error = AudioOutputError::BufferUnderrun;
+        assert_eq!(format!("{}", error), "Buffer underrun");
+    }
+
+    #[test]
+    fn test_audio_output_error_device_disconnected() {
+        let error = AudioOutputError::DeviceDisconnected;
+        assert_eq!(format!("{}", error), "Device disconnected");
+    }
+
+    #[test]
+    fn test_audio_output_error_unsupported_format() {
+        let error = AudioOutputError::UnsupportedFormat("32-bit float".to_string());
+        assert_eq!(format!("{}", error), "Unsupported format: 32-bit float");
+    }
+
+    #[test]
+    fn test_audio_output_error_debug() {
+        let error = AudioOutputError::BufferUnderrun;
+        let debug = format!("{:?}", error);
+        assert!(debug.contains("BufferUnderrun"));
+    }
+}

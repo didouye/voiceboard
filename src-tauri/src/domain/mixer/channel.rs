@@ -133,4 +133,84 @@ mod tests {
         channel.toggle_mute();
         assert!(!channel.is_muted());
     }
+
+    #[test]
+    fn test_channel_default_solo() {
+        let channel = MixerChannel::new("ch1", "Test", ChannelType::Microphone);
+        assert!(!channel.is_solo());
+    }
+
+    #[test]
+    fn test_channel_set_solo() {
+        let mut channel = MixerChannel::new("ch1", "Test", ChannelType::Microphone);
+        channel.set_solo(true);
+        assert!(channel.is_solo());
+        channel.set_solo(false);
+        assert!(!channel.is_solo());
+    }
+
+    #[test]
+    fn test_channel_set_muted() {
+        let mut channel = MixerChannel::new("ch1", "Test", ChannelType::AudioFile);
+        channel.set_muted(true);
+        assert!(channel.is_muted());
+        channel.set_muted(false);
+        assert!(!channel.is_muted());
+    }
+
+    #[test]
+    fn test_channel_type_audio_file() {
+        let channel = MixerChannel::new("ch1", "Test", ChannelType::AudioFile);
+        assert_eq!(channel.channel_type(), ChannelType::AudioFile);
+    }
+
+    #[test]
+    fn test_channel_type_system_audio() {
+        let channel = MixerChannel::new("ch1", "Test", ChannelType::SystemAudio);
+        assert_eq!(channel.channel_type(), ChannelType::SystemAudio);
+    }
+
+    #[test]
+    fn test_channel_volume_at_boundary() {
+        let mut channel = MixerChannel::new("ch1", "Test", ChannelType::Microphone);
+        channel.set_volume(0.0);
+        assert_eq!(channel.volume(), 0.0);
+        channel.set_volume(2.0);
+        assert_eq!(channel.volume(), 2.0);
+    }
+
+    #[test]
+    fn test_channel_clone() {
+        let channel1 = MixerChannel::new("ch1", "Test", ChannelType::Microphone);
+        let channel2 = channel1.clone();
+        assert_eq!(channel1.id(), channel2.id());
+        assert_eq!(channel1.name(), channel2.name());
+    }
+
+    #[test]
+    fn test_channel_type_debug() {
+        let ct = ChannelType::Microphone;
+        let debug = format!("{:?}", ct);
+        assert!(debug.contains("Microphone"));
+    }
+
+    #[test]
+    fn test_channel_type_partial_eq() {
+        assert_eq!(ChannelType::AudioFile, ChannelType::AudioFile);
+        assert_ne!(ChannelType::AudioFile, ChannelType::Microphone);
+    }
+
+    #[test]
+    fn test_channel_debug() {
+        let channel = MixerChannel::new("ch1", "Test", ChannelType::Microphone);
+        let debug = format!("{:?}", channel);
+        assert!(debug.contains("MixerChannel"));
+    }
+
+    #[test]
+    fn test_effective_volume_with_zero_volume() {
+        let channel = MixerChannel::new("ch1", "Test", ChannelType::AudioFile);
+        // Default volume is 1.0, not 0.0
+        assert_eq!(channel.effective_volume(), 1.0);
+    }
 }

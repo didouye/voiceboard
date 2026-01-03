@@ -116,4 +116,114 @@ mod tests {
         assert_eq!(format.bytes_per_second(), 176400);
         assert_eq!(format.bytes_per_frame(), 4);
     }
+
+    #[test]
+    fn test_audio_file_format_extension() {
+        assert_eq!(AudioFileFormat::Mp3.extension(), "mp3");
+        assert_eq!(AudioFileFormat::Ogg.extension(), "ogg");
+        assert_eq!(AudioFileFormat::Wav.extension(), "wav");
+        assert_eq!(AudioFileFormat::Flac.extension(), "flac");
+    }
+
+    #[test]
+    fn test_audio_file_format_from_extension_all_formats() {
+        assert_eq!(
+            AudioFileFormat::from_extension("wav"),
+            Some(AudioFileFormat::Wav)
+        );
+        assert_eq!(
+            AudioFileFormat::from_extension("flac"),
+            Some(AudioFileFormat::Flac)
+        );
+    }
+
+    #[test]
+    fn test_audio_format_cd_quality() {
+        let format = AudioFormat::CD_QUALITY;
+        assert_eq!(format.sample_rate, 44100);
+        assert_eq!(format.channels, 2);
+        assert_eq!(format.bits_per_sample, 16);
+    }
+
+    #[test]
+    fn test_audio_format_voice() {
+        let format = AudioFormat::VOICE;
+        assert_eq!(format.sample_rate, 16000);
+        assert_eq!(format.channels, 1);
+        assert_eq!(format.bits_per_sample, 16);
+    }
+
+    #[test]
+    fn test_audio_format_high_quality() {
+        let format = AudioFormat::HIGH_QUALITY;
+        assert_eq!(format.sample_rate, 48000);
+        assert_eq!(format.channels, 2);
+        assert_eq!(format.bits_per_sample, 24);
+    }
+
+    #[test]
+    fn test_audio_format_new() {
+        let format = AudioFormat::new(96000, 4, 32);
+        assert_eq!(format.sample_rate, 96000);
+        assert_eq!(format.channels, 4);
+        assert_eq!(format.bits_per_sample, 32);
+    }
+
+    #[test]
+    fn test_audio_format_default() {
+        let format = AudioFormat::default();
+        assert_eq!(format, AudioFormat::CD_QUALITY);
+    }
+
+    #[test]
+    fn test_audio_format_bytes_per_second_high_quality() {
+        let format = AudioFormat::HIGH_QUALITY;
+        // 48000 * 2 * 3 = 288000
+        assert_eq!(format.bytes_per_second(), 288000);
+    }
+
+    #[test]
+    fn test_audio_format_bytes_per_frame_high_quality() {
+        let format = AudioFormat::HIGH_QUALITY;
+        // 2 * 3 = 6
+        assert_eq!(format.bytes_per_frame(), 6);
+    }
+
+    #[test]
+    fn test_audio_format_clone() {
+        let format1 = AudioFormat::CD_QUALITY;
+        let format2 = format1.clone();
+        assert_eq!(format1, format2);
+    }
+
+    #[test]
+    fn test_audio_file_format_clone() {
+        let format1 = AudioFileFormat::Mp3;
+        let format2 = format1.clone();
+        assert_eq!(format1, format2);
+    }
+
+    #[test]
+    fn test_audio_file_format_debug() {
+        let format = AudioFileFormat::Wav;
+        let debug = format!("{:?}", format);
+        assert!(debug.contains("Wav"));
+    }
+
+    #[test]
+    fn test_audio_format_debug() {
+        let format = AudioFormat::CD_QUALITY;
+        let debug = format!("{:?}", format);
+        assert!(debug.contains("AudioFormat"));
+    }
+
+    #[test]
+    fn test_audio_file_format_hash() {
+        use std::collections::HashSet;
+        let mut set = HashSet::new();
+        set.insert(AudioFileFormat::Mp3);
+        set.insert(AudioFileFormat::Ogg);
+        assert_eq!(set.len(), 2);
+        assert!(set.contains(&AudioFileFormat::Mp3));
+    }
 }

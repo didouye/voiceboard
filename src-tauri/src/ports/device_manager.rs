@@ -73,3 +73,42 @@ pub trait DeviceMonitor: Send + Sync {
     /// Register a callback for device changes
     fn register_callback(&mut self, callback: Box<dyn DeviceChangeCallback>);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_device_manager_error_enumeration() {
+        let error = DeviceManagerError::EnumerationError("No audio host".to_string());
+        assert_eq!(
+            format!("{}", error),
+            "Failed to enumerate devices: No audio host"
+        );
+    }
+
+    #[test]
+    fn test_device_manager_error_device_not_found() {
+        let error = DeviceManagerError::DeviceNotFound("mic-123".to_string());
+        assert_eq!(format!("{}", error), "Device not found: mic-123");
+    }
+
+    #[test]
+    fn test_device_manager_error_permission_denied() {
+        let error = DeviceManagerError::PermissionDenied("Microphone access".to_string());
+        assert_eq!(format!("{}", error), "Permission denied: Microphone access");
+    }
+
+    #[test]
+    fn test_device_manager_error_system_error() {
+        let error = DeviceManagerError::SystemError("ALSA error".to_string());
+        assert_eq!(format!("{}", error), "System error: ALSA error");
+    }
+
+    #[test]
+    fn test_device_manager_error_debug() {
+        let error = DeviceManagerError::DeviceNotFound("test".to_string());
+        let debug = format!("{:?}", error);
+        assert!(debug.contains("DeviceNotFound"));
+    }
+}

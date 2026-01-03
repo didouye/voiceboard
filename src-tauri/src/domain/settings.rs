@@ -85,4 +85,105 @@ mod tests {
             deserialized.audio.master_volume
         );
     }
+
+    #[test]
+    fn test_audio_settings_new() {
+        let settings = AudioSettings::new();
+        assert!(settings.input_device_id.is_none());
+        assert!(settings.output_device_id.is_none());
+        assert!(settings.preview_device_id.is_none());
+        assert_eq!(settings.master_volume, 1.0);
+        assert_eq!(settings.sample_rate, 48000);
+        assert_eq!(settings.buffer_size, 1024);
+        assert!(!settings.mic_monitoring);
+    }
+
+    #[test]
+    fn test_audio_settings_default() {
+        let settings = AudioSettings::default();
+        assert_eq!(settings.master_volume, 0.0); // Default trait gives 0.0
+    }
+
+    #[test]
+    fn test_app_settings_new() {
+        let settings = AppSettings::new();
+        assert!(!settings.start_minimized);
+        assert!(!settings.auto_start_mixing);
+    }
+
+    #[test]
+    fn test_app_settings_clone() {
+        let settings1 = AppSettings::new();
+        let settings2 = settings1.clone();
+        assert_eq!(settings1.start_minimized, settings2.start_minimized);
+    }
+
+    #[test]
+    fn test_audio_settings_clone() {
+        let settings1 = AudioSettings::new();
+        let settings2 = settings1.clone();
+        assert_eq!(settings1.sample_rate, settings2.sample_rate);
+    }
+
+    #[test]
+    fn test_audio_settings_with_device_ids() {
+        let mut settings = AudioSettings::new();
+        settings.input_device_id = Some("mic-1".to_string());
+        settings.output_device_id = Some("vb-cable".to_string());
+        settings.preview_device_id = Some("speakers".to_string());
+
+        assert_eq!(settings.input_device_id.as_deref(), Some("mic-1"));
+        assert_eq!(settings.output_device_id.as_deref(), Some("vb-cable"));
+        assert_eq!(settings.preview_device_id.as_deref(), Some("speakers"));
+    }
+
+    #[test]
+    fn test_audio_settings_mic_monitoring() {
+        let mut settings = AudioSettings::new();
+        assert!(!settings.mic_monitoring);
+        settings.mic_monitoring = true;
+        assert!(settings.mic_monitoring);
+    }
+
+    #[test]
+    fn test_app_settings_start_minimized() {
+        let mut settings = AppSettings::new();
+        settings.start_minimized = true;
+        assert!(settings.start_minimized);
+    }
+
+    #[test]
+    fn test_app_settings_auto_start_mixing() {
+        let mut settings = AppSettings::new();
+        settings.auto_start_mixing = true;
+        assert!(settings.auto_start_mixing);
+    }
+
+    #[test]
+    fn test_app_settings_debug() {
+        let settings = AppSettings::new();
+        let debug = format!("{:?}", settings);
+        assert!(debug.contains("AppSettings"));
+    }
+
+    #[test]
+    fn test_audio_settings_debug() {
+        let settings = AudioSettings::new();
+        let debug = format!("{:?}", settings);
+        assert!(debug.contains("AudioSettings"));
+    }
+
+    #[test]
+    fn test_audio_settings_buffer_size() {
+        let mut settings = AudioSettings::new();
+        settings.buffer_size = 2048;
+        assert_eq!(settings.buffer_size, 2048);
+    }
+
+    #[test]
+    fn test_audio_settings_sample_rate() {
+        let mut settings = AudioSettings::new();
+        settings.sample_rate = 96000;
+        assert_eq!(settings.sample_rate, 96000);
+    }
 }

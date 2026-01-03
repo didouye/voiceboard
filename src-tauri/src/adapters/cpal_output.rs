@@ -178,4 +178,73 @@ mod tests {
         assert!(!output.is_playing());
         assert!(output.current_format().is_none());
     }
+
+    #[test]
+    fn test_output_default() {
+        let output = CpalAudioOutput::default();
+        assert!(!output.is_playing());
+        assert!(output.stream.is_none());
+        assert!(output.producer.is_none());
+        assert!(output.format.is_none());
+    }
+
+    #[test]
+    fn test_output_available_frames_when_not_started() {
+        let output = CpalAudioOutput::new();
+        assert_eq!(output.available_frames(), 0);
+    }
+
+    #[test]
+    fn test_output_stop_when_not_started() {
+        let mut output = CpalAudioOutput::new();
+        // Stop should succeed even when not started
+        assert!(output.stop().is_ok());
+        assert!(!output.is_playing());
+    }
+
+    #[test]
+    fn test_output_format_none_initially() {
+        let output = CpalAudioOutput::new();
+        assert!(output.format.is_none());
+        assert!(output.current_format().is_none());
+    }
+
+    #[test]
+    fn test_output_find_device_not_found() {
+        let output = CpalAudioOutput::new();
+        let device_id = DeviceId::new("nonexistent-output-device-12345");
+        let result = output.find_device(&device_id);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_output_write_when_not_started() {
+        use crate::domain::Sample;
+
+        let mut output = CpalAudioOutput::new();
+        let samples = vec![Sample::new(0.0); 100];
+        let buffer = AudioBuffer::new(samples, 2, 48000);
+        let result = output.write(&buffer);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_output_ring_buffer_size_constant() {
+        assert_eq!(RING_BUFFER_SIZE, 4096);
+    }
+
+    #[test]
+    fn test_output_is_playing_atomic_default() {
+        let output = CpalAudioOutput::new();
+        assert!(!output.is_playing.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn test_output_multiple_stops() {
+        let mut output = CpalAudioOutput::new();
+        assert!(output.stop().is_ok());
+        assert!(output.stop().is_ok());
+        assert!(output.stop().is_ok());
+        assert!(!output.is_playing());
+    }
 }

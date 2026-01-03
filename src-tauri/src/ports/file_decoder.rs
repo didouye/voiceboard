@@ -77,3 +77,83 @@ pub trait FileDecoderFactory: Send + Sync {
     /// Get list of supported formats
     fn supported_formats(&self) -> Vec<AudioFileFormat>;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_file_decoder_error_file_not_found() {
+        let error = FileDecoderError::FileNotFound("/path/to/file.mp3".to_string());
+        assert_eq!(format!("{}", error), "File not found: /path/to/file.mp3");
+    }
+
+    #[test]
+    fn test_file_decoder_error_unsupported_format() {
+        let error = FileDecoderError::UnsupportedFormat("aac".to_string());
+        assert_eq!(format!("{}", error), "Unsupported format: aac");
+    }
+
+    #[test]
+    fn test_file_decoder_error_decode_error() {
+        let error = FileDecoderError::DecodeError("Invalid header".to_string());
+        assert_eq!(format!("{}", error), "Decode error: Invalid header");
+    }
+
+    #[test]
+    fn test_file_decoder_error_io_error() {
+        let error = FileDecoderError::IoError("Permission denied".to_string());
+        assert_eq!(format!("{}", error), "IO error: Permission denied");
+    }
+
+    #[test]
+    fn test_file_decoder_error_invalid_file() {
+        let error = FileDecoderError::InvalidFile("Corrupted data".to_string());
+        assert_eq!(format!("{}", error), "Invalid file: Corrupted data");
+    }
+
+    #[test]
+    fn test_audio_file_metadata_creation() {
+        let metadata = AudioFileMetadata {
+            format: AudioFileFormat::Mp3,
+            duration: Duration::from_secs(180),
+            audio_format: AudioFormat::default(),
+            title: Some("Test Song".to_string()),
+            artist: Some("Test Artist".to_string()),
+        };
+
+        assert_eq!(metadata.format, AudioFileFormat::Mp3);
+        assert_eq!(metadata.duration, Duration::from_secs(180));
+        assert_eq!(metadata.title, Some("Test Song".to_string()));
+        assert_eq!(metadata.artist, Some("Test Artist".to_string()));
+    }
+
+    #[test]
+    fn test_audio_file_metadata_without_tags() {
+        let metadata = AudioFileMetadata {
+            format: AudioFileFormat::Wav,
+            duration: Duration::from_secs(60),
+            audio_format: AudioFormat::default(),
+            title: None,
+            artist: None,
+        };
+
+        assert!(metadata.title.is_none());
+        assert!(metadata.artist.is_none());
+    }
+
+    #[test]
+    fn test_audio_file_metadata_clone() {
+        let metadata = AudioFileMetadata {
+            format: AudioFileFormat::Flac,
+            duration: Duration::from_secs(300),
+            audio_format: AudioFormat::default(),
+            title: Some("Title".to_string()),
+            artist: None,
+        };
+
+        let cloned = metadata.clone();
+        assert_eq!(cloned.format, metadata.format);
+        assert_eq!(cloned.duration, metadata.duration);
+    }
+}

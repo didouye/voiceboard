@@ -93,4 +93,106 @@ mod tests {
         let config = MixerConfig::default().with_master_volume(-0.5);
         assert_eq!(config.master_volume, 0.0);
     }
+
+    #[test]
+    fn test_mixer_config_new() {
+        let config = MixerConfig::new(AudioFormat::HIGH_QUALITY, 2048);
+        assert_eq!(config.buffer_size, 2048);
+        assert_eq!(config.output_format, AudioFormat::HIGH_QUALITY);
+    }
+
+    #[test]
+    fn test_mixer_config_get_channel() {
+        let mut config = MixerConfig::default();
+        let channel = MixerChannel::new("ch1", "Channel 1", ChannelType::AudioFile);
+        config.add_channel(channel);
+
+        let found = config.get_channel("ch1");
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().name(), "Channel 1");
+    }
+
+    #[test]
+    fn test_mixer_config_get_channel_not_found() {
+        let config = MixerConfig::default();
+        let found = config.get_channel("nonexistent");
+        assert!(found.is_none());
+    }
+
+    #[test]
+    fn test_mixer_config_get_channel_mut() {
+        let mut config = MixerConfig::default();
+        let channel = MixerChannel::new("ch1", "Channel 1", ChannelType::AudioFile);
+        config.add_channel(channel);
+
+        if let Some(ch) = config.get_channel_mut("ch1") {
+            ch.set_volume(0.5);
+        }
+
+        assert_eq!(config.get_channel("ch1").unwrap().volume(), 0.5);
+    }
+
+    #[test]
+    fn test_mixer_config_get_channel_mut_not_found() {
+        let mut config = MixerConfig::default();
+        let found = config.get_channel_mut("nonexistent");
+        assert!(found.is_none());
+    }
+
+    #[test]
+    fn test_mixer_config_remove_nonexistent_channel() {
+        let mut config = MixerConfig::default();
+        let removed = config.remove_channel("nonexistent");
+        assert!(removed.is_none());
+    }
+
+    #[test]
+    fn test_mixer_config_add_multiple_channels() {
+        let mut config = MixerConfig::default();
+        config.add_channel(MixerChannel::new(
+            "ch1",
+            "Channel 1",
+            ChannelType::AudioFile,
+        ));
+        config.add_channel(MixerChannel::new(
+            "ch2",
+            "Channel 2",
+            ChannelType::Microphone,
+        ));
+        config.add_channel(MixerChannel::new(
+            "ch3",
+            "Channel 3",
+            ChannelType::SystemAudio,
+        ));
+        assert_eq!(config.channels.len(), 3);
+    }
+
+    #[test]
+    fn test_mixer_config_clone() {
+        let config1 = MixerConfig::default().with_master_volume(0.5);
+        let config2 = config1.clone();
+        assert_eq!(config1.master_volume, config2.master_volume);
+    }
+
+    #[test]
+    fn test_mixer_config_with_master_volume_chaining() {
+        let config = MixerConfig::default()
+            .with_master_volume(0.3)
+            .with_master_volume(0.7);
+        assert_eq!(config.master_volume, 0.7);
+    }
+
+    #[test]
+    fn test_mixer_config_output_format() {
+        let config = MixerConfig::new(AudioFormat::VOICE, 512);
+        assert_eq!(config.output_format.sample_rate, 16000);
+        assert_eq!(config.output_format.channels, 1);
+    }
+
+    #[test]
+    fn test_mixer_config_debug() {
+        let config = MixerConfig::default();
+        let debug = format!("{:?}", config);
+        assert!(debug.contains("MixerConfig"));
+    }
 }

@@ -56,3 +56,51 @@ pub trait AudioInputCallback: Send + Sync {
     /// Called when an error occurs
     fn on_error(&mut self, error: AudioInputError);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_audio_input_error_device_not_found() {
+        let error = AudioInputError::DeviceNotFound("Microphone".to_string());
+        assert_eq!(format!("{}", error), "Device not found: Microphone");
+    }
+
+    #[test]
+    fn test_audio_input_error_open_error() {
+        let error = AudioInputError::OpenError("Failed to open stream".to_string());
+        assert_eq!(
+            format!("{}", error),
+            "Failed to open device: Failed to open stream"
+        );
+    }
+
+    #[test]
+    fn test_audio_input_error_stream_error() {
+        let error = AudioInputError::StreamError("Buffer overflow".to_string());
+        assert_eq!(format!("{}", error), "Stream error: Buffer overflow");
+    }
+
+    #[test]
+    fn test_audio_input_error_device_disconnected() {
+        let error = AudioInputError::DeviceDisconnected;
+        assert_eq!(format!("{}", error), "Device disconnected");
+    }
+
+    #[test]
+    fn test_audio_input_error_unsupported_format() {
+        let error = AudioInputError::UnsupportedFormat("96kHz not supported".to_string());
+        assert_eq!(
+            format!("{}", error),
+            "Unsupported format: 96kHz not supported"
+        );
+    }
+
+    #[test]
+    fn test_audio_input_error_debug() {
+        let error = AudioInputError::DeviceDisconnected;
+        let debug = format!("{:?}", error);
+        assert!(debug.contains("DeviceDisconnected"));
+    }
+}

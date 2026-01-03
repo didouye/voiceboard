@@ -98,4 +98,93 @@ mod tests {
         let amplified = sample.apply_gain(2.0);
         assert_eq!(amplified.value(), 1.0); // Clamped
     }
+
+    #[test]
+    fn test_sample_silence() {
+        let sample = Sample::silence();
+        assert_eq!(sample.value(), 0.0);
+    }
+
+    #[test]
+    fn test_sample_default() {
+        let sample = Sample::default();
+        assert_eq!(sample.value(), 0.0);
+    }
+
+    #[test]
+    fn test_sample_from_f32() {
+        let sample: Sample = 0.75.into();
+        assert_eq!(sample.value(), 0.75);
+    }
+
+    #[test]
+    fn test_sample_into_f32() {
+        let sample = Sample::new(0.5);
+        let value: f32 = sample.into();
+        assert_eq!(value, 0.5);
+    }
+
+    #[test]
+    fn test_sample_from_i16() {
+        let sample: Sample = i16::MAX.into();
+        assert!((sample.value() - 1.0).abs() < 0.001);
+
+        let sample: Sample = 0i16.into();
+        assert_eq!(sample.value(), 0.0);
+    }
+
+    #[test]
+    fn test_sample_clone() {
+        let sample = Sample::new(0.5);
+        let cloned = sample.clone();
+        assert_eq!(sample.value(), cloned.value());
+    }
+
+    #[test]
+    fn test_sample_partial_eq() {
+        let a = Sample::new(0.5);
+        let b = Sample::new(0.5);
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn test_sample_debug() {
+        let sample = Sample::new(0.5);
+        let debug = format!("{:?}", sample);
+        assert!(debug.contains("Sample"));
+    }
+
+    #[test]
+    fn test_sample_mix_different_values() {
+        let a = Sample::new(1.0);
+        let b = Sample::new(0.0);
+        let mixed = a.mix(&b);
+        assert_eq!(mixed.value(), 0.5);
+    }
+
+    #[test]
+    fn test_sample_apply_gain_zero() {
+        let sample = Sample::new(0.5);
+        let silenced = sample.apply_gain(0.0);
+        assert_eq!(silenced.value(), 0.0);
+    }
+
+    #[test]
+    fn test_sample_apply_gain_negative() {
+        let sample = Sample::new(0.5);
+        let inverted = sample.apply_gain(-1.0);
+        assert_eq!(inverted.value(), -0.5);
+    }
+
+    #[test]
+    fn test_sample_clamping_negative() {
+        let sample = Sample::new(-2.0);
+        assert_eq!(sample.value(), -1.0);
+    }
+
+    #[test]
+    fn test_sample_no_clamping_in_range() {
+        let sample = Sample::new(0.75);
+        assert_eq!(sample.value(), 0.75);
+    }
 }

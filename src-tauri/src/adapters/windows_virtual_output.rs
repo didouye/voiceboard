@@ -157,6 +157,7 @@ impl VirtualAudioOutput for WindowsVirtualOutput {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::Sample;
 
     #[test]
     fn test_virtual_output_creation() {
@@ -172,5 +173,77 @@ mod tests {
     fn test_custom_device_name() {
         let output = WindowsVirtualOutput::new().with_device_name("My Virtual Mic");
         assert_eq!(output.virtual_device_name(), "My Virtual Mic");
+    }
+
+    #[test]
+    fn test_virtual_output_default() {
+        let output = WindowsVirtualOutput::default();
+        assert!(!output.is_playing());
+        assert_eq!(output.virtual_device_name(), "Virtual Audio Device");
+        assert!(output.format.is_none());
+    }
+
+    #[test]
+    fn test_virtual_output_default_device_name_constant() {
+        assert_eq!(
+            WindowsVirtualOutput::DEFAULT_DEVICE_NAME,
+            "Virtual Audio Device"
+        );
+    }
+
+    #[test]
+    fn test_virtual_output_stop() {
+        let mut output = WindowsVirtualOutput::new();
+        assert!(output.stop().is_ok());
+        assert!(!output.is_playing());
+        assert!(output.current_format().is_none());
+    }
+
+    #[test]
+    fn test_virtual_output_available_frames() {
+        let output = WindowsVirtualOutput::new();
+        assert_eq!(output.available_frames(), 1024);
+    }
+
+    #[test]
+    fn test_virtual_output_current_format_none_initially() {
+        let output = WindowsVirtualOutput::new();
+        assert!(output.current_format().is_none());
+    }
+
+    #[test]
+    fn test_virtual_output_write_when_not_playing() {
+        let mut output = WindowsVirtualOutput::new();
+        let samples = vec![Sample::new(0.0); 100];
+        let buffer = AudioBuffer::new(samples, 2, 48000);
+        let result = output.write(&buffer);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_virtual_output_with_device_name_chaining() {
+        let output = WindowsVirtualOutput::new()
+            .with_device_name("First")
+            .with_device_name("Second");
+        assert_eq!(output.virtual_device_name(), "Second");
+    }
+
+    #[test]
+    fn test_virtual_output_is_driver_installed() {
+        let output = WindowsVirtualOutput::new();
+        // On non-Windows platforms, this should return false
+        #[cfg(not(target_os = "windows"))]
+        {
+            assert!(!output.is_driver_installed());
+        }
+    }
+
+    #[test]
+    fn test_virtual_output_check_driver_installed_static() {
+        // On non-Windows platforms, this should return false
+        #[cfg(not(target_os = "windows"))]
+        {
+            assert!(!WindowsVirtualOutput::check_driver_installed());
+        }
     }
 }

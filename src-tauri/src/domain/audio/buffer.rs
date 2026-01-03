@@ -161,4 +161,114 @@ mod tests {
         let result = buffer1.mix(&buffer2);
         assert!(matches!(result, Err(BufferError::ChannelMismatch { .. })));
     }
+
+    #[test]
+    fn test_buffer_mixing_sample_rate_mismatch() {
+        let buffer1 = AudioBuffer::from_raw_f32(vec![0.5, 0.5], 2, 44100);
+        let buffer2 = AudioBuffer::from_raw_f32(vec![0.5, 0.5], 2, 48000);
+
+        let result = buffer1.mix(&buffer2);
+        assert!(matches!(
+            result,
+            Err(BufferError::SampleRateMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn test_buffer_to_raw_f32() {
+        let buffer = AudioBuffer::from_raw_f32(vec![0.5, -0.5, 0.25], 1, 44100);
+        let raw = buffer.to_raw_f32();
+        assert_eq!(raw.len(), 3);
+        assert_eq!(raw[0], 0.5);
+        assert_eq!(raw[1], -0.5);
+        assert_eq!(raw[2], 0.25);
+    }
+
+    #[test]
+    fn test_buffer_from_raw_f32() {
+        let buffer = AudioBuffer::from_raw_f32(vec![1.0, -1.0], 2, 48000);
+        assert_eq!(buffer.channels(), 2);
+        assert_eq!(buffer.sample_rate(), 48000);
+        assert_eq!(buffer.samples().len(), 2);
+    }
+
+    #[test]
+    fn test_buffer_samples_mut() {
+        let mut buffer = AudioBuffer::from_raw_f32(vec![0.0, 0.0], 2, 44100);
+        buffer.samples_mut()[0] = Sample::new(0.5);
+        assert_eq!(buffer.samples()[0].value(), 0.5);
+    }
+
+    #[test]
+    fn test_buffer_apply_gain() {
+        let mut buffer = AudioBuffer::from_raw_f32(vec![0.5, 0.5], 2, 44100);
+        buffer.apply_gain(2.0);
+        assert!(buffer.samples().iter().all(|s| s.value() == 1.0)); // Clamped
+    }
+
+    #[test]
+    fn test_buffer_apply_gain_zero() {
+        let mut buffer = AudioBuffer::from_raw_f32(vec![0.5, 0.5], 2, 44100);
+        buffer.apply_gain(0.0);
+        assert!(buffer.samples().iter().all(|s| s.value() == 0.0));
+    }
+
+    #[test]
+    fn test_buffer_duration_ms() {
+        let buffer = AudioBuffer::silence(100, 2, 44100);
+        // At 44100 Hz, 100ms = 4410 samples per channel
+        assert!(buffer.duration_ms() >= 95 && buffer.duration_ms() <= 105);
+    }
+
+    #[test]
+    fn test_buffer_frame_count() {
+        let samples = vec![Sample::new(0.0); 200]; // 100 frames for stereo
+        let buffer = AudioBuffer::new(samples, 2, 44100);
+        assert_eq!(buffer.frame_count(), 100);
+    }
+
+    #[test]
+    fn test_buffer_clone() {
+        let buffer1 = AudioBuffer::from_raw_f32(vec![0.5, 0.5], 2, 44100);
+        let buffer2 = buffer1.clone();
+        assert_eq!(buffer1.samples().len(), buffer2.samples().len());
+        assert_eq!(buffer1.channels(), buffer2.channels());
+    }
+
+    #[test]
+    fn test_buffer_partial_eq() {
+        let buffer1 = AudioBuffer::from_raw_f32(vec![0.5, 0.5], 2, 44100);
+        let buffer2 = AudioBuffer::from_raw_f32(vec![0.5, 0.5], 2, 44100);
+        assert_eq!(buffer1, buffer2);
+    }
+
+    #[test]
+    fn test_buffer_error_channel_mismatch_display() {
+        let error = BufferError::ChannelMismatch {
+            expected: 2,
+            got: 1,
+        };
+        let msg = format!("{}", error);
+        assert!(msg.contains("Channel mismatch"));
+    }
+
+    #[test]
+    fn test_buffer_error_sample_rate_mismatch_display() {
+        let error = BufferError::SampleRateMismatch {
+            expected: 44100,
+            got: 48000,
+        };
+        let msg = format!("{}", error);
+        assert!(msg.contains("Sample rate mismatch"));
+    }
+
+    #[test]
+    fn test_buffer_mix_different_lengths() {
+        let buffer1 = AudioBuffer::from_raw_f32(vec![0.5, 0.5, 0.5, 0.5], 2, 44100);
+        let buffer2 = AudioBuffer::from_raw_f32(vec![0.5, 0.5], 2, 44100);
+
+        let mixed = buffer1.mix(&buffer2).unwrap();
+        // Should use the shorter length
+        assert_eq!(mixed.samples().len(), 2);
+    }
 }

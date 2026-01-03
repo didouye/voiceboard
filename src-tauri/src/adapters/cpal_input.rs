@@ -148,4 +148,43 @@ mod tests {
         assert!(!input.is_capturing());
         assert!(input.current_format().is_none());
     }
+
+    #[test]
+    fn test_cpal_input_default() {
+        let input = CpalAudioInput::default();
+        assert!(!input.is_capturing());
+        assert!(input.stream.is_none());
+        assert!(input.sender.is_none());
+        assert!(input.receiver.is_none());
+    }
+
+    #[test]
+    fn test_cpal_input_get_receiver_returns_none() {
+        let input = CpalAudioInput::new();
+        // get_receiver returns None in current implementation
+        assert!(input.get_receiver().is_none());
+    }
+
+    #[test]
+    fn test_cpal_input_stop_when_not_started() {
+        let mut input = CpalAudioInput::new();
+        // Stop should succeed even when not started
+        assert!(input.stop().is_ok());
+        assert!(!input.is_capturing());
+    }
+
+    #[test]
+    fn test_cpal_input_format_none_initially() {
+        let input = CpalAudioInput::new();
+        assert!(input.format.is_none());
+        assert!(input.current_format().is_none());
+    }
+
+    #[test]
+    fn test_cpal_input_find_device_not_found() {
+        let input = CpalAudioInput::new();
+        let device_id = DeviceId::new("nonexistent-device-12345");
+        let result = input.find_device(&device_id);
+        assert!(result.is_err());
+    }
 }
