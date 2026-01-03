@@ -233,6 +233,126 @@ export class SoundboardService {
   }
 
   /**
+   * Import multiple sound files at once
+   * Opens a multi-file dialog and assigns sounds to empty pads
+   */
+  async importMultipleSounds(): Promise<{ imported: number; errors: string[] }> {
+    try {
+      this._loading.set(true);
+      this._error.set(null);
+
+      // Open file dialog with multiple selection
+      const selected = await open({
+        multiple: true,
+        filters: [{
+          name: 'Audio Files',
+          extensions: ['mp3', 'ogg', 'wav', 'flac']
+        }]
+      });
+
+      if (!selected || (Array.isArray(selected) && selected.length === 0)) {
+        this._loading.set(false);
+        return { imported: 0, errors: [] };
+      }
+
+      const paths = Array.isArray(selected) ? selected : [selected];
+      return await this.importSoundsFromPaths(paths);
+    } catch (err) {
+      this._error.set(err instanceof Error ? err.message : String(err));
+      return { imported: 0, errors: [String(err)] };
+    } finally {
+      this._loading.set(false);
+    }
+  }
+
+  /**
+   * Import sounds from an array of file paths
+   * Used by both button import and drag & drop
+   */
+  async importSoundsFromPaths(paths: string[]): Promise<{ imported: number; errors: string[] }> {
+    if (paths.length === 0) {
+      return { imported: 0, errors: [] };
+    }
+
+    // Sort paths alphabetically by filename
+    const sortedPaths = [...paths].sort((a, b) => {
+      const nameA = a.split('/').pop()?.toLowerCase() || a;
+      const nameB = b.split('/').pop()?.toLowerCase() || b;
+      return nameA.localeCompare(nameB);
+    });
+
+    // Load all files in parallel
+    const results = await this.tauri.loadMultipleSoundFiles(sortedPaths);
+
+    // Separate successes and errors
+    const successfulSounds: { sound: SoundFile; originalPath: string }[] = [];
+    const errors: string[] = [];
+
+    results.forEach((result, index) => {
+      if ('ok' in result) {
+        successfulSounds.push({ sound: result.ok, originalPath: sortedPaths[index] });
+      } else {
+        const fileName = sortedPaths[index].split('/').pop() || sortedPaths[index];
+        errors.push(`${fileName}: ${result.err}`);
+      }
+    });
+
+    if (successfulSounds.length === 0) {
+      return { imported: 0, errors };
+    }
+
+    // Ensure we have enough empty pads
+    this.ensurePadsForImport(successfulSounds.length);
+
+    // Find empty pads and assign sounds
+    const pads = this._pads();
+    const emptyPadIds: string[] = [];
+    for (const pad of pads) {
+      if (pad.sound === null && emptyPadIds.length < successfulSounds.length) {
+        emptyPadIds.push(pad.id);
+      }
+    }
+
+    // Assign sounds to empty pads
+    this._pads.update(currentPads => {
+      const updatedPads = [...currentPads];
+      successfulSounds.forEach((item, index) => {
+        const padId = emptyPadIds[index];
+        const padIndex = updatedPads.findIndex(p => p.id === padId);
+        if (padIndex !== -1) {
+          updatedPads[padIndex] = { ...updatedPads[padIndex], sound: item.sound };
+        }
+      });
+      return updatedPads;
+    });
+
+    // Ensure there's still an empty pad available after import
+    this.ensureEmptyPadAvailable();
+
+    await this.saveState();
+
+    return { imported: successfulSounds.length, errors };
+  }
+
+  /**
+   * Ensure there are enough pads for the import
+   * Adds rows as needed to accommodate all files plus 1 empty pad
+   */
+  private ensurePadsForImport(fileCount: number): void {
+    const pads = this._pads();
+    const emptyPads = pads.filter(p => p.sound === null).length;
+
+    // Need fileCount empty pads + 1 extra for the "always have 1 empty" rule
+    const padsNeeded = fileCount + 1;
+
+    if (emptyPads < padsNeeded) {
+      const additionalPadsNeeded = padsNeeded - emptyPads;
+      const rowsToAdd = Math.ceil(additionalPadsNeeded / 4);
+      this.addPads(rowsToAdd * 4);
+    }
+  }
+
+  /**
    * Play a sound from a pad
    */
   async playSound(padId: string): Promise<void> {
