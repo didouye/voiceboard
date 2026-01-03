@@ -33,9 +33,28 @@ Voiceboard is a virtual microphone mixer application that allows users to mix th
 
 ### Testing
 
+**Only commit if all tests pass**
+
 - Write tests for new features
-- Run `cargo test` for Rust tests
+- Run `cargo test --manifest-path src-tauri/Cargo.toml` for Rust tests
 - Run `npm test` for Angular tests
+
+### Code Coverage
+
+To measure Rust code coverage:
+
+```bash
+# Install cargo-tarpaulin (one-time)
+cargo install cargo-tarpaulin
+
+# Run coverage report
+cd src-tauri && cargo tarpaulin --out Stdout
+```
+
+**Coverage targets:**
+- Domain layer: 100% (unit tests)
+- Application layer: 80%+ (unit tests + mocks)
+- Adapters: Hardware-dependent code may have lower coverage
 
 ## Key Files
 
