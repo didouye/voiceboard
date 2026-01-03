@@ -1,4 +1,4 @@
-import { Component, HostListener } from '@angular/core';
+import { Component, HostListener, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { SoundboardService } from '../../core/services/soundboard.service';
 import { SoundPadComponent } from './sound-pad/sound-pad.component';
@@ -30,18 +30,31 @@ const DEFAULT_HOTKEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', 
         </div>
       }
 
-      <div class="pads-grid">
-        @for (pad of soundboard.pads(); track pad.id; let i = $index) {
-          <app-sound-pad
-            [pad]="pad"
-            [hotkey]="getHotkey(i)"
-            [loading]="soundboard.loading()"
-            [isPreviewing]="soundboard.previewingPadId() === pad.id"
-            (play)="soundboard.playSound(pad.id)"
-            (preview)="soundboard.previewSound(pad.id)"
-            (import)="soundboard.importSound(pad.id)"
-            (remove)="soundboard.removeSound(pad.id)"
-          />
+      <div
+        class="pads-container"
+        (dragover)="onDragOver($event)"
+        (dragleave)="onDragLeave($event)"
+        (drop)="onDrop($event)"
+      >
+        <div class="pads-grid">
+          @for (pad of soundboard.pads(); track pad.id; let i = $index) {
+            <app-sound-pad
+              [pad]="pad"
+              [hotkey]="getHotkey(i)"
+              [loading]="soundboard.loading()"
+              [isPreviewing]="soundboard.previewingPadId() === pad.id"
+              (play)="soundboard.playSound(pad.id)"
+              (preview)="soundboard.previewSound(pad.id)"
+              (import)="soundboard.importSound(pad.id)"
+              (remove)="soundboard.removeSound(pad.id)"
+            />
+          }
+        </div>
+
+        @if (isDragging()) {
+          <div class="drop-overlay">
+            <span>Drop to import {{ dragFileCount() }} file{{ dragFileCount() > 1 ? 's' : '' }}</span>
+          </div>
         }
       </div>
 
@@ -120,10 +133,32 @@ const DEFAULT_HOTKEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', 
       font-size: 0.8rem;
     }
 
+    .pads-container {
+      position: relative;
+    }
+
     .pads-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
       gap: 12px;
+    }
+
+    .drop-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(52, 152, 219, 0.85);
+      border: 3px dashed #fff;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+
+    .drop-overlay span {
+      color: #fff;
+      font-size: 1.2rem;
+      font-weight: 500;
     }
 
     .soundboard-footer {
@@ -170,6 +205,11 @@ const DEFAULT_HOTKEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', 
 })
 export class SoundboardComponent {
   constructor(public soundboard: SoundboardService) {}
+
+  isDragging = signal(false);
+  dragFileCount = signal(0);
+
+  private readonly AUDIO_EXTENSIONS = ['mp3', 'ogg', 'wav', 'flac'];
 
   @HostListener('window:keydown', ['$event'])
   handleKeydown(event: KeyboardEvent): void {
@@ -221,6 +261,74 @@ export class SoundboardComponent {
       const errorMessage = `Imported ${result.imported} files.\nFailed (${result.errors.length}):\n${result.errors.join('\n')}`;
       console.warn(errorMessage);
       // TODO: Show toast notification instead of console
+    }
+  }
+
+  onDragOver(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!event.dataTransfer) return;
+
+    // Check if dragging files
+    if (event.dataTransfer.types.includes('Files')) {
+      event.dataTransfer.dropEffect = 'copy';
+
+      // Count audio files
+      const items = Array.from(event.dataTransfer.items);
+      const audioCount = items.filter(item => {
+        if (item.kind !== 'file') return false;
+        const type = item.type.toLowerCase();
+        return type.startsWith('audio/') ||
+               this.AUDIO_EXTENSIONS.some(ext => type.includes(ext));
+      }).length;
+
+      // If we can't determine from MIME, use total count
+      const count = audioCount > 0 ? audioCount : items.filter(i => i.kind === 'file').length;
+
+      this.dragFileCount.set(count);
+      this.isDragging.set(true);
+    }
+  }
+
+  onDragLeave(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+
+    // Only hide overlay if leaving the container (not entering a child)
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const x = event.clientX;
+    const y = event.clientY;
+
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+      this.isDragging.set(false);
+      this.dragFileCount.set(0);
+    }
+  }
+
+  async onDrop(event: DragEvent): Promise<void> {
+    event.preventDefault();
+    event.stopPropagation();
+
+    this.isDragging.set(false);
+    this.dragFileCount.set(0);
+
+    if (!event.dataTransfer) return;
+
+    const files = Array.from(event.dataTransfer.files);
+    const audioPaths = files
+      .filter(file => {
+        const ext = file.name.split('.').pop()?.toLowerCase();
+        return ext && this.AUDIO_EXTENSIONS.includes(ext);
+      })
+      .map(file => file.path);
+
+    if (audioPaths.length === 0) return;
+
+    const result = await this.soundboard.importSoundsFromPaths(audioPaths);
+
+    if (result.errors.length > 0) {
+      console.warn(`Imported ${result.imported} files. Failed: ${result.errors.join(', ')}`);
     }
   }
 }
