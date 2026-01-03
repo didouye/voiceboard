@@ -62,6 +62,7 @@ use application::{
         set_input_device,
         set_master_volume,
         set_mic_muted,
+        set_mic_monitoring,
         set_mic_volume,
         set_output_device,
         set_preview_device,
@@ -214,6 +215,7 @@ pub fn run() {
             set_input_device,
             set_output_device,
             set_preview_device,
+            set_mic_monitoring,
             // Mixer configuration
             get_mixer_config,
             set_master_volume,

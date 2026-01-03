@@ -460,6 +460,47 @@ pub async fn set_preview_device(
     Ok(())
 }
 
+/// Set mic monitoring enabled/disabled
+#[tauri::command]
+pub async fn set_mic_monitoring(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    enabled: bool,
+) -> Result<(), String> {
+    tracing::info!("Setting mic monitoring to: {}", enabled);
+
+    {
+        let mut settings = state.settings.write().await;
+        settings.audio.mic_monitoring = enabled;
+    }
+
+    // Send to audio engine
+    // TODO: Uncomment when AudioEngineCommand::SetMicMonitoring is added in Task 4
+    // let engine = state.audio_engine.lock().await;
+    // engine
+    //     .send_command(AudioEngineCommand::SetMicMonitoring(enabled))
+    //     .map_err(|e| format!("Failed to set mic monitoring: {}", e))?;
+
+    // Auto-save settings
+    let settings = state.settings.read().await;
+    let dto = AppSettingsDto::from(&*settings);
+    drop(settings);
+
+    let store = app.store(SETTINGS_STORE).map_err(|e| e.to_string())?;
+    let _ = store.reload();
+    store.set(
+        SETTINGS_KEY,
+        serde_json::to_value(&dto).map_err(|e| e.to_string())?,
+    );
+    store.save().map_err(|e| {
+        tracing::error!("Failed to save settings: {}", e);
+        e.to_string()
+    })?;
+
+    tracing::info!("Mic monitoring saved: {}", enabled);
+    Ok(())
+}
+
 // ============================================================================
 // Mixer Configuration Commands
 // ============================================================================
