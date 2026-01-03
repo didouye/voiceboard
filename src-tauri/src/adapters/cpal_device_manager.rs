@@ -267,11 +267,21 @@ impl DeviceManager for CpalDeviceManager {
 mod tests {
     use super::*;
 
+    // ==================== Device Manager Tests ====================
+
     #[test]
     fn test_device_manager_creation() {
         let manager = CpalDeviceManager::new();
         assert!(manager.cached_devices.is_empty());
     }
+
+    #[test]
+    fn test_device_manager_default() {
+        let manager = CpalDeviceManager::default();
+        assert!(manager.cached_devices.is_empty());
+    }
+
+    // ==================== Virtual Device Detection Tests ====================
 
     #[test]
     fn test_virtual_device_detection() {
@@ -282,5 +292,165 @@ mod tests {
         assert!(CpalDeviceManager::is_virtual_device("Voicemeeter Input"));
         assert!(!CpalDeviceManager::is_virtual_device("Realtek HD Audio"));
         assert!(!CpalDeviceManager::is_virtual_device("Built-in Microphone"));
+    }
+
+    #[test]
+    fn test_virtual_device_detection_case_insensitive() {
+        // Should be case-insensitive
+        assert!(CpalDeviceManager::is_virtual_device("VIRTUAL AUDIO DEVICE"));
+        assert!(CpalDeviceManager::is_virtual_device("Virtual Audio Device"));
+        assert!(CpalDeviceManager::is_virtual_device("virtual audio device"));
+        assert!(CpalDeviceManager::is_virtual_device("VB-AUDIO VIRTUAL"));
+        assert!(CpalDeviceManager::is_virtual_device("VOICEMEETER"));
+    }
+
+    #[test]
+    fn test_virtual_device_detection_blackhole() {
+        // macOS virtual audio device
+        assert!(CpalDeviceManager::is_virtual_device("BlackHole 2ch"));
+        assert!(CpalDeviceManager::is_virtual_device("BlackHole 16ch"));
+        assert!(CpalDeviceManager::is_virtual_device("blackhole"));
+    }
+
+    #[test]
+    fn test_virtual_device_detection_loopback() {
+        assert!(CpalDeviceManager::is_virtual_device("Loopback Audio"));
+        assert!(CpalDeviceManager::is_virtual_device("System Loopback"));
+    }
+
+    #[test]
+    fn test_physical_device_not_virtual() {
+        // Common physical device names that should NOT be detected as virtual
+        assert!(!CpalDeviceManager::is_virtual_device("Realtek HD Audio"));
+        assert!(!CpalDeviceManager::is_virtual_device("Built-in Microphone"));
+        assert!(!CpalDeviceManager::is_virtual_device(
+            "MacBook Pro Speakers"
+        ));
+        assert!(!CpalDeviceManager::is_virtual_device("USB Microphone"));
+        assert!(!CpalDeviceManager::is_virtual_device("Blue Yeti"));
+        assert!(!CpalDeviceManager::is_virtual_device("AirPods Pro"));
+        assert!(!CpalDeviceManager::is_virtual_device(
+            "Focusrite Scarlett 2i2"
+        ));
+    }
+
+    // ==================== VB-Cable Specific Detection Tests ====================
+
+    #[test]
+    fn test_vb_cable_device_detection() {
+        // VB-Cable specific patterns
+        assert!(CpalDeviceManager::is_vb_cable_device(
+            "CABLE Output (VB-Audio Virtual Cable)"
+        ));
+        assert!(CpalDeviceManager::is_vb_cable_device(
+            "CABLE Input (VB-Audio Virtual Cable)"
+        ));
+        assert!(CpalDeviceManager::is_vb_cable_device(
+            "VB-Audio Virtual Cable"
+        ));
+    }
+
+    #[test]
+    fn test_vb_cable_detection_case_insensitive() {
+        assert!(CpalDeviceManager::is_vb_cable_device(
+            "cable output (vb-audio virtual cable)"
+        ));
+        assert!(CpalDeviceManager::is_vb_cable_device(
+            "CABLE OUTPUT (VB-AUDIO VIRTUAL CABLE)"
+        ));
+    }
+
+    #[test]
+    fn test_vb_cable_detection_not_other_virtual() {
+        // Other virtual devices should NOT be detected as VB-Cable
+        assert!(!CpalDeviceManager::is_vb_cable_device("Voicemeeter Input"));
+        assert!(!CpalDeviceManager::is_vb_cable_device("BlackHole 2ch"));
+        assert!(!CpalDeviceManager::is_vb_cable_device(
+            "Virtual Audio Device"
+        ));
+        assert!(!CpalDeviceManager::is_vb_cable_device("Loopback Audio"));
+    }
+
+    #[test]
+    fn test_vb_cable_detection_not_physical() {
+        // Physical devices should NOT be detected as VB-Cable
+        assert!(!CpalDeviceManager::is_vb_cable_device("Realtek HD Audio"));
+        assert!(!CpalDeviceManager::is_vb_cable_device(
+            "Built-in Microphone"
+        ));
+        assert!(!CpalDeviceManager::is_vb_cable_device("USB Audio"));
+    }
+
+    // ==================== Priority Tests ====================
+
+    #[test]
+    fn test_virtual_device_priority_vb_cable_highest() {
+        // VB-Cable should have highest priority (lowest number)
+        let vb_cable_priority =
+            CpalDeviceManager::get_virtual_device_priority("CABLE Output (VB-Audio Virtual Cable)");
+        let voicemeeter_priority =
+            CpalDeviceManager::get_virtual_device_priority("Voicemeeter Input");
+        let blackhole_priority = CpalDeviceManager::get_virtual_device_priority("BlackHole 2ch");
+
+        assert!(vb_cable_priority < voicemeeter_priority);
+        assert!(vb_cable_priority < blackhole_priority);
+    }
+
+    #[test]
+    fn test_virtual_device_priority_voicemeeter_before_blackhole() {
+        let voicemeeter_priority =
+            CpalDeviceManager::get_virtual_device_priority("Voicemeeter Input");
+        let blackhole_priority = CpalDeviceManager::get_virtual_device_priority("BlackHole 2ch");
+
+        assert!(voicemeeter_priority < blackhole_priority);
+    }
+
+    #[test]
+    fn test_virtual_device_priority_unknown_device() {
+        // Unknown devices should have lowest priority (usize::MAX)
+        let unknown_priority =
+            CpalDeviceManager::get_virtual_device_priority("Some Random Virtual Device");
+        assert_eq!(unknown_priority, usize::MAX);
+    }
+
+    #[test]
+    fn test_virtual_device_priority_case_insensitive() {
+        let lower = CpalDeviceManager::get_virtual_device_priority("cable output (vb-audio");
+        let upper = CpalDeviceManager::get_virtual_device_priority("CABLE OUTPUT (VB-AUDIO");
+        let mixed = CpalDeviceManager::get_virtual_device_priority("Cable Output (VB-Audio");
+
+        assert_eq!(lower, upper);
+        assert_eq!(upper, mixed);
+    }
+
+    // ==================== Pattern Constants Tests ====================
+
+    #[test]
+    fn test_virtual_device_patterns_not_empty() {
+        assert!(!VIRTUAL_DEVICE_PATTERNS.is_empty());
+    }
+
+    #[test]
+    fn test_vb_cable_patterns_not_empty() {
+        assert!(!VB_CABLE_PATTERNS.is_empty());
+    }
+
+    #[test]
+    fn test_virtual_output_priority_not_empty() {
+        assert!(!VIRTUAL_OUTPUT_PRIORITY.is_empty());
+    }
+
+    #[test]
+    fn test_vb_cable_patterns_in_virtual_patterns() {
+        // All VB-Cable patterns should also match virtual device patterns
+        // This ensures VB-Cable is recognized as a virtual device
+        for vb_pattern in VB_CABLE_PATTERNS {
+            let test_name = format!("Test Device {}", vb_pattern);
+            assert!(
+                CpalDeviceManager::is_virtual_device(&test_name),
+                "VB-Cable pattern '{}' should also be detected as virtual device",
+                vb_pattern
+            );
+        }
     }
 }

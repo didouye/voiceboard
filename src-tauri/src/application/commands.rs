@@ -1387,3 +1387,401 @@ fn run_installer(path: &std::path::Path) -> Result<(), String> {
         Err("VB-Cable installation is only supported on Windows".to_string())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::{AudioDevice, AudioFormat, AudioSettings, DeviceId, DeviceType};
+
+    // ==================== ApiResponse Tests ====================
+
+    #[test]
+    fn test_api_response_ok() {
+        let response: ApiResponse<String> = ApiResponse::ok("test data".to_string());
+
+        assert!(response.success);
+        assert_eq!(response.data, Some("test data".to_string()));
+        assert!(response.error.is_none());
+    }
+
+    #[test]
+    fn test_api_response_ok_with_vec() {
+        let data = vec![1, 2, 3];
+        let response: ApiResponse<Vec<i32>> = ApiResponse::ok(data.clone());
+
+        assert!(response.success);
+        assert_eq!(response.data, Some(data));
+        assert!(response.error.is_none());
+    }
+
+    #[test]
+    fn test_api_response_err() {
+        let response: ApiResponse<String> = ApiResponse::err("Something went wrong");
+
+        assert!(!response.success);
+        assert!(response.data.is_none());
+        assert_eq!(response.error, Some("Something went wrong".to_string()));
+    }
+
+    #[test]
+    fn test_api_response_err_from_string() {
+        let error_msg = String::from("Error message");
+        let response: ApiResponse<i32> = ApiResponse::err(error_msg);
+
+        assert!(!response.success);
+        assert!(response.data.is_none());
+        assert_eq!(response.error, Some("Error message".to_string()));
+    }
+
+    // ==================== AudioDeviceDto Tests ====================
+
+    #[test]
+    fn test_audio_device_dto_from_physical_input() {
+        let device = AudioDevice::new(
+            DeviceId::new("mic-1"),
+            "Built-in Microphone".to_string(),
+            DeviceType::InputPhysical,
+            true,
+            vec![48000],
+            vec![1, 2],
+        );
+
+        let dto = AudioDeviceDto::from(device);
+
+        assert_eq!(dto.id, "mic-1");
+        assert_eq!(dto.name, "Built-in Microphone");
+        assert_eq!(dto.device_type, "InputPhysical");
+        assert!(dto.is_default);
+        assert!(!dto.is_virtual);
+    }
+
+    #[test]
+    fn test_audio_device_dto_from_virtual_output() {
+        let device = AudioDevice::new(
+            DeviceId::new("vb-cable"),
+            "VB-Cable Input".to_string(),
+            DeviceType::OutputVirtual,
+            false,
+            vec![44100, 48000],
+            vec![2],
+        );
+
+        let dto = AudioDeviceDto::from(device);
+
+        assert_eq!(dto.id, "vb-cable");
+        assert_eq!(dto.name, "VB-Cable Input");
+        assert_eq!(dto.device_type, "OutputVirtual");
+        assert!(!dto.is_default);
+        assert!(dto.is_virtual);
+    }
+
+    // ==================== MixerChannelDto Tests ====================
+
+    #[test]
+    fn test_mixer_channel_dto_from_microphone() {
+        let channel = MixerChannel::new("ch-1", "Main Mic", ChannelType::Microphone);
+        let dto = MixerChannelDto::from(&channel);
+
+        assert_eq!(dto.id, "ch-1");
+        assert_eq!(dto.name, "Main Mic");
+        assert_eq!(dto.channel_type, "Microphone");
+        assert_eq!(dto.volume, 1.0);
+        assert!(!dto.muted);
+        assert!(!dto.solo);
+    }
+
+    #[test]
+    fn test_mixer_channel_dto_from_audio_file() {
+        let mut channel = MixerChannel::new("ch-2", "Sound Effect", ChannelType::AudioFile);
+        channel.set_volume(0.75);
+        channel.set_muted(true);
+
+        let dto = MixerChannelDto::from(&channel);
+
+        assert_eq!(dto.id, "ch-2");
+        assert_eq!(dto.name, "Sound Effect");
+        assert_eq!(dto.channel_type, "AudioFile");
+        assert_eq!(dto.volume, 0.75);
+        assert!(dto.muted);
+        assert!(!dto.solo);
+    }
+
+    // ==================== MixerConfigDto Tests ====================
+
+    #[test]
+    fn test_mixer_config_dto_from() {
+        let mut config = MixerConfig::new(AudioFormat::default(), 512);
+        config.master_volume = 0.8;
+        config.add_channel(MixerChannel::new("ch-1", "Mic", ChannelType::Microphone));
+
+        let dto = MixerConfigDto::from(&config);
+
+        assert_eq!(dto.master_volume, 0.8);
+        assert_eq!(dto.channels.len(), 1);
+        assert_eq!(dto.channels[0].id, "ch-1");
+        assert_eq!(dto.buffer_size, 512);
+    }
+
+    // ==================== AudioSettingsDto Tests ====================
+
+    #[test]
+    fn test_audio_settings_dto_from() {
+        let settings = AudioSettings {
+            input_device_id: Some("mic-1".to_string()),
+            output_device_id: Some("vb-cable".to_string()),
+            preview_device_id: Some("speakers".to_string()),
+            master_volume: 0.9,
+            sample_rate: 48000,
+            buffer_size: 512,
+            mic_monitoring: true,
+        };
+
+        let dto = AudioSettingsDto::from(&settings);
+
+        assert_eq!(dto.input_device_id, Some("mic-1".to_string()));
+        assert_eq!(dto.output_device_id, Some("vb-cable".to_string()));
+        assert_eq!(dto.preview_device_id, Some("speakers".to_string()));
+        assert_eq!(dto.master_volume, 0.9);
+        assert_eq!(dto.sample_rate, 48000);
+        assert_eq!(dto.buffer_size, 512);
+        assert!(dto.mic_monitoring);
+    }
+
+    #[test]
+    fn test_audio_settings_from_dto() {
+        let dto = AudioSettingsDto {
+            input_device_id: Some("mic-2".to_string()),
+            output_device_id: None,
+            preview_device_id: None,
+            master_volume: 0.5,
+            sample_rate: 44100,
+            buffer_size: 256,
+            mic_monitoring: false,
+        };
+
+        let settings = AudioSettings::from(dto);
+
+        assert_eq!(settings.input_device_id, Some("mic-2".to_string()));
+        assert!(settings.output_device_id.is_none());
+        assert!(settings.preview_device_id.is_none());
+        assert_eq!(settings.master_volume, 0.5);
+        assert_eq!(settings.sample_rate, 44100);
+        assert_eq!(settings.buffer_size, 256);
+        assert!(!settings.mic_monitoring);
+    }
+
+    #[test]
+    fn test_audio_settings_roundtrip() {
+        let original = AudioSettings {
+            input_device_id: Some("test-mic".to_string()),
+            output_device_id: Some("test-output".to_string()),
+            preview_device_id: Some("test-preview".to_string()),
+            master_volume: 0.75,
+            sample_rate: 48000,
+            buffer_size: 1024,
+            mic_monitoring: true,
+        };
+
+        let dto = AudioSettingsDto::from(&original);
+        let converted = AudioSettings::from(dto);
+
+        assert_eq!(original.input_device_id, converted.input_device_id);
+        assert_eq!(original.output_device_id, converted.output_device_id);
+        assert_eq!(original.preview_device_id, converted.preview_device_id);
+        assert_eq!(original.master_volume, converted.master_volume);
+        assert_eq!(original.sample_rate, converted.sample_rate);
+        assert_eq!(original.buffer_size, converted.buffer_size);
+        assert_eq!(original.mic_monitoring, converted.mic_monitoring);
+    }
+
+    // ==================== AppSettingsDto Tests ====================
+
+    #[test]
+    fn test_app_settings_dto_from() {
+        let settings = AppSettings {
+            audio: AudioSettings::default(),
+            start_minimized: true,
+            auto_start_mixing: false,
+        };
+
+        let dto = AppSettingsDto::from(&settings);
+
+        assert!(dto.start_minimized);
+        assert!(!dto.auto_start_mixing);
+    }
+
+    #[test]
+    fn test_app_settings_from_dto() {
+        let dto = AppSettingsDto {
+            audio: AudioSettingsDto {
+                input_device_id: None,
+                output_device_id: None,
+                preview_device_id: None,
+                master_volume: 1.0,
+                sample_rate: 48000,
+                buffer_size: 512,
+                mic_monitoring: false,
+            },
+            start_minimized: false,
+            auto_start_mixing: true,
+        };
+
+        let settings = AppSettings::from(dto);
+
+        assert!(!settings.start_minimized);
+        assert!(settings.auto_start_mixing);
+    }
+
+    #[test]
+    fn test_app_settings_roundtrip() {
+        let original = AppSettings {
+            audio: AudioSettings {
+                input_device_id: Some("mic".to_string()),
+                output_device_id: Some("output".to_string()),
+                preview_device_id: None,
+                master_volume: 0.8,
+                sample_rate: 44100,
+                buffer_size: 256,
+                mic_monitoring: true,
+            },
+            start_minimized: true,
+            auto_start_mixing: true,
+        };
+
+        let dto = AppSettingsDto::from(&original);
+        let converted = AppSettings::from(dto);
+
+        assert_eq!(original.start_minimized, converted.start_minimized);
+        assert_eq!(original.auto_start_mixing, converted.auto_start_mixing);
+        assert_eq!(
+            original.audio.input_device_id,
+            converted.audio.input_device_id
+        );
+        assert_eq!(
+            original.audio.mic_monitoring,
+            converted.audio.mic_monitoring
+        );
+    }
+
+    // ==================== UpdateInfo Tests ====================
+
+    #[test]
+    fn test_update_info_available() {
+        let info = UpdateInfo {
+            available: true,
+            version: Some("1.2.0".to_string()),
+            body: Some("Bug fixes and improvements".to_string()),
+        };
+
+        assert!(info.available);
+        assert_eq!(info.version, Some("1.2.0".to_string()));
+        assert!(info.body.is_some());
+    }
+
+    #[test]
+    fn test_update_info_not_available() {
+        let info = UpdateInfo {
+            available: false,
+            version: None,
+            body: None,
+        };
+
+        assert!(!info.available);
+        assert!(info.version.is_none());
+        assert!(info.body.is_none());
+    }
+
+    // ==================== VbCableStatus Tests ====================
+
+    #[test]
+    fn test_vb_cable_status_installed() {
+        let status = VbCableStatus {
+            installed: true,
+            device_name: Some("CABLE Input (VB-Audio Virtual Cable)".to_string()),
+        };
+
+        assert!(status.installed);
+        assert!(status.device_name.is_some());
+        assert!(status.device_name.unwrap().contains("VB-Audio"));
+    }
+
+    #[test]
+    fn test_vb_cable_status_not_installed() {
+        let status = VbCableStatus {
+            installed: false,
+            device_name: None,
+        };
+
+        assert!(!status.installed);
+        assert!(status.device_name.is_none());
+    }
+
+    // ==================== SoundFileDto Tests ====================
+
+    #[test]
+    fn test_sound_file_dto_creation() {
+        let dto = SoundFileDto {
+            id: "sound_abc123".to_string(),
+            name: "airhorn".to_string(),
+            path: "/sounds/airhorn.mp3".to_string(),
+            duration: 2.5,
+            sample_rate: 44100,
+            channels: 2,
+        };
+
+        assert_eq!(dto.id, "sound_abc123");
+        assert_eq!(dto.name, "airhorn");
+        assert_eq!(dto.duration, 2.5);
+        assert_eq!(dto.sample_rate, 44100);
+        assert_eq!(dto.channels, 2);
+    }
+
+    // ==================== Serialization Tests ====================
+
+    #[test]
+    fn test_api_response_serialization() {
+        let response: ApiResponse<String> = ApiResponse::ok("test".to_string());
+        let json = serde_json::to_string(&response).unwrap();
+
+        assert!(json.contains("\"success\":true"));
+        assert!(json.contains("\"data\":\"test\""));
+    }
+
+    #[test]
+    fn test_audio_device_dto_serialization() {
+        let dto = AudioDeviceDto {
+            id: "mic-1".to_string(),
+            name: "Microphone".to_string(),
+            device_type: "InputPhysical".to_string(),
+            is_default: true,
+            is_virtual: false,
+        };
+
+        let json = serde_json::to_string(&dto).unwrap();
+        let deserialized: AudioDeviceDto = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(dto.id, deserialized.id);
+        assert_eq!(dto.name, deserialized.name);
+        assert_eq!(dto.is_default, deserialized.is_default);
+    }
+
+    #[test]
+    fn test_audio_settings_dto_serialization() {
+        let dto = AudioSettingsDto {
+            input_device_id: Some("mic".to_string()),
+            output_device_id: None,
+            preview_device_id: None,
+            master_volume: 0.8,
+            sample_rate: 48000,
+            buffer_size: 512,
+            mic_monitoring: true,
+        };
+
+        let json = serde_json::to_string(&dto).unwrap();
+        let deserialized: AudioSettingsDto = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(dto.input_device_id, deserialized.input_device_id);
+        assert_eq!(dto.master_volume, deserialized.master_volume);
+        assert_eq!(dto.mic_monitoring, deserialized.mic_monitoring);
+    }
+}

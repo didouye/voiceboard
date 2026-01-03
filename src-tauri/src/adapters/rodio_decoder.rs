@@ -196,6 +196,8 @@ impl FileDecoderFactory for RodioDecoderFactory {
 mod tests {
     use super::*;
 
+    // ==================== RodioFileDecoder Tests ====================
+
     #[test]
     fn test_decoder_creation() {
         let decoder = RodioFileDecoder::new();
@@ -204,10 +206,192 @@ mod tests {
     }
 
     #[test]
+    fn test_decoder_default() {
+        let decoder = RodioFileDecoder::default();
+        assert!(decoder.source.is_none());
+        assert!(decoder.metadata.is_none());
+        assert_eq!(decoder.position, Duration::ZERO);
+        assert!(!decoder.finished);
+        assert_eq!(decoder.buffer_size, 4096);
+    }
+
+    #[test]
+    fn test_decoder_with_buffer_size() {
+        let decoder = RodioFileDecoder::new().with_buffer_size(8192);
+        assert_eq!(decoder.buffer_size, 8192);
+    }
+
+    #[test]
+    fn test_decoder_with_custom_buffer_size() {
+        let decoder = RodioFileDecoder::new().with_buffer_size(1024);
+        assert_eq!(decoder.buffer_size, 1024);
+    }
+
+    #[test]
+    fn test_decoder_initial_position() {
+        let decoder = RodioFileDecoder::new();
+        assert_eq!(decoder.position(), Duration::ZERO);
+    }
+
+    #[test]
+    fn test_decoder_initial_duration() {
+        let decoder = RodioFileDecoder::new();
+        assert!(decoder.duration().is_none());
+    }
+
+    #[test]
+    fn test_decoder_read_without_open_fails() {
+        let mut decoder = RodioFileDecoder::new();
+        let result = decoder.read_next();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decoder_seek_not_supported() {
+        let mut decoder = RodioFileDecoder::new();
+        let result = decoder.seek(Duration::from_secs(1));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decoder_reset_without_open_fails() {
+        let mut decoder = RodioFileDecoder::new();
+        let result = decoder.reset();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decoder_close_without_open() {
+        let mut decoder = RodioFileDecoder::new();
+        decoder.close(); // Should not panic
+        assert!(decoder.is_finished());
+        assert!(decoder.source.is_none());
+        assert!(decoder.metadata.is_none());
+    }
+
+    #[test]
+    fn test_decoder_open_nonexistent_file() {
+        let mut decoder = RodioFileDecoder::new();
+        let result = decoder.open(Path::new("/nonexistent/path/audio.mp3"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decoder_open_no_extension() {
+        let mut decoder = RodioFileDecoder::new();
+        let result = decoder.open(Path::new("/some/path/audiofile"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decoder_open_unsupported_format() {
+        let mut decoder = RodioFileDecoder::new();
+        let result = decoder.open(Path::new("/some/path/audio.xyz"));
+        assert!(result.is_err());
+    }
+
+    // ==================== RodioDecoderFactory Tests ====================
+
+    #[test]
+    fn test_factory_creation() {
+        let factory = RodioDecoderFactory::new();
+        // Factory has no state, just verify it creates
+        let _ = factory;
+    }
+
+    #[test]
+    fn test_factory_default() {
+        let factory = RodioDecoderFactory::default();
+        // Verify it supports expected formats
+        assert!(factory.supports_format(AudioFileFormat::Mp3));
+    }
+
+    #[test]
     fn test_factory_supported_formats() {
         let factory = RodioDecoderFactory::new();
         assert!(factory.supports_format(AudioFileFormat::Mp3));
         assert!(factory.supports_format(AudioFileFormat::Ogg));
         assert!(factory.supports_format(AudioFileFormat::Wav));
+    }
+
+    #[test]
+    fn test_factory_supports_flac() {
+        let factory = RodioDecoderFactory::new();
+        assert!(factory.supports_format(AudioFileFormat::Flac));
+    }
+
+    #[test]
+    fn test_factory_supported_formats_list() {
+        let factory = RodioDecoderFactory::new();
+        let formats = factory.supported_formats();
+
+        assert_eq!(formats.len(), 4);
+        assert!(formats.contains(&AudioFileFormat::Mp3));
+        assert!(formats.contains(&AudioFileFormat::Ogg));
+        assert!(formats.contains(&AudioFileFormat::Wav));
+        assert!(formats.contains(&AudioFileFormat::Flac));
+    }
+
+    #[test]
+    fn test_factory_create_decoder_nonexistent_file() {
+        let factory = RodioDecoderFactory::new();
+        let result = factory.create_decoder(Path::new("/nonexistent/audio.mp3"));
+        assert!(result.is_err());
+    }
+
+    // ==================== Format Detection Tests ====================
+
+    #[test]
+    fn test_detect_format_mp3() {
+        let result = RodioFileDecoder::detect_format(Path::new("test.mp3"));
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), AudioFileFormat::Mp3);
+    }
+
+    #[test]
+    fn test_detect_format_ogg() {
+        let result = RodioFileDecoder::detect_format(Path::new("test.ogg"));
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), AudioFileFormat::Ogg);
+    }
+
+    #[test]
+    fn test_detect_format_wav() {
+        let result = RodioFileDecoder::detect_format(Path::new("test.wav"));
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), AudioFileFormat::Wav);
+    }
+
+    #[test]
+    fn test_detect_format_flac() {
+        let result = RodioFileDecoder::detect_format(Path::new("test.flac"));
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), AudioFileFormat::Flac);
+    }
+
+    #[test]
+    fn test_detect_format_case_insensitive() {
+        assert!(RodioFileDecoder::detect_format(Path::new("test.MP3")).is_ok());
+        assert!(RodioFileDecoder::detect_format(Path::new("test.Mp3")).is_ok());
+        assert!(RodioFileDecoder::detect_format(Path::new("test.WAV")).is_ok());
+        assert!(RodioFileDecoder::detect_format(Path::new("test.FLAC")).is_ok());
+    }
+
+    #[test]
+    fn test_detect_format_no_extension() {
+        let result = RodioFileDecoder::detect_format(Path::new("audiofile"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_detect_format_unsupported() {
+        let result = RodioFileDecoder::detect_format(Path::new("test.aac"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_detect_format_unknown_extension() {
+        let result = RodioFileDecoder::detect_format(Path::new("test.xyz"));
+        assert!(result.is_err());
     }
 }

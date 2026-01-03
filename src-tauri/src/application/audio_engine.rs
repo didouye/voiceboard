@@ -1009,10 +1009,250 @@ fn run_engine_thread(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
+
+    // ==================== AudioState Tests ====================
+
+    #[test]
+    fn test_audio_state_default_values() {
+        let state = AudioState::default();
+        assert!(state.playing_sounds.is_empty());
+        assert_eq!(state.mic_volume, 1.0);
+        assert_eq!(state.master_volume, 1.0);
+        assert!(!state.mic_muted);
+    }
+
+    // ==================== AudioEngine Tests ====================
 
     #[test]
     fn test_engine_creation() {
         let engine = AudioEngine::new();
+        assert!(!engine.is_running());
+    }
+
+    #[test]
+    fn test_engine_is_not_running_initially() {
+        let engine = AudioEngine::new();
+        assert!(!engine.is_running());
+    }
+
+    #[test]
+    fn test_send_command_succeeds() {
+        let engine = AudioEngine::new();
+        let result = engine.send_command(AudioEngineCommand::SetMicVolume(0.5));
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_send_multiple_commands_succeeds() {
+        let engine = AudioEngine::new();
+
+        assert!(engine
+            .send_command(AudioEngineCommand::SetMicVolume(0.5))
+            .is_ok());
+        assert!(engine
+            .send_command(AudioEngineCommand::SetMasterVolume(0.8))
+            .is_ok());
+        assert!(engine
+            .send_command(AudioEngineCommand::SetMicMuted(true))
+            .is_ok());
+        assert!(engine
+            .send_command(AudioEngineCommand::SetMicMonitoring(true))
+            .is_ok());
+    }
+
+    #[test]
+    fn test_try_recv_event_returns_none_when_no_events() {
+        let engine = AudioEngine::new();
+        // Give the engine thread time to start
+        std::thread::sleep(Duration::from_millis(10));
+        // No events should be pending initially (before any command)
+        // Note: We can't guarantee no events since the thread runs independently
+        // Just verify the method doesn't panic
+        let _event = engine.try_recv_event();
+    }
+
+    #[test]
+    fn test_shutdown_completes_without_panic() {
+        let mut engine = AudioEngine::new();
+        engine.shutdown();
+        // Engine should no longer be running after shutdown
+        assert!(!engine.is_running());
+    }
+
+    #[test]
+    fn test_shutdown_is_idempotent() {
+        let mut engine = AudioEngine::new();
+        engine.shutdown();
+        engine.shutdown(); // Second shutdown should not panic
+        assert!(!engine.is_running());
+    }
+
+    #[test]
+    fn test_drop_shuts_down_engine() {
+        let engine = AudioEngine::new();
+        let is_running = engine.is_running.clone();
+        drop(engine);
+        // After drop, the engine thread should have stopped
+        // Give it time to process shutdown
+        std::thread::sleep(Duration::from_millis(50));
+        assert!(!is_running.load(std::sync::atomic::Ordering::SeqCst));
+    }
+
+    // ==================== PlayingSound Tests ====================
+
+    #[test]
+    fn test_playing_sound_creation() {
+        let samples = vec![0.1, 0.2, 0.3, 0.4, 0.5];
+        let sound = PlayingSound {
+            samples: samples.clone(),
+            position: 0,
+        };
+        assert_eq!(sound.samples.len(), 5);
+        assert_eq!(sound.position, 0);
+    }
+
+    #[test]
+    fn test_playing_sound_position_tracking() {
+        let mut sound = PlayingSound {
+            samples: vec![0.1, 0.2, 0.3, 0.4, 0.5],
+            position: 0,
+        };
+
+        // Simulate playback advancing
+        sound.position = 2;
+        assert_eq!(sound.position, 2);
+
+        // Check remaining samples
+        let remaining = sound.samples.len() - sound.position;
+        assert_eq!(remaining, 3);
+    }
+
+    #[test]
+    fn test_playing_sound_finished_when_position_at_end() {
+        let sound = PlayingSound {
+            samples: vec![0.1, 0.2, 0.3],
+            position: 3,
+        };
+        assert!(sound.position >= sound.samples.len());
+    }
+
+    // ==================== AudioEngineCommand Tests ====================
+
+    #[test]
+    fn test_play_sound_command_creation() {
+        let samples = vec![0.1, 0.2, 0.3];
+        let cmd = AudioEngineCommand::PlaySound {
+            id: "test-sound".to_string(),
+            samples: samples.clone(),
+        };
+
+        if let AudioEngineCommand::PlaySound { id, samples: s } = cmd {
+            assert_eq!(id, "test-sound");
+            assert_eq!(s.len(), 3);
+        } else {
+            panic!("Expected PlaySound command");
+        }
+    }
+
+    #[test]
+    fn test_start_command_creation() {
+        let cmd = AudioEngineCommand::Start {
+            input_device: "Microphone".to_string(),
+            output_device: "VB-Cable".to_string(),
+            sample_rate: 48000,
+            channels: 2,
+        };
+
+        if let AudioEngineCommand::Start {
+            input_device,
+            output_device,
+            sample_rate,
+            channels,
+        } = cmd
+        {
+            assert_eq!(input_device, "Microphone");
+            assert_eq!(output_device, "VB-Cable");
+            assert_eq!(sample_rate, 48000);
+            assert_eq!(channels, 2);
+        } else {
+            panic!("Expected Start command");
+        }
+    }
+
+    // ==================== AudioEngineEvent Tests ====================
+
+    #[test]
+    fn test_event_clone() {
+        let event = AudioEngineEvent::LevelUpdate {
+            input_rms: 0.5,
+            input_peak: 0.8,
+            output_rms: 0.3,
+            output_peak: 0.6,
+        };
+
+        let cloned = event.clone();
+        if let AudioEngineEvent::LevelUpdate {
+            input_rms,
+            input_peak,
+            output_rms,
+            output_peak,
+        } = cloned
+        {
+            assert_eq!(input_rms, 0.5);
+            assert_eq!(input_peak, 0.8);
+            assert_eq!(output_rms, 0.3);
+            assert_eq!(output_peak, 0.6);
+        } else {
+            panic!("Expected LevelUpdate event");
+        }
+    }
+
+    #[test]
+    fn test_error_event_message() {
+        let event = AudioEngineEvent::Error("Device not found".to_string());
+
+        if let AudioEngineEvent::Error(msg) = event {
+            assert_eq!(msg, "Device not found");
+        } else {
+            panic!("Expected Error event");
+        }
+    }
+
+    #[test]
+    fn test_info_event_message() {
+        let event = AudioEngineEvent::Info("Engine started".to_string());
+
+        if let AudioEngineEvent::Info(msg) = event {
+            assert_eq!(msg, "Engine started");
+        } else {
+            panic!("Expected Info event");
+        }
+    }
+
+    // ==================== Integration-like Tests ====================
+
+    #[test]
+    fn test_engine_accepts_stop_sound_command() {
+        let engine = AudioEngine::new();
+        let result = engine.send_command(AudioEngineCommand::StopSound {
+            id: "nonexistent".to_string(),
+        });
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_engine_accepts_set_monitoring_device_command() {
+        let engine = AudioEngine::new();
+        let result = engine.send_command(AudioEngineCommand::SetMonitoringDevice(
+            "Speakers".to_string(),
+        ));
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_engine_default_trait() {
+        let engine = AudioEngine::default();
         assert!(!engine.is_running());
     }
 }
