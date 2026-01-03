@@ -27,7 +27,7 @@
 ### To Do
 - [x] Mic monitoring on preview output - Hear your own microphone in preview
 - [x] Unit tests - 284 tests covering domain layer (100%), adapters, and application layer
-- [ ] Individual volume control per pad in UI
+- [x] Individual volume control per pad in UI (0-200% with popup slider)
 - [x] Bulk import - Import multiple audio files at once (with drag & drop and dynamic pad rows)
 - [ ] **Speed Playback**
   - Button on each pad (next to preview button)
