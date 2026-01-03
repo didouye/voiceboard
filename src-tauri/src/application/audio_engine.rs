@@ -521,20 +521,29 @@ fn run_engine_thread(
                                 }
 
                                 // Mix in playing sounds (this goes to BOTH outputs)
+                                // Sounds are stored as MONO, output may be stereo
+                                // We need to mix one mono sample per FRAME, not per sample
                                 if let Ok(mut state) = audio_state_clone.try_lock() {
                                     let mut finished = Vec::new();
+                                    let num_frames = data_len / engine_channels as usize;
 
                                     for (id, sound) in state.playing_sounds.iter_mut() {
                                         let remaining = sound.samples.len() - sound.position;
-                                        let to_mix = remaining.min(data_len);
+                                        let frames_to_mix = remaining.min(num_frames);
 
-                                        for (i, sample) in data.iter_mut().take(to_mix).enumerate()
-                                        {
-                                            *sample = (*sample + sound.samples[sound.position + i])
-                                                .clamp(-1.0, 1.0);
+                                        for frame in 0..frames_to_mix {
+                                            let mono_sample = sound.samples[sound.position + frame];
+
+                                            // Duplicate mono sample to all output channels
+                                            for ch in 0..engine_channels as usize {
+                                                let idx = frame * engine_channels as usize + ch;
+                                                if idx < data_len {
+                                                    data[idx] = (data[idx] + mono_sample).clamp(-1.0, 1.0);
+                                                }
+                                            }
                                         }
 
-                                        sound.position += to_mix;
+                                        sound.position += frames_to_mix;
                                         if sound.position >= sound.samples.len() {
                                             finished.push(id.clone());
                                         }
@@ -727,12 +736,12 @@ fn run_engine_thread(
                                             let t = *frac_pos as f32;
                                             let sample = *prev_sample + (*curr_sample - *prev_sample) * t;
 
-                                            // Write to output (mono or stereo)
-                                            if mon_channels == 2 {
-                                                data[frame * 2] = sample;
-                                                data[frame * 2 + 1] = sample;
-                                            } else {
-                                                data[frame] = sample;
+                                            // Write to output (duplicate mono sample to all channels)
+                                            let base_idx = frame * mon_channels as usize;
+                                            for ch in 0..mon_channels as usize {
+                                                if base_idx + ch < data.len() {
+                                                    data[base_idx + ch] = sample;
+                                                }
                                             }
 
                                             // Advance position by resample ratio
