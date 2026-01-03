@@ -533,4 +533,79 @@ mod tests {
         assert!(config.channels.is_empty());
         assert_eq!(config.master_volume, 1.0);
     }
+
+    #[tokio::test]
+    async fn test_mixer_service_set_channel_muted_nonexistent() {
+        let input = MockAudioInput::new();
+        let output = MockAudioOutput::new();
+        let device_manager = MockDeviceManager::new();
+
+        let service = MixerService::new(input, output, device_manager);
+        let result = service.set_channel_muted("nonexistent", true).await;
+
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_mixer_service_add_multiple_channels() {
+        let input = MockAudioInput::new();
+        let output = MockAudioOutput::new();
+        let device_manager = MockDeviceManager::new();
+
+        let service = MixerService::new(input, output, device_manager);
+
+        service
+            .add_channel(MixerChannel::new("ch-1", "Mic", ChannelType::Microphone))
+            .await
+            .unwrap();
+        service
+            .add_channel(MixerChannel::new("ch-2", "Sound", ChannelType::AudioFile))
+            .await
+            .unwrap();
+
+        let config = service.get_config().await;
+        assert_eq!(config.channels.len(), 2);
+    }
+
+    #[test]
+    fn test_mixer_service_error_from_input_error() {
+        let input_error = AudioInputError::DeviceNotFound("mic".to_string());
+        let error: MixerServiceError = input_error.into();
+        let msg = format!("{}", error);
+        assert!(msg.contains("Input error"));
+    }
+
+    #[test]
+    fn test_mixer_service_error_from_output_error() {
+        let output_error = AudioOutputError::DeviceNotFound("speaker".to_string());
+        let error: MixerServiceError = output_error.into();
+        let msg = format!("{}", error);
+        assert!(msg.contains("Output error"));
+    }
+
+    #[test]
+    fn test_mixer_service_error_from_device_error() {
+        let device_error = DeviceManagerError::EnumerationError("test".to_string());
+        let error: MixerServiceError = device_error.into();
+        let msg = format!("{}", error);
+        assert!(msg.contains("Device error"));
+    }
+
+    #[test]
+    fn test_mixer_service_error_from_decoder_error() {
+        let decoder_error = FileDecoderError::FileNotFound("test.mp3".to_string());
+        let error: MixerServiceError = decoder_error.into();
+        let msg = format!("{}", error);
+        assert!(msg.contains("Decoder error"));
+    }
+
+    #[test]
+    fn test_mix_buffers_zero_weight() {
+        let samples = vec![Sample::new(1.0), Sample::new(1.0)];
+        let buffer = AudioBuffer::new(samples, 1, 48000);
+
+        // Zero total weight should handle gracefully
+        let result = mix_buffers(&[buffer], &[0.0]);
+        assert!(result.is_some());
+    }
 }
