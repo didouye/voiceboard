@@ -406,7 +406,8 @@ fn run_engine_thread(
                         let producer = Arc::new(Mutex::new(producer));
                         let consumer = Arc::new(Mutex::new(consumer));
 
-                        // Create second ring buffer for monitoring output
+                        // Create ring buffer for monitoring: carries the MIXED output from main callback
+                        // This ensures monitoring gets exactly what virtual output gets
                         let rb_monitoring = HeapRb::<f32>::new(RING_BUFFER_SIZE);
                         let (producer_monitoring, consumer_monitoring) = rb_monitoring.split();
                         let producer_monitoring = Arc::new(Mutex::new(producer_monitoring));
@@ -421,8 +422,6 @@ fn run_engine_thread(
                         let producer_clone = producer.clone();
                         let mic_volume_clone = mic_volume.clone();
                         let mic_muted_clone = mic_muted.clone();
-                        let producer_monitoring_clone = producer_monitoring.clone();
-                        let mic_monitoring_clone = mic_monitoring.clone();
 
                         // Debug counter for input callback
                         let input_callback_count = Arc::new(AtomicU32::new(0));
@@ -447,7 +446,6 @@ fn run_engine_thread(
                                 let muted = mic_muted_clone.load(Ordering::Relaxed);
                                 let volume =
                                     f32::from_bits(mic_volume_clone.load(Ordering::Relaxed));
-                                let monitoring_enabled = mic_monitoring_clone.load(Ordering::Relaxed);
 
                                 // Calculate RMS for input level
                                 let mut sum_squares = 0.0f32;
@@ -457,16 +455,6 @@ fn run_engine_thread(
                                         let processed = if muted { 0.0 } else { sample * volume };
                                         sum_squares += processed * processed;
                                         let _ = prod.try_push(processed);
-                                    }
-                                }
-
-                                // Also write to monitoring ring buffer when monitoring is enabled
-                                if monitoring_enabled {
-                                    if let Ok(mut prod_mon) = producer_monitoring_clone.try_lock() {
-                                        for &sample in data {
-                                            let processed = if muted { 0.0 } else { sample * volume };
-                                            let _ = prod_mon.try_push(processed);
-                                        }
                                     }
                                 }
 
@@ -498,6 +486,8 @@ fn run_engine_thread(
                         let master_volume_clone = master_volume.clone();
                         let audio_state_clone = audio_state.clone();
                         let output_level_for_callback = output_level.clone();
+                        let producer_monitoring_for_output = producer_monitoring.clone();
+                        let mic_monitoring_for_output = mic_monitoring.clone();
 
                         // Debug counter for output callback
                         let output_callback_count = Arc::new(AtomicU32::new(0));
@@ -512,26 +502,30 @@ fn run_engine_thread(
 
                                 let master_vol =
                                     f32::from_bits(master_volume_clone.load(Ordering::Relaxed));
+                                let mic_mon_enabled = mic_monitoring_for_output.load(Ordering::Relaxed);
 
-                                // First, fill with mic input from ring buffer
+                                // Read mic samples and store temporarily
+                                let data_len = data.len();
+                                let mut mic_samples = vec![0.0f32; data_len];
                                 if let Ok(mut cons) = consumer_clone.try_lock() {
-                                    for sample in data.iter_mut() {
+                                    for sample in mic_samples.iter_mut() {
                                         *sample = cons.try_pop().unwrap_or(0.0);
-                                    }
-                                } else {
-                                    // If we can't get the lock, output silence
-                                    for sample in data.iter_mut() {
-                                        *sample = 0.0;
                                     }
                                 }
 
-                                // Mix in playing sounds
+                                // Start with zeros, then mix sounds
+                                // This way we can control mic separately for monitoring
+                                for sample in data.iter_mut() {
+                                    *sample = 0.0;
+                                }
+
+                                // Mix in playing sounds (this goes to BOTH outputs)
                                 if let Ok(mut state) = audio_state_clone.try_lock() {
                                     let mut finished = Vec::new();
 
                                     for (id, sound) in state.playing_sounds.iter_mut() {
                                         let remaining = sound.samples.len() - sound.position;
-                                        let to_mix = remaining.min(data.len());
+                                        let to_mix = remaining.min(data_len);
 
                                         for (i, sample) in data.iter_mut().take(to_mix).enumerate()
                                         {
@@ -550,7 +544,27 @@ fn run_engine_thread(
                                     }
                                 }
 
-                                // Apply master volume
+                                // Write to monitoring buffer BEFORE adding mic to main output
+                                // Monitoring gets: sounds + (mic if mic_monitoring enabled)
+                                if let Ok(mut prod_mon) = producer_monitoring_for_output.try_lock() {
+                                    for (i, &sound_sample) in data.iter().enumerate() {
+                                        let mic_sample = mic_samples.get(i).copied().unwrap_or(0.0);
+                                        let monitoring_sample = if mic_mon_enabled {
+                                            (sound_sample + mic_sample) * master_vol
+                                        } else {
+                                            sound_sample * master_vol
+                                        };
+                                        let _ = prod_mon.try_push(monitoring_sample.clamp(-1.0, 1.0));
+                                    }
+                                }
+
+                                // Add mic to main output (always)
+                                for (i, sample) in data.iter_mut().enumerate() {
+                                    let mic_sample = mic_samples.get(i).copied().unwrap_or(0.0);
+                                    *sample = (*sample + mic_sample).clamp(-1.0, 1.0);
+                                }
+
+                                // Apply master volume to main output
                                 for sample in data.iter_mut() {
                                     *sample = (*sample * master_vol).clamp(-1.0, 1.0);
                                 }
@@ -561,7 +575,7 @@ fn run_engine_thread(
                                     sum_squares += sample * sample;
                                 }
                                 if !data.is_empty() {
-                                    let rms = (sum_squares / data.len() as f32).sqrt();
+                                    let rms = (sum_squares / data_len as f32).sqrt();
                                     output_level_for_callback
                                         .store(rms.to_bits(), Ordering::Relaxed);
 
@@ -571,7 +585,7 @@ fn run_engine_thread(
                                         tracing::info!(
                                             "[AudioEngine] Output callback #{}: {} samples, max amplitude: {:.6}, rms: {:.6}",
                                             count,
-                                            data.len(),
+                                            data_len,
                                             max_sample,
                                             rms
                                         );
@@ -603,55 +617,43 @@ fn run_engine_thread(
 
                         let mut monitoring_s: Option<cpal::Stream> = None;
                         if let Some(monitoring_dev) = find_device(&host, &monitoring_dev_name, false) {
+                            // Use same config as main output - both should support it
+                            // since we negotiated a common config for input/output
                             let consumer_monitoring_clone = consumer_monitoring.clone();
-                            let master_volume_monitoring = master_volume.clone();
-                            let audio_state_monitoring = audio_state.clone();
-                            let mic_monitoring_for_output = mic_monitoring.clone();
+                            let event_tx_mon = event_tx.clone();
+
+                            // Log monitoring device info
+                            if let Ok(mon_config) = monitoring_dev.default_output_config() {
+                                let _ = event_tx.send(AudioEngineEvent::Info(format!(
+                                    "Monitoring '{}': {:?}, {}ch, {}Hz (using {}Hz)",
+                                    monitoring_dev_name,
+                                    mon_config.sample_format(),
+                                    mon_config.channels(),
+                                    mon_config.sample_rate().0,
+                                    config.sample_rate.0
+                                )));
+                            }
 
                             let monitoring_result = monitoring_dev.build_output_stream(
                                 &config,
                                 move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
-                                    let master_vol = f32::from_bits(master_volume_monitoring.load(Ordering::Relaxed));
-                                    let monitoring_enabled = mic_monitoring_for_output.load(Ordering::Relaxed);
-
-                                    // Fill with mic input from monitoring ring buffer (if enabled)
-                                    if monitoring_enabled {
-                                        if let Ok(mut cons) = consumer_monitoring_clone.try_lock() {
-                                            for sample in data.iter_mut() {
-                                                *sample = cons.try_pop().unwrap_or(0.0);
-                                            }
-                                        } else {
-                                            for sample in data.iter_mut() {
-                                                *sample = 0.0;
-                                            }
+                                    // Simply read the pre-mixed output from main callback
+                                    // This contains: mic + sounds + master volume (already applied)
+                                    if let Ok(mut cons) = consumer_monitoring_clone.try_lock() {
+                                        for sample in data.iter_mut() {
+                                            *sample = cons.try_pop().unwrap_or(0.0);
                                         }
                                     } else {
                                         for sample in data.iter_mut() {
                                             *sample = 0.0;
                                         }
                                     }
-
-                                    // Mix in playing sounds (always play on monitoring)
-                                    if let Ok(mut state) = audio_state_monitoring.try_lock() {
-                                        for (_id, sound) in state.playing_sounds.iter_mut() {
-                                            let remaining = sound.samples.len() - sound.position;
-                                            let to_mix = remaining.min(data.len());
-
-                                            for (i, sample) in data.iter_mut().take(to_mix).enumerate() {
-                                                if sound.position + i < sound.samples.len() {
-                                                    *sample = (*sample + sound.samples[sound.position + i]).clamp(-1.0, 1.0);
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    // Apply master volume
-                                    for sample in data.iter_mut() {
-                                        *sample = (*sample * master_vol).clamp(-1.0, 1.0);
-                                    }
                                 },
                                 move |err| {
-                                    tracing::error!("Monitoring stream error: {}", err);
+                                    let _ = event_tx_mon.send(AudioEngineEvent::Info(format!(
+                                        "Monitoring stream error: {}",
+                                        err
+                                    )));
                                 },
                                 None,
                             );
