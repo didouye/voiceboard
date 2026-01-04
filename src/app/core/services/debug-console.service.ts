@@ -84,6 +84,19 @@ export class DebugConsoleService {
     } catch {
       // Event listener not available
     }
+
+    // Listen for audio debug events (sound loading info)
+    try {
+      await listen<string>('audio-debug', (event) => {
+        this.addLog({
+          timestamp: new Date(),
+          level: 'debug',
+          message: `[Audio] ${event.payload}`,
+        });
+      });
+    } catch {
+      // Event listener not available
+    }
   }
 
   private parseLevel(level: string): LogEntry['level'] {

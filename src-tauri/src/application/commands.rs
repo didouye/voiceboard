@@ -775,6 +775,7 @@ async fn load_sound_file_internal(path: &str) -> Result<SoundFileDto, String> {
 /// and optional speed (0.5-2.0, default 1.0)
 #[tauri::command]
 pub async fn play_sound(
+    app_handle: tauri::AppHandle,
     state: State<'_, AppState>,
     id: String,
     path: String,
@@ -867,12 +868,17 @@ pub async fn play_sound(
     let (min_sample, max_sample) = samples.iter().fold((0.0f32, 0.0f32), |(min, max), &s| {
         (min.min(s), max.max(s))
     });
-    tracing::info!(
-        "Sample stats: min={:.4}, max={:.4}, peak={:.4}",
-        min_sample,
-        max_sample,
-        min_sample.abs().max(max_sample.abs())
-    );
+
+    // Send debug info via event so it shows in frontend debug console
+    use tauri::Emitter;
+    let _ = app_handle.emit("audio-debug", format!(
+        "Sound: {}Hz->{}Hz, {}ch, peak={:.3}, resampled={}",
+        source_sample_rate,
+        target_sample_rate,
+        channels,
+        min_sample.abs().max(max_sample.abs()),
+        source_sample_rate != target_sample_rate
+    ));
 
     // Send to audio engine
     let engine = state.audio_engine.lock().await;
