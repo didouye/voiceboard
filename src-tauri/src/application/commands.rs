@@ -828,7 +828,8 @@ pub async fn play_sound(
     }
 
     // Resample if source sample rate differs from target
-    if source_sample_rate != target_sample_rate {
+    // TEMPORARILY DISABLED FOR DEBUGGING - testing if resampling causes saturation
+    if false && source_sample_rate != target_sample_rate {
         let ratio = target_sample_rate as f64 / source_sample_rate as f64;
         let new_len = (samples.len() as f64 * ratio) as usize;
         let mut resampled = Vec::with_capacity(new_len);
