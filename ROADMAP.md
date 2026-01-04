@@ -37,7 +37,7 @@
 
 ---
 
-## Phase 2 - Distribution & CI/CD - 90% Complete
+## Phase 2 - Distribution & CI/CD - 95% Complete
 
 ### Done
 - [x] **GitHub Actions CI**
@@ -65,13 +65,12 @@
   - Display backend audio engine logs in real-time
   - Log export functionality
 
-### In Progress
-- [ ] **Error Tracking (Sentry)**
+- [x] **Error Tracking (Sentry)**
   - Integrate Sentry SDK in Rust backend
   - Integrate Sentry SDK in Angular frontend
   - Capture panics and errors
-  - Source maps for frontend errors
-  - Release tracking with version tags
+  - Source maps for frontend errors (CI upload)
+  - Release tracking with version tags (CI)
   - Breadcrumbs: send logs as Sentry breadcrumbs for error context
 
 ### To Do
