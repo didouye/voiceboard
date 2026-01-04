@@ -56,9 +56,24 @@ cd src-tauri && cargo tarpaulin --out Stdout
 - Application layer: 80%+ (unit tests + mocks)
 - Adapters: Hardware-dependent code may have lower coverage
 
+## Design Plans
+
+Design documents are stored in `docs/plans/`:
+
+- **Active plans** (root): Plans for features currently in progress or not yet started
+- **Archived plans** (`archive/`): Plans for completed features
+
+**Naming convention:** `YYYY-MM-DD-<feature>-design.md` (and optionally `-implementation.md`)
+
+**After completing an implementation:**
+1. Move the plan file(s) to `docs/plans/archive/`
+2. Commit with message: `docs: archive <feature> plan`
+
 ## Key Files
 
 - `ROADMAP.md` - Project roadmap and task tracking
 - `README.md` - Project overview and setup instructions
+- `docs/plans/` - Design documents (active plans)
+- `docs/plans/archive/` - Completed design documents
 - `src-tauri/src/application/audio_engine.rs` - Core audio processing
 - `src-tauri/src/application/commands.rs` - Tauri IPC commands
