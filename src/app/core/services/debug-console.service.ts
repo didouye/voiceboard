@@ -126,6 +126,23 @@ export class DebugConsoleService {
       }
       return newLogs;
     });
+
+    // Send log as Sentry breadcrumb for error context
+    Sentry.addBreadcrumb({
+      category: 'log',
+      message: entry.message,
+      level: this.toSentryLevel(entry.level),
+      data: entry.context,
+    });
+  }
+
+  private toSentryLevel(level: LogEntry['level']): Sentry.SeverityLevel {
+    switch (level) {
+      case 'error': return 'error';
+      case 'warn': return 'warning';
+      case 'debug': return 'debug';
+      default: return 'info';
+    }
   }
 
   toggle() {
