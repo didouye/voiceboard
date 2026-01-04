@@ -616,6 +616,8 @@ pub async fn toggle_channel_mute(
 /// Start mixing
 #[tauri::command]
 pub async fn start_mixing(state: State<'_, AppState>) -> Result<(), String> {
+    use crate::application::audio_engine::AudioEngineEvent;
+
     // Verify we have devices selected
     let settings = state.settings.read().await;
     let input_device = settings
@@ -659,6 +661,59 @@ pub async fn start_mixing(state: State<'_, AppState>) -> Result<(), String> {
             channels: 2, // Stereo
         })
         .map_err(|e| format!("Failed to start audio engine: {}", e))?;
+
+    // Poll for events to extract the actual sample rate used by the engine
+    // The engine emits "Input config: Xch, YHz | Output config: Zch, YHz" when it starts
+    let mut actual_sample_rate = sample_rate;
+    let start_time = std::time::Instant::now();
+    let timeout = std::time::Duration::from_millis(500);
+
+    while start_time.elapsed() < timeout {
+        if let Some(event) = engine.try_recv_event() {
+            match event {
+                AudioEngineEvent::Info(msg) => {
+                    // Parse "Input config: Xch, YHz | Output config: Zch, YHz"
+                    if msg.contains("Input config:") && msg.contains("Hz") {
+                        // Extract sample rate from the message
+                        // Format: "Input config: 1ch, 24000Hz | Output config: 16ch, 24000Hz"
+                        if let Some(hz_pos) = msg.find("Hz") {
+                            // Find the number before Hz
+                            let before_hz = &msg[..hz_pos];
+                            if let Some(comma_pos) = before_hz.rfind(", ") {
+                                let rate_str = &before_hz[comma_pos + 2..];
+                                if let Ok(rate) = rate_str.parse::<u32>() {
+                                    actual_sample_rate = rate;
+                                    tracing::info!(
+                                        "Extracted actual engine sample rate: {}Hz",
+                                        actual_sample_rate
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+                AudioEngineEvent::Started => {
+                    // Engine started, we can stop polling
+                    break;
+                }
+                AudioEngineEvent::Error(e) => {
+                    return Err(format!("Audio engine error: {}", e));
+                }
+                _ => {}
+            }
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+
+    // Update the state with the actual sample rate
+    state.set_engine_sample_rate(actual_sample_rate);
+    tracing::info!(
+        "Engine sample rate set to: {}Hz (requested: {}Hz)",
+        actual_sample_rate,
+        sample_rate
+    );
+
+    drop(engine);
 
     let mut is_mixing = state.is_mixing.write().await;
     *is_mixing = true;
@@ -788,10 +843,14 @@ pub async fn play_sound(
     use std::fs::File;
     use std::io::BufReader;
 
-    // Get engine sample rate from settings
-    let settings = state.settings.read().await;
-    let target_sample_rate = settings.audio.sample_rate;
-    drop(settings);
+    // Get the ACTUAL sample rate from the audio engine state
+    // This is set when the engine starts and reflects the negotiated rate
+    // between input and output devices (may differ from device default config)
+    let target_sample_rate = state.get_engine_sample_rate();
+    tracing::debug!(
+        "Using engine sample rate for resampling: {}Hz",
+        target_sample_rate
+    );
 
     // Decode the audio file
     let file = File::open(&path).map_err(|e| format!("Failed to open file: {}", e))?;
@@ -865,20 +924,23 @@ pub async fn play_sound(
     let samples_len = samples.len();
 
     // Debug: log sample statistics to diagnose saturation issues
-    let (min_sample, max_sample) = samples.iter().fold((0.0f32, 0.0f32), |(min, max), &s| {
-        (min.min(s), max.max(s))
-    });
+    let (min_sample, max_sample) = samples
+        .iter()
+        .fold((0.0f32, 0.0f32), |(min, max), &s| (min.min(s), max.max(s)));
 
     // Send debug info via event so it shows in frontend debug console
     use tauri::Emitter;
-    let _ = app_handle.emit("audio-debug", format!(
-        "Sound: {}Hz->{}Hz, {}ch, peak={:.3}, resampled={}",
-        source_sample_rate,
-        target_sample_rate,
-        channels,
-        min_sample.abs().max(max_sample.abs()),
-        source_sample_rate != target_sample_rate
-    ));
+    let _ = app_handle.emit(
+        "audio-debug",
+        format!(
+            "Sound: {}Hz->{}Hz, {}ch, peak={:.3}, resampled={}",
+            source_sample_rate,
+            target_sample_rate,
+            channels,
+            min_sample.abs().max(max_sample.abs()),
+            source_sample_rate != target_sample_rate
+        ),
+    );
 
     // Send to audio engine
     let engine = state.audio_engine.lock().await;

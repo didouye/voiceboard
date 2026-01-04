@@ -3,6 +3,7 @@
 use crate::application::audio_engine::AudioEngine;
 use crate::application::preview_engine::PreviewEngine;
 use crate::domain::{AppSettings, MixerConfig};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 
@@ -13,6 +14,9 @@ pub struct AppState {
     pub is_mixing: Arc<RwLock<bool>>,
     pub audio_engine: Arc<Mutex<AudioEngine>>,
     pub preview_engine: Arc<Mutex<Option<PreviewEngine>>>,
+    /// Actual sample rate used by the audio engine (set after engine starts)
+    /// This may differ from settings.audio.sample_rate due to device negotiation
+    pub engine_sample_rate: Arc<AtomicU32>,
 }
 
 impl AppState {
@@ -23,6 +27,7 @@ impl AppState {
             is_mixing: Arc::new(RwLock::new(false)),
             audio_engine: Arc::new(Mutex::new(AudioEngine::new())),
             preview_engine: Arc::new(Mutex::new(None)),
+            engine_sample_rate: Arc::new(AtomicU32::new(48000)), // Default, updated when engine starts
         }
     }
 
@@ -35,11 +40,22 @@ impl AppState {
 
         Self {
             mixer_config: Arc::new(RwLock::new(mixer_config)),
-            settings: Arc::new(RwLock::new(settings)),
+            settings: Arc::new(RwLock::new(settings.clone())),
             is_mixing: Arc::new(RwLock::new(false)),
             audio_engine: Arc::new(Mutex::new(AudioEngine::new())),
             preview_engine: Arc::new(Mutex::new(None)),
+            engine_sample_rate: Arc::new(AtomicU32::new(settings.audio.sample_rate)),
         }
+    }
+
+    /// Get the actual sample rate used by the audio engine
+    pub fn get_engine_sample_rate(&self) -> u32 {
+        self.engine_sample_rate.load(Ordering::Relaxed)
+    }
+
+    /// Set the actual sample rate used by the audio engine
+    pub fn set_engine_sample_rate(&self, rate: u32) {
+        self.engine_sample_rate.store(rate, Ordering::Relaxed);
     }
 }
 
