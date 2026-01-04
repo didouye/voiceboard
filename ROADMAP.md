@@ -73,13 +73,14 @@
   - Release tracking with version tags (CI)
   - Breadcrumbs: send logs as Sentry breadcrumbs for error context
 
-### To Do
-- [ ] **Landing Page** *(see docs/plans/2026-01-04-landing-page-design.md)*
+- [x] **Landing Page** *(see docs/plans/2026-01-04-landing-page-design.md)*
   - Product presentation with features overview
   - Download section with OS detection
   - Tailwind CSS, dark theme, responsive
   - Auto-fetch download links from GitHub Releases API
   - Located in `/website` folder
+
+### To Do
 
 - [ ] **Website Hosting**
   - Choose hosting provider (Vercel, Netlify, Cloudflare Pages)
