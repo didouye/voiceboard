@@ -214,6 +214,53 @@ jobs:
             voiceboard-*.AppImage.sig
           if-no-files-found: error
 
+  # Upload source maps to Sentry
+  sentry:
+    needs: version
+    runs-on: ubuntu-latest
+    # Only run if SENTRY_AUTH_TOKEN is set
+    if: ${{ vars.SENTRY_ORG != '' }}
+    env:
+      SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+      SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      APP_VERSION: ${{ needs.version.outputs.app_version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for commit tracking
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Angular (with source maps)
+        run: npm run build
+
+      - name: Install Sentry CLI
+        run: npm install -g @sentry/cli
+
+      - name: Create Sentry release
+        run: |
+          sentry-cli releases new "$APP_VERSION"
+          sentry-cli releases set-commits "$APP_VERSION" --auto
+
+      - name: Upload source maps
+        run: |
+          sentry-cli sourcemaps upload \
+            --release="$APP_VERSION" \
+            --url-prefix="~/" \
+            dist/voiceboard/browser/
+
+      - name: Finalize Sentry release
+        run: sentry-cli releases finalize "$APP_VERSION"
+
   # Create GitHub Release
   release:
     needs: [version, build]
