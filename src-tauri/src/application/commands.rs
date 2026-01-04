@@ -863,6 +863,17 @@ pub async fn play_sound(
 
     let samples_len = samples.len();
 
+    // Debug: log sample statistics to diagnose saturation issues
+    let (min_sample, max_sample) = samples.iter().fold((0.0f32, 0.0f32), |(min, max), &s| {
+        (min.min(s), max.max(s))
+    });
+    tracing::info!(
+        "Sample stats: min={:.4}, max={:.4}, peak={:.4}",
+        min_sample,
+        max_sample,
+        min_sample.abs().max(max_sample.abs())
+    );
+
     // Send to audio engine
     let engine = state.audio_engine.lock().await;
     engine
