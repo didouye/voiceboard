@@ -74,13 +74,17 @@
   - Breadcrumbs: send logs as Sentry breadcrumbs for error context
 
 ### To Do
-- [ ] **GitHub Pages Landing Page**
+- [ ] **Landing Page** *(see docs/plans/2026-01-04-landing-page-design.md)*
   - Product presentation with features overview
-  - Download section with latest release
-  - OS detection to highlight matching download (Windows/macOS/Linux)
-  - Tailwind CSS for styling
-  - Responsive design (mobile-friendly)
-  - Auto-update download links from GitHub Releases API
+  - Download section with OS detection
+  - Tailwind CSS, dark theme, responsive
+  - Auto-fetch download links from GitHub Releases API
+  - Located in `/website` folder
+
+- [ ] **Website Hosting**
+  - Choose hosting provider (Vercel, Netlify, Cloudflare Pages)
+  - Custom domain setup
+  - Deploy pipeline
 
 - [ ] **Windows Installer Improvements**
   - Bundled Virtual Audio Driver
