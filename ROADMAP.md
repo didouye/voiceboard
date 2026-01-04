@@ -2,7 +2,7 @@
 
 > **Last updated:** January 2026
 
-## Phase 1 - Core Application (MVP) - 95% Complete
+## Phase 1 - Core Application (MVP) - 100% Complete
 
 ### Done
 - [x] Hexagonal architecture (DDD, Ports & Adapters)
@@ -29,10 +29,10 @@
 - [x] Unit tests - 284 tests covering domain layer (100%), adapters, and application layer
 - [x] Individual volume control per pad in UI (0-200% with popup slider)
 - [x] Bulk import - Import multiple audio files at once (with drag & drop and dynamic pad rows)
-- [ ] **Speed Playback**
-  - Button on each pad (next to preview button)
+- [x] **Speed Playback**
+  - Speed control integrated in volume popup (click volume button)
   - Play sound at different speeds (accelerated/slowed)
-  - Outputs to both virtual output and monitoring
+  - Outputs to virtual output
   - Speed options: 0.5x, 0.75x, 1x, 1.25x, 1.5x, 2x
 
 ---
