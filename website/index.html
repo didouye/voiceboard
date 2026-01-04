@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voiceboard - Mix your voice with sounds</title>
+  <meta name="description" content="Mix your microphone with sounds in real-time and send it to Discord, Zoom, Teams, or any app. Free, open-source, cross-platform.">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
+
+  <!-- Google Fonts - Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          },
+        },
+      },
+    }
+  </script>
+
+  <style>
+    /* Custom styles */
+    .window-frame {
+      background: linear-gradient(180deg, #374151 0%, #1f2937 100%);
+    }
+
+    .traffic-light {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+
+    .traffic-red { background: #ef4444; }
+    .traffic-yellow { background: #eab308; }
+    .traffic-green { background: #22c55e; }
+
+    /* Subtle glow effect on hero */
+    .hero-glow {
+      background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59, 130, 246, 0.15), transparent);
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans antialiased">
+
+  <!-- Hero Section -->
+  <section class="relative min-h-screen flex flex-col items-center justify-center px-6 py-20 hero-glow">
+    <!-- Logo + Title -->
+    <div class="text-center mb-8">
+      <div class="flex items-center justify-center gap-3 mb-6">
+        <img src="assets/logo.svg" alt="Voiceboard" class="w-12 h-12">
+        <h1 class="text-4xl md:text-5xl font-bold">Voiceboard</h1>
+      </div>
+      <p class="text-xl md:text-2xl text-slate-400 max-w-md mx-auto">
+        Mix your voice with sounds.<br>Send it anywhere.
+      </p>
+    </div>
+
+    <!-- Download Button -->
+    <div class="text-center mb-16">
+      <a
+        id="download-btn"
+        href="#"
+        class="inline-flex items-center gap-3 px-8 py-4 bg-blue-500 hover:bg-blue-600 text-white font-semibold text-lg rounded-xl shadow-lg shadow-blue-500/25 transition-all hover:scale-105"
+      >
+        <span id="os-icon">
+          <!-- Default: Windows icon -->
+          <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M3 5.5L10.5 4.5V11.5H3V5.5ZM3 18.5V12.5H10.5V19.5L3 18.5ZM11.5 4.35L21 3V11.5H11.5V4.35ZM11.5 12.5H21V21L11.5 19.65V12.5Z"/>
+          </svg>
+        </span>
+        <span id="download-text">Download for Windows</span>
+      </a>
+      <p class="mt-4 text-slate-400 text-sm">
+        Also available for
+        <a href="#" id="alt-link-1" class="underline hover:text-slate-300 transition-colors">macOS</a> and
+        <a href="#" id="alt-link-2" class="underline hover:text-slate-300 transition-colors">Linux</a>
+      </p>
+      <p id="version-info" class="mt-2 text-slate-500 text-xs"></p>
+    </div>
+
+    <!-- Screenshot Mockup -->
+    <div class="w-full max-w-4xl mx-auto">
+      <div class="window-frame rounded-xl overflow-hidden shadow-2xl">
+        <!-- Window Title Bar -->
+        <div class="flex items-center gap-2 px-4 py-3 bg-slate-800/50">
+          <div class="flex gap-2">
+            <span class="traffic-light traffic-red"></span>
+            <span class="traffic-light traffic-yellow"></span>
+            <span class="traffic-light traffic-green"></span>
+          </div>
+          <span class="flex-1 text-center text-sm text-slate-400 -ml-12">Voiceboard</span>
+        </div>
+        <!-- Screenshot -->
+        <div class="bg-slate-800">
+          <img
+            src="assets/screenshot.png"
+            alt="Voiceboard application screenshot"
+            class="w-full h-auto"
+            onerror="this.parentElement.innerHTML='<div class=\'flex items-center justify-center h-64 text-slate-500\'>Screenshot coming soon</div>'"
+          >
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Section -->
+  <section class="py-20 px-6 bg-slate-800/30">
+    <div class="max-w-5xl mx-auto">
+      <h2 class="text-3xl font-bold text-center mb-12">Why Voiceboard?</h2>
+
+      <div class="grid md:grid-cols-3 gap-8">
+        <!-- Feature 1: Mix -->
+        <div class="text-center p-6">
+          <div class="w-16 h-16 mx-auto mb-4 bg-blue-500/10 rounded-2xl flex items-center justify-center">
+            <svg class="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+            </svg>
+          </div>
+          <h3 class="text-xl font-semibold mb-2">Real-time Mix</h3>
+          <p class="text-slate-400">
+            Mix your microphone with sound effects in real-time. Perfect for streaming, podcasting, or video calls.
+          </p>
+        </div>
+
+        <!-- Feature 2: Soundboard -->
+        <div class="text-center p-6">
+          <div class="w-16 h-16 mx-auto mb-4 bg-purple-500/10 rounded-2xl flex items-center justify-center">
+            <svg class="w-8 h-8 text-purple-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
+            </svg>
+          </div>
+          <h3 class="text-xl font-semibold mb-2">Soundboard</h3>
+          <p class="text-slate-400">
+            Trigger sounds instantly with keyboard shortcuts. Add unlimited pads, set volumes, and organize your sounds.
+          </p>
+        </div>
+
+        <!-- Feature 3: Cross-platform -->
+        <div class="text-center p-6">
+          <div class="w-16 h-16 mx-auto mb-4 bg-green-500/10 rounded-2xl flex items-center justify-center">
+            <svg class="w-8 h-8 text-green-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+            </svg>
+          </div>
+          <h3 class="text-xl font-semibold mb-2">Cross-platform</h3>
+          <p class="text-slate-400">
+            Available on Windows, macOS, and Linux. Same experience everywhere, with automatic updates.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="py-8 px-6 border-t border-slate-800">
+    <div class="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-slate-400 text-sm">
+      <div class="flex items-center gap-4">
+        <a
+          href="https://github.com/didouye/voiceboard"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="flex items-center gap-2 hover:text-slate-300 transition-colors"
+        >
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+            <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.17 6.839 9.49.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.604-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.464-1.11-1.464-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.336-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.167 22 16.418 22 12c0-5.523-4.477-10-10-10z"/>
+          </svg>
+          GitHub
+        </a>
+      </div>
+      <div>
+        Made with care by <a href="https://github.com/didouye" target="_blank" rel="noopener noreferrer" class="hover:text-slate-300 transition-colors">didouye</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- JavaScript: OS Detection + GitHub API -->
+  <script>
+    const REPO = 'didouye/voiceboard';
+    const API_URL = `https://api.github.com/repos/${REPO}/releases/latest`;
+
+    // OS Detection
+    function detectOS() {
+      const ua = navigator.userAgent;
+      if (ua.includes('Win')) return 'windows';
+      if (ua.includes('Mac')) return 'macos';
+      if (ua.includes('Linux')) return 'linux';
+      return 'windows'; // fallback
+    }
+
+    // OS display names and icons
+    const osConfig = {
+      windows: {
+        name: 'Windows',
+        icon: `<svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M3 5.5L10.5 4.5V11.5H3V5.5ZM3 18.5V12.5H10.5V19.5L3 18.5ZM11.5 4.35L21 3V11.5H11.5V4.35ZM11.5 12.5H21V21L11.5 19.65V12.5Z"/>
+        </svg>`,
+        filePattern: 'windows-x64.msi'
+      },
+      macos: {
+        name: 'macOS',
+        icon: `<svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M18.71 19.5C17.88 20.74 17 21.95 15.66 21.97C14.32 22 13.89 21.18 12.37 21.18C10.84 21.18 10.37 21.95 9.1 22C7.79 22.05 6.8 20.68 5.96 19.47C4.25 17 2.94 12.45 4.7 9.39C5.57 7.87 7.13 6.91 8.82 6.88C10.1 6.86 11.32 7.75 12.11 7.75C12.89 7.75 14.37 6.68 15.92 6.84C16.57 6.87 18.39 7.1 19.56 8.82C19.47 8.88 17.39 10.1 17.41 12.63C17.44 15.65 20.06 16.66 20.09 16.67C20.06 16.74 19.67 18.11 18.71 19.5ZM13 3.5C13.73 2.67 14.94 2.04 15.94 2C16.07 3.17 15.6 4.35 14.9 5.19C14.21 6.04 13.07 6.7 11.95 6.61C11.8 5.46 12.36 4.26 13 3.5Z"/>
+        </svg>`,
+        filePattern: 'macos-arm64.dmg'
+      },
+      linux: {
+        name: 'Linux',
+        icon: `<svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12.504 0c-.155 0-.315.008-.48.021-4.226.333-3.105 4.807-3.17 6.298-.076 1.092-.3 1.953-1.05 3.02-.885 1.051-2.127 2.75-2.716 4.521-.278.832-.41 1.684-.287 2.489a.424.424 0 00-.11.135c-.26.268-.45.6-.663.839-.199.199-.485.267-.797.4-.313.136-.658.269-.864.68-.09.189-.136.394-.132.602 0 .199.027.4.055.536.058.399.116.728.04.97-.249.68-.28 1.145-.106 1.484.174.334.535.47.94.601.81.2 1.91.135 2.774.6.926.466 1.866.67 2.616.47.526-.116.97-.464 1.208-.946.587-.003 1.23-.269 2.26-.334.699-.058 1.574.267 2.577.2.025.134.063.198.114.333l.003.003c.391.778 1.113 1.132 1.884 1.071.771-.06 1.592-.536 2.257-1.306.631-.765 1.683-1.084 2.378-1.503.348-.199.629-.469.649-.853.023-.4-.2-.811-.714-1.376v-.097l-.003-.003c-.17-.2-.25-.535-.338-.926-.085-.401-.182-.786-.492-1.046h-.003c-.059-.054-.123-.067-.188-.135a.357.357 0 00-.19-.064c.431-1.278.264-2.55-.173-3.694-.533-1.41-1.465-2.638-2.175-3.483-.796-1.005-1.576-1.957-1.56-3.368.026-2.152.236-6.133-3.544-6.139zm.529 3.405h.013c.213 0 .396.062.584.198.19.135.33.332.438.533.105.259.158.459.166.724 0-.02.006-.04.006-.06v.105a.086.086 0 01-.004-.021l-.004-.024a1.807 1.807 0 01-.15.706.953.953 0 01-.213.335.71.71 0 00-.088-.042c-.104-.045-.198-.064-.284-.133a1.312 1.312 0 00-.22-.066c.05-.06.146-.133.183-.198.053-.128.082-.264.088-.402v-.02a1.21 1.21 0 00-.061-.4c-.045-.134-.101-.2-.183-.333-.084-.066-.167-.132-.267-.132h-.016c-.093 0-.176.03-.262.132a.8.8 0 00-.205.334 1.18 1.18 0 00-.09.4v.019c.002.089.008.179.02.267-.193-.067-.438-.135-.607-.202a1.635 1.635 0 01-.018-.2v-.02a1.772 1.772 0 01.15-.768c.082-.22.232-.406.43-.533a.985.985 0 01.594-.2zm-2.962.059h.036c.142 0 .27.048.399.135.146.129.264.288.344.465.09.199.14.4.153.667v.004c.007.134.006.2-.002.266v.08c-.03.007-.056.018-.083.024-.152.055-.274.135-.393.2.012-.09.013-.18.003-.267v-.015c-.012-.133-.04-.2-.082-.333a.613.613 0 00-.166-.267.248.248 0 00-.183-.064h-.021c-.071.006-.13.04-.186.132a.552.552 0 00-.12.27.944.944 0 00-.023.33v.015c.012.135.037.2.08.334.046.134.098.2.166.268.01.009.02.018.034.024-.07.057-.117.07-.176.136a.304.304 0 01-.131.068 2.62 2.62 0 01-.275-.402 1.772 1.772 0 01-.155-.667 1.759 1.759 0 01.08-.668 1.43 1.43 0 01.283-.535c.128-.133.26-.2.418-.2zm1.37 1.706c.332 0 .733.065 1.216.399.293.2.523.269 1.052.468h.003c.255.136.405.266.478.399v-.131a.571.571 0 01.016.47c-.123.31-.516.643-1.063.842v.002c-.268.135-.501.333-.775.465-.276.135-.588.292-1.012.267a1.139 1.139 0 01-.448-.067 3.566 3.566 0 01-.322-.198c-.195-.135-.363-.332-.612-.465v-.005h-.005c-.4-.246-.616-.512-.686-.71-.07-.268-.005-.47.193-.6.224-.135.38-.271.483-.336.104-.074.143-.102.176-.131h.002v-.003c.169-.202.436-.47.839-.601.139-.036.294-.065.466-.065zm2.8 2.142c.358 1.417 1.196 3.475 1.735 4.473.286.534.855 1.659 1.102 3.024.156-.005.33.018.513.064.646-1.671-.546-3.467-1.089-3.966-.22-.2-.232-.335-.123-.335.59.534 1.365 1.572 1.646 2.757.13.535.16 1.104.021 1.67.067.028.135.06.205.067 1.032.534 1.413.938 1.23 1.537v-.002c-.06-.135-.12-.2-.184-.268-.193-.135-.406-.199-.603-.534-.268-.467-.539-.602-.932-.602-.146 0-.292.034-.411.067-.349.07-.75.467-.899.867v.134c-.06.135-.06.2-.06.267 0 .469.119.869.313 1.336-.12.07-.18.135-.241.2-.169.135-.303.2-.467.268-.319.135-.67.202-1.002.468-.449.333-.688.933-.688 1.604v.07a3.09 3.09 0 01-.584-.334 4.96 4.96 0 00-.378-.2c-.076-.135-.174-.468-.248-.869-.12-.6-.357-.936-.727-1.003-.09 0-.18.066-.27.135-.085.068-.155.135-.225.27a1.916 1.916 0 00-.12.533v.2c0 .069.012.135.02.2.012.135.037.27.08.4.012.066.024.135.053.199v.002c.068.199.171.401.296.535-.39.399-.655.2-1.002.067-.39-.2-.852-.268-1.463-.135-.039.468.084.935.298 1.402.217.469.513.87.868 1.203.373.335.804.602 1.254.735.434.135.869.2 1.314.135h.014c.257.135.514.2.771.268.257.135.522.135.784.135.513 0 1.009-.135 1.459-.4.45-.27.816-.669 1.067-1.136l.012-.024c.068.134.136.268.219.4.12.2.257.334.437.469.09.067.181.135.27.135.085.066.185.066.283.066h.043c.126 0 .234-.066.345-.135.111-.066.209-.135.296-.268.09-.135.135-.268.135-.402 0-.135-.015-.267-.06-.398a5.413 5.413 0 00-.283-.734 2.42 2.42 0 01-.166-.535c0-.2.045-.4.12-.601.074-.203.165-.4.241-.602a.96.96 0 00.12-.4c0-.135-.06-.27-.12-.402-.135-.2-.36-.334-.615-.4h.006c-.089-.066-.18-.135-.271-.2-.09-.07-.165-.135-.24-.202-.038-.032-.067-.066-.094-.1v-.002l.003-.003a13.4 13.4 0 01-.616-2.869c-.045-.4-.06-.802-.03-1.203.03-.4.09-.802.18-1.136a4.136 4.136 0 01-.105-.869c-.015-.2-.015-.467.06-.734.015-.135.045-.267.09-.402a3.73 3.73 0 01-.54-.936 4.036 4.036 0 01-.27-1.202c-.015-.135-.015-.267-.015-.402v-.066z"/>
+        </svg>`,
+        filePattern: 'linux-x64.AppImage'
+      }
+    };
+
+    // Get alternative OS list (excluding current)
+    function getAlternativeOS(currentOS) {
+      const allOS = ['windows', 'macos', 'linux'];
+      return allOS.filter(os => os !== currentOS);
+    }
+
+    // Find asset URL by pattern
+    function findAssetUrl(assets, pattern) {
+      const asset = assets.find(a => a.name.includes(pattern));
+      return asset ? asset.browser_download_url : null;
+    }
+
+    // Initialize page
+    async function init() {
+      const currentOS = detectOS();
+      const config = osConfig[currentOS];
+      const alternatives = getAlternativeOS(currentOS);
+
+      // Update main button
+      document.getElementById('os-icon').innerHTML = config.icon;
+      document.getElementById('download-text').textContent = `Download for ${config.name}`;
+
+      // Update alternative links text
+      document.getElementById('alt-link-1').textContent = osConfig[alternatives[0]].name;
+      document.getElementById('alt-link-2').textContent = osConfig[alternatives[1]].name;
+
+      // Fetch latest release
+      try {
+        const response = await fetch(API_URL);
+        if (!response.ok) throw new Error('API error');
+
+        const release = await response.json();
+        const version = release.tag_name || release.name;
+
+        // Update download URLs
+        const mainUrl = findAssetUrl(release.assets, config.filePattern);
+        const alt1Url = findAssetUrl(release.assets, osConfig[alternatives[0]].filePattern);
+        const alt2Url = findAssetUrl(release.assets, osConfig[alternatives[1]].filePattern);
+
+        if (mainUrl) {
+          document.getElementById('download-btn').href = mainUrl;
+        }
+        if (alt1Url) {
+          document.getElementById('alt-link-1').href = alt1Url;
+        }
+        if (alt2Url) {
+          document.getElementById('alt-link-2').href = alt2Url;
+        }
+
+        // Show version
+        document.getElementById('version-info').textContent = `Version ${version}`;
+
+      } catch (error) {
+        console.warn('Could not fetch latest release:', error);
+        // Fallback: link to releases page
+        const releasesUrl = `https://github.com/${REPO}/releases/latest`;
+        document.getElementById('download-btn').href = releasesUrl;
+        document.getElementById('alt-link-1').href = releasesUrl;
+        document.getElementById('alt-link-2').href = releasesUrl;
+      }
+    }
+
+    // Run on page load
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
