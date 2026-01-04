@@ -16,6 +16,7 @@ interface SavedPad {
   color: string;
   hotkey?: string;
   volume?: number; // Optional for backwards compatibility
+  speed?: number;  // Optional for backwards compatibility
 }
 
 @Injectable({
@@ -70,7 +71,8 @@ export class SoundboardService {
       sound: null,
       color: PAD_COLORS[i % PAD_COLORS.length],
       isPlaying: false,
-      volume: 1.0
+      volume: 1.0,
+      speed: 1.0
     }));
   }
 
@@ -81,11 +83,12 @@ export class SoundboardService {
     try {
       const saved = await this.tauri.loadSoundboardState();
       if (saved && saved.length > 0) {
-        // Restore pads, ensuring isPlaying is false and volume has default
+        // Restore pads, ensuring isPlaying is false and defaults for backwards compatibility
         const restoredPads: SoundPad[] = saved.map(p => ({
           ...p,
           isPlaying: false,
-          volume: p.volume ?? 1.0 // Default for backwards compatibility
+          volume: p.volume ?? 1.0,
+          speed: p.speed ?? 1.0
         }));
         this._pads.set(restoredPads);
         console.log(`Loaded ${saved.filter(p => p.sound).length} sounds from storage`);
@@ -111,7 +114,8 @@ export class SoundboardService {
         sound: p.sound,
         color: p.color,
         hotkey: p.hotkey,
-        volume: p.volume
+        volume: p.volume,
+        speed: p.speed
       }));
       await this.tauri.saveSoundboardState(padsToSave);
     } catch (err) {
@@ -130,7 +134,8 @@ export class SoundboardService {
       sound: null,
       color: PAD_COLORS[(startIndex + i) % PAD_COLORS.length],
       isPlaying: false,
-      volume: 1.0
+      volume: 1.0,
+      speed: 1.0
     }));
     this._pads.set([...current, ...newPads]);
     this.saveState();
@@ -397,15 +402,16 @@ export class SoundboardService {
         p.id === padId ? { ...p, isPlaying: true } : p
       ));
 
-      // Play the sound with pad volume
-      await this.tauri.playSound(pad.sound.id, pad.sound.path, pad.volume);
+      // Play the sound with pad volume and speed
+      await this.tauri.playSound(pad.sound.id, pad.sound.path, pad.volume, pad.speed);
 
-      // Auto-stop after duration (with small buffer)
+      // Auto-stop after duration adjusted for speed (with small buffer)
+      const adjustedDuration = pad.sound.duration / pad.speed;
       setTimeout(() => {
         this._pads.update(pads => pads.map(p =>
           p.id === padId ? { ...p, isPlaying: false } : p
         ));
-      }, (pad.sound.duration + 0.5) * 1000);
+      }, (adjustedDuration + 0.5) * 1000);
 
     } catch (err) {
       this._error.set(err instanceof Error ? err.message : 'Failed to play sound');
@@ -447,6 +453,17 @@ export class SoundboardService {
     const clampedVolume = Math.max(0, Math.min(2, volume));
     this._pads.update(pads => pads.map(p =>
       p.id === padId ? { ...p, volume: clampedVolume } : p
+    ));
+    this.saveState();
+  }
+
+  /**
+   * Set playback speed for a pad (0.5-2.0, where 1.0 = normal)
+   */
+  setPadSpeed(padId: string, speed: number): void {
+    const clampedSpeed = Math.max(0.5, Math.min(2, speed));
+    this._pads.update(pads => pads.map(p =>
+      p.id === padId ? { ...p, speed: clampedSpeed } : p
     ));
     this.saveState();
   }

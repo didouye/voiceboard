@@ -71,4 +71,6 @@ export interface SoundPad {
   isPlaying: boolean;
   /** Volume level (0.0-2.0, default 1.0 = 100%) */
   volume: number;
+  /** Playback speed (0.5-2.0, default 1.0 = normal) */
+  speed: number;
 }

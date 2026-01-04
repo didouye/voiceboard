@@ -33,11 +33,12 @@ pub enum AudioEngineCommand {
     },
     /// Stop mixing
     Stop,
-    /// Play an audio buffer (from a sound file) with volume (0.0 - 2.0)
+    /// Play an audio buffer with volume (0.0-2.0) and speed (0.5-2.0)
     PlaySound {
         id: String,
         samples: Vec<f32>,
         volume: f32,
+        speed: f32,
     },
     /// Stop a playing sound
     StopSound { id: String },
@@ -79,8 +80,12 @@ pub enum AudioEngineEvent {
 struct PlayingSound {
     samples: Vec<f32>,
     position: usize,
+    /// Fractional position for interpolated playback
+    frac_position: f64,
     /// Volume for this sound (0.0 - 2.0)
     volume: f32,
+    /// Playback speed (0.5 - 2.0, default 1.0)
+    speed: f32,
 }
 
 /// Shared state for audio processing
@@ -556,28 +561,42 @@ fn run_engine_thread(
                                 }
 
                                 // Mix in playing sounds (sounds are stored as MONO)
-                                // Duplicate mono sample to all output channels
+                                // Use fractional position with linear interpolation for speed control
                                 if let Ok(mut state) = audio_state_clone.try_lock() {
                                     let mut finished = Vec::new();
 
                                     for (id, sound) in state.playing_sounds.iter_mut() {
-                                        let remaining = sound.samples.len() - sound.position;
-                                        let frames_to_mix = remaining.min(num_frames);
+                                        for frame in 0..num_frames {
+                                            // Check if we've reached the end
+                                            let idx = sound.frac_position.floor() as usize;
+                                            if idx >= sound.samples.len() {
+                                                break;
+                                            }
 
-                                        for frame in 0..frames_to_mix {
-                                            // Apply per-sound volume
-                                            let mono_sample = sound.samples[sound.position + frame] * sound.volume;
+                                            // Linear interpolation for sub-sample accuracy
+                                            let frac = sound.frac_position - idx as f64;
+                                            let mono_sample = if idx + 1 < sound.samples.len() {
+                                                let s0 = sound.samples[idx] as f64;
+                                                let s1 = sound.samples[idx + 1] as f64;
+                                                ((s0 + (s1 - s0) * frac) as f32) * sound.volume
+                                            } else {
+                                                sound.samples[idx] * sound.volume
+                                            };
 
                                             // Duplicate mono sample to all output channels
                                             for ch in 0..output_ch as usize {
-                                                let idx = frame * output_ch as usize + ch;
-                                                if idx < data_len {
-                                                    data[idx] = (data[idx] + mono_sample).clamp(-1.0, 1.0);
+                                                let out_idx = frame * output_ch as usize + ch;
+                                                if out_idx < data_len {
+                                                    data[out_idx] = (data[out_idx] + mono_sample).clamp(-1.0, 1.0);
                                                 }
                                             }
+
+                                            // Advance by speed factor
+                                            sound.frac_position += sound.speed as f64;
                                         }
 
-                                        sound.position += frames_to_mix;
+                                        // Update integer position for finished check
+                                        sound.position = sound.frac_position.floor() as usize;
                                         if sound.position >= sound.samples.len() {
                                             finished.push(id.clone());
                                         }
@@ -954,6 +973,7 @@ fn run_engine_thread(
                         id,
                         samples,
                         volume,
+                        speed,
                     } => {
                         if let Ok(mut state) = audio_state.lock() {
                             state.playing_sounds.insert(
@@ -961,7 +981,9 @@ fn run_engine_thread(
                                 PlayingSound {
                                     samples,
                                     position: 0,
+                                    frac_position: 0.0,
                                     volume: volume.clamp(0.0, 2.0),
+                                    speed: speed.clamp(0.5, 2.0),
                                 },
                             );
                         }
@@ -1132,11 +1154,15 @@ mod tests {
         let sound = PlayingSound {
             samples: samples.clone(),
             position: 0,
+            frac_position: 0.0,
             volume: 1.0,
+            speed: 1.0,
         };
         assert_eq!(sound.samples.len(), 5);
         assert_eq!(sound.position, 0);
+        assert_eq!(sound.frac_position, 0.0);
         assert_eq!(sound.volume, 1.0);
+        assert_eq!(sound.speed, 1.0);
     }
 
     #[test]
@@ -1144,11 +1170,14 @@ mod tests {
         let mut sound = PlayingSound {
             samples: vec![0.1, 0.2, 0.3, 0.4, 0.5],
             position: 0,
+            frac_position: 0.0,
             volume: 1.0,
+            speed: 1.0,
         };
 
-        // Simulate playback advancing
-        sound.position = 2;
+        // Simulate playback advancing with speed
+        sound.frac_position = 2.5;
+        sound.position = sound.frac_position.floor() as usize;
         assert_eq!(sound.position, 2);
 
         // Check remaining samples
@@ -1161,7 +1190,9 @@ mod tests {
         let sound = PlayingSound {
             samples: vec![0.1, 0.2, 0.3],
             position: 3,
+            frac_position: 3.0,
             volume: 0.5,
+            speed: 1.5,
         };
         assert!(sound.position >= sound.samples.len());
     }
@@ -1175,17 +1206,20 @@ mod tests {
             id: "test-sound".to_string(),
             samples: samples.clone(),
             volume: 0.8,
+            speed: 1.5,
         };
 
         if let AudioEngineCommand::PlaySound {
             id,
             samples: s,
             volume,
+            speed,
         } = cmd
         {
             assert_eq!(id, "test-sound");
             assert_eq!(s.len(), 3);
             assert_eq!(volume, 0.8);
+            assert_eq!(speed, 1.5);
         } else {
             panic!("Expected PlaySound command");
         }

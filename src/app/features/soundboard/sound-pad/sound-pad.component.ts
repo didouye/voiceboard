@@ -52,7 +52,7 @@ import { SoundboardService } from '../../../core/services/soundboard.service';
           </button>
         </div>
 
-        <!-- Volume Popup -->
+        <!-- Volume & Speed Popup -->
         @if (showVolumePopup) {
           <div class="volume-popup" (click)="$event.stopPropagation()">
             <div class="volume-header">
@@ -71,7 +71,24 @@ import { SoundboardService } from '../../../core/services/soundboard.service';
               <span>100%</span>
               <span>200%</span>
             </div>
-            <button class="reset-btn" (click)="resetVolume()">Reset to 100%</button>
+
+            <div class="speed-section">
+              <div class="speed-header">
+                <span>Speed</span>
+                <span class="speed-value">{{ pad.speed }}x</span>
+              </div>
+              <div class="speed-buttons">
+                @for (s of speedOptions; track s) {
+                  <button class="speed-btn"
+                          [class.active]="pad.speed === s"
+                          (click)="onSpeedChange(s)">
+                    {{ s }}x
+                  </button>
+                }
+              </div>
+            </div>
+
+            <button class="reset-btn" (click)="resetAll()">Reset to defaults</button>
           </div>
         }
       } @else {
@@ -370,6 +387,56 @@ import { SoundboardService } from '../../../core/services/soundboard.service';
       margin-top: 4px;
     }
 
+    .speed-section {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .speed-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 0.75rem;
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .speed-value {
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .speed-buttons {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+
+    .speed-btn {
+      flex: 1;
+      min-width: 40px;
+      padding: 4px 6px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 0.65rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .speed-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+      color: #fff;
+    }
+
+    .speed-btn.active {
+      background: #3498db;
+      border-color: #3498db;
+      color: #fff;
+    }
+
     .reset-btn {
       width: 100%;
       margin-top: 8px;
@@ -400,9 +467,11 @@ export class SoundPadComponent {
   @Output() import = new EventEmitter<void>();
   @Output() remove = new EventEmitter<void>();
   @Output() volumeChange = new EventEmitter<number>();
+  @Output() speedChange = new EventEmitter<number>();
 
   @HostBinding('class.popup-open') showVolumePopup = false;
   Math = Math; // Expose Math to template
+  speedOptions = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
   constructor(private soundboardService: SoundboardService) {}
 
@@ -448,8 +517,13 @@ export class SoundPadComponent {
     this.volumeChange.emit(volume);
   }
 
-  resetVolume(): void {
+  onSpeedChange(speed: number): void {
+    this.speedChange.emit(speed);
+  }
+
+  resetAll(): void {
     this.volumeChange.emit(1.0);
+    this.speedChange.emit(1.0);
   }
 
   formatDuration(seconds: number): string {

@@ -324,9 +324,10 @@ export class TauriService {
   /**
    * Play a sound file (mixed with microphone)
    * @param volume Volume level (0.0-2.0, default 1.0)
+   * @param speed Playback speed (0.5-2.0, default 1.0)
    */
-  async playSound(id: string, path: string, volume: number = 1.0): Promise<void> {
-    await invoke('play_sound', { id, path, volume });
+  async playSound(id: string, path: string, volume: number = 1.0, speed: number = 1.0): Promise<void> {
+    await invoke('play_sound', { id, path, volume, speed });
   }
 
   /**

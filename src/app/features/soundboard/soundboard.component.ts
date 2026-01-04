@@ -44,6 +44,7 @@ const DEFAULT_HOTKEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', 
               (import)="soundboard.importSound(pad.id)"
               (remove)="soundboard.removeSound(pad.id)"
               (volumeChange)="soundboard.setPadVolume(pad.id, $event)"
+              (speedChange)="soundboard.setPadSpeed(pad.id, $event)"
             />
           }
         </div>

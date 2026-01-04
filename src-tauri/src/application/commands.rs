@@ -772,14 +772,17 @@ async fn load_sound_file_internal(path: &str) -> Result<SoundFileDto, String> {
 }
 
 /// Play a sound file (mix with microphone) with optional volume (0.0-2.0, default 1.0)
+/// and optional speed (0.5-2.0, default 1.0)
 #[tauri::command]
 pub async fn play_sound(
     state: State<'_, AppState>,
     id: String,
     path: String,
     volume: Option<f32>,
+    speed: Option<f32>,
 ) -> Result<(), String> {
     let volume = volume.unwrap_or(1.0);
+    let speed = speed.unwrap_or(1.0);
     use rodio::Source;
     use std::fs::File;
     use std::io::BufReader;
@@ -867,18 +870,20 @@ pub async fn play_sound(
             id,
             samples,
             volume,
+            speed,
         })
         .map_err(|e| format!("Failed to play sound: {}", e))?;
 
     tracing::info!(
-        "Playing sound: {} ({} samples original, {} final, {}Hz -> {}Hz, {} ch, vol: {:.0}%)",
+        "Playing sound: {} ({} samples original, {} final, {}Hz -> {}Hz, {} ch, vol: {:.0}%, speed: {:.2}x)",
         path,
         original_len,
         samples_len,
         source_sample_rate,
         target_sample_rate,
         channels,
-        volume * 100.0
+        volume * 100.0,
+        speed
     );
 
     Ok(())
