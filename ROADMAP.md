@@ -298,6 +298,12 @@
   - Add Tauri integration tests for commands
   - Refactor code to separate testable logic from I/O
 
+- [ ] **E2E Testing (Playwright)**
+  - Demo mode for running Angular app without Tauri backend
+  - Automated screenshot generation for landing page
+  - UI interaction tests (soundboard, mixer, settings)
+  - Visual regression testing
+
 ### Quality of Life
 - [ ] **Launch at Startup**
   - Option to start Voiceboard automatically when Windows/macOS boots

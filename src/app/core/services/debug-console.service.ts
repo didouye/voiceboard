@@ -1,7 +1,8 @@
-import { Injectable, signal } from '@angular/core';
+import { inject, Injectable, signal } from '@angular/core';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import * as Sentry from '@sentry/angular';
+import { DemoService } from './demo.service';
 
 export interface LogEntry {
   timestamp: Date;
@@ -16,6 +17,7 @@ export class DebugConsoleService {
   private readonly _logs = signal<LogEntry[]>([]);
   private readonly _isOpen = signal(false);
   private readonly _isEnabled = signal(false);
+  private demoService = inject(DemoService);
 
   readonly logs = this._logs.asReadonly();
   readonly isOpen = this._isOpen.asReadonly();
@@ -26,6 +28,13 @@ export class DebugConsoleService {
   }
 
   private async initialize() {
+    // In demo mode, enable debug console by default
+    if (this.demoService.isDemoMode) {
+      this._isEnabled.set(true);
+      this.log('info', 'Debug console initialized (demo mode)');
+      return;
+    }
+
     // Get initial debug mode from backend
     try {
       const enabled = await invoke<boolean>('get_debug_mode');

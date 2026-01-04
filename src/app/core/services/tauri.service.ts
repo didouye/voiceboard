@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import { invoke } from '@tauri-apps/api/core';
 import {
   AudioDevice,
@@ -8,14 +8,27 @@ import {
   ApiResponse,
   SoundFile
 } from '../models';
+import { DemoService } from './demo.service';
+import {
+  DEMO_INPUT_DEVICES,
+  DEMO_OUTPUT_DEVICES,
+  DEMO_PREVIEW_DEVICES,
+  DEMO_SETTINGS,
+  DEMO_MIXER_CONFIG,
+  DEMO_SOUNDBOARD_PADS,
+  createDemoSoundFile
+} from './demo-data';
 
 /**
  * Service for communicating with the Tauri/Rust backend
+ * In demo mode, returns mock data instead of calling Tauri APIs
  */
 @Injectable({
   providedIn: 'root'
 })
 export class TauriService {
+  private demoService = inject(DemoService);
+  private demoMixing = false;
 
   // =========================================================================
   // Device Management
@@ -25,6 +38,9 @@ export class TauriService {
    * Get all available audio devices
    */
   async getAudioDevices(): Promise<AudioDevice[]> {
+    if (this.demoService.isDemoMode) {
+      return [...DEMO_INPUT_DEVICES, ...DEMO_OUTPUT_DEVICES, ...DEMO_PREVIEW_DEVICES];
+    }
     const response = await invoke<ApiResponse<AudioDevice[]>>('get_audio_devices');
     if (!response.success || !response.data) {
       throw new Error(response.error || 'Failed to get audio devices');
@@ -36,6 +52,9 @@ export class TauriService {
    * Get input devices only (microphones)
    */
   async getInputDevices(): Promise<AudioDevice[]> {
+    if (this.demoService.isDemoMode) {
+      return DEMO_INPUT_DEVICES;
+    }
     const response = await invoke<ApiResponse<AudioDevice[]>>('get_input_devices');
     if (!response.success || !response.data) {
       throw new Error(response.error || 'Failed to get input devices');
@@ -47,6 +66,9 @@ export class TauriService {
    * Get virtual output devices (for sending mixed audio)
    */
   async getVirtualOutputDevices(): Promise<AudioDevice[]> {
+    if (this.demoService.isDemoMode) {
+      return DEMO_OUTPUT_DEVICES;
+    }
     const response = await invoke<ApiResponse<AudioDevice[]>>('get_virtual_output_devices');
     if (!response.success || !response.data) {
       throw new Error(response.error || 'Failed to get virtual output devices');
@@ -58,6 +80,9 @@ export class TauriService {
    * Get physical output devices (speakers, headphones - for preview/monitoring)
    */
   async getPhysicalOutputDevices(): Promise<AudioDevice[]> {
+    if (this.demoService.isDemoMode) {
+      return DEMO_PREVIEW_DEVICES;
+    }
     const response = await invoke<ApiResponse<AudioDevice[]>>('get_physical_output_devices');
     if (!response.success || !response.data) {
       throw new Error(response.error || 'Failed to get physical output devices');
@@ -69,6 +94,9 @@ export class TauriService {
    * Get virtual output devices sorted by priority (VB-Cable first)
    */
   async getVirtualOutputsByPriority(): Promise<AudioDevice[]> {
+    if (this.demoService.isDemoMode) {
+      return DEMO_OUTPUT_DEVICES;
+    }
     const response = await invoke<ApiResponse<AudioDevice[]>>('get_virtual_outputs_by_priority');
     if (!response.success || !response.data) {
       throw new Error(response.error || 'Failed to get virtual outputs by priority');
@@ -80,6 +108,9 @@ export class TauriService {
    * Check if virtual audio driver is installed
    */
   async checkVirtualDriver(): Promise<boolean> {
+    if (this.demoService.isDemoMode) {
+      return true;
+    }
     const response = await invoke<ApiResponse<boolean>>('check_virtual_driver');
     return response.success && response.data === true;
   }
@@ -105,6 +136,9 @@ export class TauriService {
    * Get current application settings
    */
   async getSettings(): Promise<AppSettings> {
+    if (this.demoService.isDemoMode) {
+      return DEMO_SETTINGS;
+    }
     const settings = await invoke<any>('get_settings');
     return this.mapSettings(settings);
   }
@@ -113,6 +147,7 @@ export class TauriService {
    * Save application settings
    */
   async saveSettings(settings: AppSettings): Promise<void> {
+    if (this.demoService.isDemoMode) return;
     await invoke('save_settings', { settings: this.unmapSettings(settings) });
   }
 
@@ -120,6 +155,9 @@ export class TauriService {
    * Load settings from persistent storage
    */
   async loadSettings(): Promise<AppSettings> {
+    if (this.demoService.isDemoMode) {
+      return DEMO_SETTINGS;
+    }
     const settings = await invoke<any>('load_settings');
     return this.mapSettings(settings);
   }
@@ -128,6 +166,7 @@ export class TauriService {
    * Set input device (microphone)
    */
   async setInputDevice(deviceId: string | null): Promise<void> {
+    if (this.demoService.isDemoMode) return;
     await invoke('set_input_device', { deviceId });
   }
 
@@ -135,6 +174,7 @@ export class TauriService {
    * Set output device (virtual microphone)
    */
   async setOutputDevice(deviceId: string | null): Promise<void> {
+    if (this.demoService.isDemoMode) return;
     await invoke('set_output_device', { deviceId });
   }
 
@@ -184,6 +224,9 @@ export class TauriService {
    * Get current mixer configuration
    */
   async getMixerConfig(): Promise<MixerConfig> {
+    if (this.demoService.isDemoMode) {
+      return DEMO_MIXER_CONFIG;
+    }
     const config = await invoke<any>('get_mixer_config');
     return {
       masterVolume: config.master_volume,
@@ -204,6 +247,7 @@ export class TauriService {
    * Set master volume (0.0 to 1.0)
    */
   async setMasterVolume(volume: number): Promise<void> {
+    if (this.demoService.isDemoMode) return;
     await invoke('set_master_volume', { volume: Math.max(0, Math.min(1, volume)) });
   }
 
@@ -215,6 +259,9 @@ export class TauriService {
    * Add a microphone channel
    */
   async addMicrophoneChannel(id: string, name: string): Promise<MixerChannel> {
+    if (this.demoService.isDemoMode) {
+      return { id, name, channelType: 'Microphone', volume: 1.0, muted: false, solo: false };
+    }
     return invoke<MixerChannel>('add_microphone_channel', { id, name });
   }
 
@@ -222,6 +269,9 @@ export class TauriService {
    * Add an audio file channel
    */
   async addAudioFileChannel(id: string, name: string): Promise<MixerChannel> {
+    if (this.demoService.isDemoMode) {
+      return { id, name, channelType: 'AudioFile', volume: 1.0, muted: false, solo: false };
+    }
     return invoke<MixerChannel>('add_audio_file_channel', { id, name });
   }
 
@@ -229,6 +279,7 @@ export class TauriService {
    * Remove a channel
    */
   async removeChannel(channelId: string): Promise<void> {
+    if (this.demoService.isDemoMode) return;
     await invoke('remove_channel', { channelId });
   }
 
@@ -236,6 +287,7 @@ export class TauriService {
    * Set channel volume (0.0 to 2.0)
    */
   async setChannelVolume(channelId: string, volume: number): Promise<void> {
+    if (this.demoService.isDemoMode) return;
     await invoke('set_channel_volume', { channelId, volume });
   }
 
@@ -243,6 +295,7 @@ export class TauriService {
    * Toggle channel mute state
    */
   async toggleChannelMute(channelId: string): Promise<boolean> {
+    if (this.demoService.isDemoMode) return false;
     return invoke<boolean>('toggle_channel_mute', { channelId });
   }
 
@@ -254,6 +307,10 @@ export class TauriService {
    * Start audio mixing
    */
   async startMixing(): Promise<void> {
+    if (this.demoService.isDemoMode) {
+      this.demoMixing = true;
+      return;
+    }
     await invoke('start_mixing');
   }
 
@@ -261,6 +318,10 @@ export class TauriService {
    * Stop audio mixing
    */
   async stopMixing(): Promise<void> {
+    if (this.demoService.isDemoMode) {
+      this.demoMixing = false;
+      return;
+    }
     await invoke('stop_mixing');
   }
 
@@ -268,6 +329,9 @@ export class TauriService {
    * Check if currently mixing
    */
   async isMixing(): Promise<boolean> {
+    if (this.demoService.isDemoMode) {
+      return this.demoMixing;
+    }
     return invoke<boolean>('is_mixing');
   }
 
@@ -279,6 +343,9 @@ export class TauriService {
    * Load and decode an audio file, returning its metadata
    */
   async loadSoundFile(path: string): Promise<SoundFile> {
+    if (this.demoService.isDemoMode) {
+      return createDemoSoundFile(path);
+    }
     console.log('[TauriService] loadSoundFile called with path:', path);
     try {
       const result = await invoke<any>('load_sound_file', { path });
@@ -302,6 +369,9 @@ export class TauriService {
    * Returns an array of results (success with SoundFile or error string)
    */
   async loadMultipleSoundFiles(paths: string[]): Promise<Array<{ ok: SoundFile } | { err: string }>> {
+    if (this.demoService.isDemoMode) {
+      return paths.map(path => ({ ok: createDemoSoundFile(path) }));
+    }
     const results = await invoke<Array<{ Ok?: any; Err?: string }>>('load_multiple_sound_files', { paths });
     return results.map(r => {
       if (r.Ok) {
@@ -327,6 +397,7 @@ export class TauriService {
    * @param speed Playback speed (0.5-2.0, default 1.0)
    */
   async playSound(id: string, path: string, volume: number = 1.0, speed: number = 1.0): Promise<void> {
+    if (this.demoService.isDemoMode) return;
     await invoke('play_sound', { id, path, volume, speed });
   }
 
@@ -334,6 +405,7 @@ export class TauriService {
    * Stop a playing sound
    */
   async stopSound(id: string): Promise<void> {
+    if (this.demoService.isDemoMode) return;
     await invoke('stop_sound', { id });
   }
 
@@ -341,6 +413,7 @@ export class TauriService {
    * Preview a sound on a specific output device
    */
   async previewSound(path: string, deviceName: string, padId: string): Promise<void> {
+    if (this.demoService.isDemoMode) return;
     await invoke('preview_sound', { path, deviceName, padId });
   }
 
@@ -348,6 +421,7 @@ export class TauriService {
    * Stop the currently playing preview
    */
   async stopPreview(): Promise<void> {
+    if (this.demoService.isDemoMode) return;
     await invoke('stop_preview');
   }
 
@@ -355,6 +429,7 @@ export class TauriService {
    * Get the currently previewing pad ID
    */
   async getPreviewState(): Promise<string | null> {
+    if (this.demoService.isDemoMode) return null;
     return invoke<string | null>('get_preview_state');
   }
 
@@ -362,6 +437,7 @@ export class TauriService {
    * Set the preview output device
    */
   async setPreviewDevice(deviceId: string | null): Promise<void> {
+    if (this.demoService.isDemoMode) return;
     await invoke('set_preview_device', { deviceId });
   }
 
@@ -369,6 +445,7 @@ export class TauriService {
    * Set mic monitoring enabled/disabled
    */
   async setMicMonitoring(enabled: boolean): Promise<void> {
+    if (this.demoService.isDemoMode) return;
     await invoke('set_mic_monitoring', { enabled });
   }
 
@@ -376,6 +453,7 @@ export class TauriService {
    * Set microphone volume (0.0 to 2.0)
    */
   async setMicVolume(volume: number): Promise<void> {
+    if (this.demoService.isDemoMode) return;
     await invoke('set_mic_volume', { volume: Math.max(0, Math.min(2, volume)) });
   }
 
@@ -383,6 +461,7 @@ export class TauriService {
    * Mute or unmute microphone
    */
   async setMicMuted(muted: boolean): Promise<void> {
+    if (this.demoService.isDemoMode) return;
     await invoke('set_mic_muted', { muted });
   }
 
@@ -394,6 +473,7 @@ export class TauriService {
    * Save soundboard state to persistent storage
    */
   async saveSoundboardState(pads: any[]): Promise<void> {
+    if (this.demoService.isDemoMode) return;
     await invoke('save_soundboard', { pads });
   }
 
@@ -401,6 +481,9 @@ export class TauriService {
    * Load soundboard state from persistent storage
    */
   async loadSoundboardState(): Promise<any[] | null> {
+    if (this.demoService.isDemoMode) {
+      return DEMO_SOUNDBOARD_PADS;
+    }
     return invoke<any[] | null>('load_soundboard');
   }
 
@@ -412,6 +495,9 @@ export class TauriService {
    * Listen for preview started events
    */
   async listenPreviewStarted(callback: (padId: string) => void): Promise<() => void> {
+    if (this.demoService.isDemoMode) {
+      return () => {}; // No-op unlisten
+    }
     const { listen } = await import('@tauri-apps/api/event');
     const unlisten = await listen<string>('preview-started', (event) => {
       callback(event.payload);
@@ -423,6 +509,9 @@ export class TauriService {
    * Listen for preview stopped events
    */
   async listenPreviewStopped(callback: (padId: string) => void): Promise<() => void> {
+    if (this.demoService.isDemoMode) {
+      return () => {}; // No-op unlisten
+    }
     const { listen } = await import('@tauri-apps/api/event');
     const unlisten = await listen<string>('preview-stopped', (event) => {
       callback(event.payload);
