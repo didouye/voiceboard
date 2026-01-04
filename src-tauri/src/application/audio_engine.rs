@@ -584,10 +584,11 @@ fn run_engine_thread(
                                             };
 
                                             // Duplicate mono sample to all output channels
+                                            // DEBUG: Reduce by 50% to test if level is the issue
                                             for ch in 0..output_ch as usize {
                                                 let out_idx = frame * output_ch as usize + ch;
                                                 if out_idx < data_len {
-                                                    data[out_idx] = (data[out_idx] + mono_sample).clamp(-1.0, 1.0);
+                                                    data[out_idx] = (data[out_idx] + mono_sample * 0.5).clamp(-1.0, 1.0);
                                                 }
                                             }
 
