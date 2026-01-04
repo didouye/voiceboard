@@ -530,6 +530,11 @@ fn run_engine_thread(
                         let output_callback_count = Arc::new(AtomicU32::new(0));
                         let output_callback_count_clone = output_callback_count.clone();
 
+                        // Dynamic limiter state: current gain (0.0 to 1.0)
+                        // Starts at 1.0 (unity gain), reduces when clipping detected
+                        let limiter_gain = Arc::new(AtomicU32::new(f32::to_bits(1.0)));
+                        let limiter_gain_clone = limiter_gain.clone();
+
                         // Build output stream (uses output device's native config)
                         let output_result = output_dev.build_output_stream(
                             &output_config,
@@ -540,6 +545,13 @@ fn run_engine_thread(
                                 let master_vol =
                                     f32::from_bits(master_volume_clone.load(Ordering::Relaxed));
                                 let mic_mon_enabled = mic_monitoring_for_output.load(Ordering::Relaxed);
+
+                                // Limiter parameters
+                                // Release: how fast we return to unity (slow to avoid pumping)
+                                // Attack is instant (no coefficient needed)
+                                let release_coeff = 0.0005f32; // ~2 seconds to return to unity at 48kHz
+                                let mut current_limiter_gain =
+                                    f32::from_bits(limiter_gain_clone.load(Ordering::Relaxed));
 
                                 // Calculate frames (output may be stereo, input may be mono)
                                 let data_len = data.len();
@@ -584,12 +596,11 @@ fn run_engine_thread(
                                             };
 
                                             // Duplicate mono sample to all output channels
-                                            // Apply 0.7 headroom to prevent clipping when mixing multiple sources
-                                            let mixed_sample = mono_sample * 0.7;
+                                            // No fixed headroom - dynamic limiter handles clipping
                                             for ch in 0..output_ch as usize {
                                                 let out_idx = frame * output_ch as usize + ch;
                                                 if out_idx < data_len {
-                                                    data[out_idx] = (data[out_idx] + mixed_sample).clamp(-1.0, 1.0);
+                                                    data[out_idx] += mono_sample;
                                                 }
                                             }
 
@@ -630,7 +641,8 @@ fn run_engine_thread(
                                         } else {
                                             sound_sample * master_vol
                                         };
-                                        let _ = prod_mon.try_push(monitoring_sample.clamp(-1.0, 1.0));
+                                        // Apply limiter gain (from previous frame) to monitoring
+                                        let _ = prod_mon.try_push((monitoring_sample * current_limiter_gain).clamp(-1.0, 1.0));
                                     }
                                 }
 
@@ -640,17 +652,46 @@ fn run_engine_thread(
                                     for ch in 0..output_ch as usize {
                                         let idx = frame * output_ch as usize + ch;
                                         if idx < data_len {
-                                            data[idx] = (data[idx] + mic_sample).clamp(-1.0, 1.0);
+                                            data[idx] += mic_sample;
                                         }
                                     }
                                 }
 
-                                // Apply master volume to main output
+                                // Apply master volume to main output (no clamp yet)
                                 for sample in data.iter_mut() {
-                                    *sample = (*sample * master_vol).clamp(-1.0, 1.0);
+                                    *sample *= master_vol;
                                 }
 
-                                // Calculate output RMS after master volume
+                                // Dynamic limiter: detect peaks and adjust gain
+                                // Find peak level in the buffer
+                                let peak = data.iter().fold(0.0f32, |acc, &s| acc.max(s.abs()));
+
+                                // If peak would clip, calculate required gain reduction
+                                let target_gain = if peak > 1.0 {
+                                    1.0 / peak // Exact gain to bring peak to 1.0
+                                } else {
+                                    1.0 // No reduction needed
+                                };
+
+                                // Apply attack/release envelope
+                                if target_gain < current_limiter_gain {
+                                    // Attack: instant reduction to prevent clipping
+                                    current_limiter_gain = target_gain;
+                                } else {
+                                    // Release: slowly return to unity gain
+                                    current_limiter_gain += (target_gain - current_limiter_gain) * release_coeff;
+                                    current_limiter_gain = current_limiter_gain.min(1.0);
+                                }
+
+                                // Apply limiter gain and final clamp (safety)
+                                for sample in data.iter_mut() {
+                                    *sample = (*sample * current_limiter_gain).clamp(-1.0, 1.0);
+                                }
+
+                                // Store limiter state for next callback
+                                limiter_gain_clone.store(current_limiter_gain.to_bits(), Ordering::Relaxed);
+
+                                // Calculate output RMS after limiter
                                 let mut sum_squares = 0.0f32;
                                 for sample in data.iter() {
                                     sum_squares += sample * sample;
