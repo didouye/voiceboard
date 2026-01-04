@@ -72,6 +72,7 @@
   - Capture panics and errors
   - Source maps for frontend errors
   - Release tracking with version tags
+  - Breadcrumbs: send logs as Sentry breadcrumbs for error context
 
 ### To Do
 - [ ] **GitHub Pages Landing Page**
@@ -156,6 +157,13 @@
   - Integration with TTS models (ElevenLabs, etc.)
   - AI sound effect generation
   - Generation history
+
+- [ ] **Remote Live Logging** *(see docs/plans/2026-01-04-remote-live-logging-design.md)*
+  - Stream logs to server when debug mode is active (with user consent)
+  - Dashboard for developer to view logs in real-time
+  - Email notification when user starts debug session
+  - Metadata: OS, app version, devices, app state
+  - 7-day retention with auto-deletion
 
 - [ ] **Remote Control Infrastructure**
   - WebSocket gateway (Django Channels + Redis)
