@@ -104,6 +104,7 @@ mod tests {
         assert_eq!(settings.sample_rate, 48000);
         assert_eq!(settings.buffer_size, 1024);
         assert!(!settings.mic_monitoring);
+        assert!(settings.global_hotkeys_enabled);
     }
 
     #[test]
@@ -151,6 +152,42 @@ mod tests {
         assert!(!settings.mic_monitoring);
         settings.mic_monitoring = true;
         assert!(settings.mic_monitoring);
+    }
+
+    #[test]
+    fn test_audio_settings_global_hotkeys_enabled() {
+        let settings = AudioSettings::new();
+        // Default is true
+        assert!(settings.global_hotkeys_enabled);
+    }
+
+    #[test]
+    fn test_audio_settings_global_hotkeys_toggle() {
+        let mut settings = AudioSettings::new();
+        assert!(settings.global_hotkeys_enabled);
+        settings.global_hotkeys_enabled = false;
+        assert!(!settings.global_hotkeys_enabled);
+    }
+
+    #[test]
+    fn test_audio_settings_global_hotkeys_serialization() {
+        // Test that global_hotkeys_enabled is properly serialized
+        let mut settings = AudioSettings::new();
+        settings.global_hotkeys_enabled = false;
+
+        let json = serde_json::to_string(&settings).unwrap();
+        assert!(json.contains("global_hotkeys_enabled"));
+
+        let deserialized: AudioSettings = serde_json::from_str(&json).unwrap();
+        assert!(!deserialized.global_hotkeys_enabled);
+    }
+
+    #[test]
+    fn test_audio_settings_global_hotkeys_default_on_missing() {
+        // Test that missing field in JSON defaults to true
+        let json = r#"{"input_device_id":null,"output_device_id":null,"preview_device_id":null,"master_volume":1.0,"sample_rate":48000,"buffer_size":1024,"mic_monitoring":false}"#;
+        let settings: AudioSettings = serde_json::from_str(json).unwrap();
+        assert!(settings.global_hotkeys_enabled); // Should default to true
     }
 
     #[test]
