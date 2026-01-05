@@ -490,6 +490,52 @@ export class TauriService {
   }
 
   // =========================================================================
+  // Image Management
+  // =========================================================================
+
+  /**
+   * Get the images directory path
+   */
+  async getImagesDir(): Promise<string> {
+    if (this.demoService.isDemoMode) {
+      return '/demo/images';
+    }
+    return invoke<string>('get_images_dir');
+  }
+
+  /**
+   * Save an image for a pad
+   * @returns The relative path to the saved image
+   */
+  async savePadImage(padId: string, imageData: Uint8Array, extension: string): Promise<string> {
+    if (this.demoService.isDemoMode) {
+      return `${padId}-demo.${extension}`;
+    }
+    return invoke<string>('save_pad_image', {
+      padId,
+      imageData: Array.from(imageData),
+      extension
+    });
+  }
+
+  /**
+   * Delete image for a pad
+   */
+  async deletePadImage(padId: string): Promise<void> {
+    if (this.demoService.isDemoMode) return;
+    await invoke('delete_pad_image', { padId });
+  }
+
+  /**
+   * Clean up orphaned images
+   * @returns Number of deleted images
+   */
+  async cleanupOrphanedImages(): Promise<number> {
+    if (this.demoService.isDemoMode) return 0;
+    return invoke<number>('cleanup_orphaned_images');
+  }
+
+  // =========================================================================
   // Preview Event Listeners
   // =========================================================================
 
