@@ -208,6 +208,11 @@
   - Metadata: OS, app version, devices, app state
   - 7-day retention with auto-deletion
 
+- [ ] **Image Search Proxy**
+  - Proxy endpoint for Pexels API (`POST /api/images/search`)
+  - API key configurable in Django admin
+  - Automatic migration (desktop removes local key when connected to cloud)
+
 - [ ] **Remote Control Infrastructure**
   - WebSocket gateway (Django Channels + Redis)
   - Desktop persistent connection to cloud
