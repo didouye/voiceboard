@@ -190,7 +190,8 @@ export class TauriService {
         masterVolume: s.audio.master_volume,
         sampleRate: s.audio.sample_rate,
         bufferSize: s.audio.buffer_size,
-        micMonitoring: s.audio.mic_monitoring ?? false
+        micMonitoring: s.audio.mic_monitoring ?? false,
+        globalHotkeysEnabled: s.audio.global_hotkeys_enabled ?? true
       },
       startMinimized: s.start_minimized,
       autoStartMixing: s.auto_start_mixing
@@ -209,7 +210,8 @@ export class TauriService {
         master_volume: s.audio.masterVolume,
         sample_rate: s.audio.sampleRate,
         buffer_size: s.audio.bufferSize,
-        mic_monitoring: s.audio.micMonitoring
+        mic_monitoring: s.audio.micMonitoring,
+        global_hotkeys_enabled: s.audio.globalHotkeysEnabled
       },
       start_minimized: s.startMinimized,
       auto_start_mixing: s.autoStartMixing
@@ -514,6 +516,64 @@ export class TauriService {
     }
     const { listen } = await import('@tauri-apps/api/event');
     const unlisten = await listen<string>('preview-stopped', (event) => {
+      callback(event.payload);
+    });
+    return unlisten;
+  }
+
+  // =========================================================================
+  // Shortcut Management
+  // =========================================================================
+
+  /**
+   * Register a global shortcut for a pad
+   */
+  async registerGlobalShortcut(padId: string, shortcut: string): Promise<void> {
+    if (this.demoService.isDemoMode) return;
+    await invoke('register_global_shortcut', { padId, shortcut });
+  }
+
+  /**
+   * Unregister a global shortcut
+   */
+  async unregisterGlobalShortcut(shortcut: string): Promise<void> {
+    if (this.demoService.isDemoMode) return;
+    await invoke('unregister_global_shortcut', { shortcut });
+  }
+
+  /**
+   * Unregister all global shortcuts
+   */
+  async unregisterAllShortcuts(): Promise<void> {
+    if (this.demoService.isDemoMode) return;
+    await invoke('unregister_all_shortcuts');
+  }
+
+  /**
+   * Enable or disable global hotkeys
+   */
+  async setGlobalHotkeysEnabled(enabled: boolean): Promise<void> {
+    if (this.demoService.isDemoMode) return;
+    await invoke('set_global_hotkeys_enabled', { enabled });
+  }
+
+  /**
+   * Get current global hotkeys enabled state
+   */
+  async getGlobalHotkeysEnabled(): Promise<boolean> {
+    if (this.demoService.isDemoMode) return true;
+    return await invoke('get_global_hotkeys_enabled');
+  }
+
+  /**
+   * Listen for global shortcut triggered events
+   */
+  async listenGlobalShortcut(callback: (data: { padId: string; shortcut: string }) => void): Promise<() => void> {
+    if (this.demoService.isDemoMode) {
+      return () => {}; // No-op unlisten
+    }
+    const { listen } = await import('@tauri-apps/api/event');
+    const unlisten = await listen<{ padId: string; shortcut: string }>('global-shortcut-triggered', (event) => {
       callback(event.payload);
     });
     return unlisten;
