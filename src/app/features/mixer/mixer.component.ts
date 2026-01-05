@@ -1,194 +1,108 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MixerService } from '../../core/services';
-import { MasterControlComponent } from './master-control/master-control.component';
-import { DeviceSelectorComponent } from '../devices/device-selector.component';
+import { SoundboardService } from '../../core/services/soundboard.service';
 import { SoundboardComponent } from '../soundboard/soundboard.component';
-import { LevelMetersComponent } from './level-meters/level-meters.component';
+import { StatusBarComponent } from './status-bar/status-bar.component';
+import { SettingsPopupComponent } from '../../shared/components/settings-popup/settings-popup.component';
 
 @Component({
   selector: 'app-mixer',
   standalone: true,
-  imports: [CommonModule, MasterControlComponent, DeviceSelectorComponent, SoundboardComponent, LevelMetersComponent],
+  imports: [CommonModule, SoundboardComponent, StatusBarComponent, SettingsPopupComponent],
   template: `
-    <div class="mixer-container">
-      <header class="mixer-header">
-        <h1>Voiceboard</h1>
-        <p class="subtitle">Virtual Microphone Mixer</p>
-      </header>
+    <div class="h-screen flex flex-col bg-background">
+      <!-- Main content area -->
+      <div class="flex-1 flex overflow-hidden">
+        <!-- Sidebar -->
+        <aside class="w-48 bg-surface border-r border-border flex flex-col">
+          <!-- Folders header -->
+          <div class="px-4 py-3 border-b border-border">
+            <h2 class="text-xs font-semibold text-text-muted uppercase tracking-wider flex items-center gap-2">
+              <span>&#128193;</span> Folders
+            </h2>
+          </div>
 
-      @if (mixer.loading()) {
-        <div class="loading">Loading...</div>
-      } @else if (mixer.error()) {
-        <div class="error-banner">
-          {{ mixer.error() }}
-          <button (click)="mixer.clearError()">Dismiss</button>
-        </div>
-      }
+          <!-- Folder list -->
+          <div class="flex-1 py-2 overflow-y-auto">
+            @for (folder of soundboard.folders(); track folder.id) {
+              <button
+                class="w-full px-4 py-2.5 text-left text-sm transition-colors flex items-center gap-2"
+                [class]="folder.id === soundboard.activeFolderId()
+                  ? 'bg-surface-hover text-text-primary border-l-2 border-accent'
+                  : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary border-l-2 border-transparent'"
+                (click)="soundboard.setActiveFolder(folder.id)"
+              >
+                <span>&#9654;</span>
+                {{ folder.name }}
+              </button>
+            }
 
-      <div class="mixer-content">
-        <div class="mixer-layout">
-          <!-- Left Sidebar - Device Selection -->
-          <aside class="sidebar">
-            <app-device-selector />
-          </aside>
+            <!-- New folder button (disabled for now) -->
+            <button
+              class="w-full px-4 py-2.5 text-left text-sm text-text-muted border-l-2 border-transparent opacity-50 cursor-not-allowed flex items-center gap-2"
+              disabled
+              title="Coming soon"
+            >
+              <span>+</span>
+              New Folder
+            </button>
+          </div>
 
-          <!-- Main Content -->
-          <main class="main-content">
-            <!-- Soundboard Section -->
+          <!-- Settings button -->
+          <div class="p-3 border-t border-border">
+            <button
+              class="w-full px-4 py-2.5 rounded-lg bg-surface-hover text-text-secondary hover:text-text-primary transition-colors flex items-center gap-2"
+              (click)="showSettings.set(true)"
+            >
+              <span>&#9881;</span>
+              Settings
+            </button>
+          </div>
+        </aside>
+
+        <!-- Main content -->
+        <main class="flex-1 flex flex-col overflow-hidden">
+          <!-- Error banner -->
+          @if (mixer.error()) {
+            <div class="mx-4 mt-4 px-4 py-3 bg-status-error/20 border border-status-error rounded-lg flex items-center justify-between">
+              <span class="text-status-error">{{ mixer.error() }}</span>
+              <button
+                class="px-3 py-1 text-sm text-status-error hover:bg-status-error/20 rounded transition-colors"
+                (click)="mixer.clearError()"
+              >
+                Dismiss
+              </button>
+            </div>
+          }
+
+          <!-- Soundboard -->
+          <div class="flex-1 p-4 overflow-y-auto">
             <app-soundboard />
-          </main>
-
-          <!-- Right Sidebar - Master Control -->
-          <aside class="master-section">
-            <app-master-control
-              [volume]="mixer.masterVolume()"
-              [isRunning]="mixer.isRunning()"
-              (volumeChange)="onMasterVolumeChange($event)"
-              (startStop)="onStartStop()"
-            />
-          </aside>
-        </div>
+          </div>
+        </main>
       </div>
 
-      <footer class="mixer-footer">
-        <app-level-meters />
-      </footer>
+      <!-- Status bar -->
+      <app-status-bar />
+
+      <!-- Settings popup -->
+      @if (showSettings()) {
+        <app-settings-popup (close)="showSettings.set(false)" />
+      }
     </div>
   `,
-  styles: [`
-    .mixer-container {
-      min-height: 100vh;
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-      color: #fff;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .mixer-header {
-      text-align: center;
-      padding: 20px;
-    }
-
-    .mixer-header h1 {
-      font-size: 2.5rem;
-      margin: 0;
-      background: linear-gradient(90deg, #00d4ff, #7b2cbf);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .subtitle {
-      color: #888;
-      margin: 5px 0 0;
-    }
-
-    .error-banner {
-      background: #e74c3c;
-      padding: 15px 20px;
-      border-radius: 8px;
-      margin: 0 20px 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      max-width: 1400px;
-      margin-left: auto;
-      margin-right: auto;
-    }
-
-    .error-banner button {
-      background: rgba(255,255,255,0.2);
-      border: none;
-      color: #fff;
-      padding: 5px 15px;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-
-    .loading {
-      text-align: center;
-      padding: 40px;
-      color: #888;
-    }
-
-    .mixer-content {
-      flex: 1;
-      padding: 0 20px 20px;
-      overflow-y: auto;
-    }
-
-    .mixer-layout {
-      display: grid;
-      grid-template-columns: 300px 1fr 200px;
-      gap: 25px;
-      max-width: 1600px;
-      margin: 0 auto;
-    }
-
-    .sidebar {
-      position: sticky;
-      top: 20px;
-      align-self: start;
-    }
-
-    .main-content {
-      min-width: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 25px;
-    }
-
-    .master-section {
-      position: sticky;
-      top: 20px;
-      align-self: start;
-    }
-
-    .mixer-footer {
-      position: sticky;
-      bottom: 0;
-      z-index: 100;
-    }
-
-    /* Responsive */
-    @media (max-width: 1200px) {
-      .mixer-layout {
-        grid-template-columns: 250px 1fr 180px;
-      }
-    }
-
-    @media (max-width: 900px) {
-      .mixer-layout {
-        grid-template-columns: 1fr;
-        gap: 20px;
-      }
-
-      .sidebar, .master-section {
-        position: static;
-      }
-
-      .master-section {
-        order: -1;
-      }
-    }
-  `]
+  styles: []
 })
 export class MixerComponent implements OnInit {
-  constructor(public mixer: MixerService) {}
+  showSettings = signal(false);
+
+  constructor(
+    public mixer: MixerService,
+    public soundboard: SoundboardService
+  ) {}
 
   ngOnInit(): void {
     this.mixer.initialize();
-  }
-
-  async onMasterVolumeChange(volume: number): Promise<void> {
-    await this.mixer.setMasterVolume(volume);
-  }
-
-  async onStartStop(): Promise<void> {
-    if (this.mixer.isRunning()) {
-      await this.mixer.stop();
-    } else {
-      await this.mixer.start();
-    }
   }
 }
