@@ -1,15 +1,19 @@
-import { Component, HostListener, signal, OnInit, OnDestroy } from '@angular/core';
+import { Component, HostListener, signal, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { SoundboardService } from '../../core/services/soundboard.service';
 import { ShortcutService } from '../../core/services/shortcut.service';
+import { TauriService } from '../../core/services/tauri.service';
 import { SoundPadComponent } from './sound-pad/sound-pad.component';
 import { listen, TauriEvent } from '@tauri-apps/api/event';
-import { eventMatchesShortcut, PadImage } from '../../core/models';
+import { eventMatchesShortcut, PadImage, SoundPad } from '../../core/models';
+import { ImageSuggestionToastComponent } from '../../shared/components/image-suggestion-toast/image-suggestion-toast.component';
+import { BulkImageWizardComponent } from '../../shared/components/bulk-image-wizard/bulk-image-wizard.component';
+import { ImageSearchService, ImageSearchResult } from '../../core/services/image-search.service';
 
 @Component({
   selector: 'app-soundboard',
   standalone: true,
-  imports: [CommonModule, SoundPadComponent],
+  imports: [CommonModule, SoundPadComponent, ImageSuggestionToastComponent, BulkImageWizardComponent],
   template: `
     <div class="h-full flex flex-col">
       <!-- Header -->
@@ -88,17 +92,72 @@ import { eventMatchesShortcut, PadImage } from '../../core/models';
         </button>
       </div>
     </div>
+
+    <!-- Image Suggestion Toast (single import) -->
+    @if (showImageSuggestion()) {
+      <app-image-suggestion-toast
+        [soundName]="suggestionSoundName"
+        [filename]="suggestionFilename"
+        (accept)="onAcceptSuggestion($event)"
+        (ignore)="onIgnoreSuggestion()"
+      />
+    }
+
+    <!-- Bulk Import Prompt -->
+    @if (showBulkPrompt()) {
+      <div class="fixed bottom-4 right-4 z-50 animate-slide-in-up">
+        <div class="bg-surface border border-border rounded-xl shadow-xl p-4 w-80">
+          <p class="text-sm text-text-primary mb-3">
+            Assign images to {{ pendingBulkPads().length }} imported sounds?
+          </p>
+          <div class="flex gap-2">
+            <button
+              class="flex-1 px-3 py-2 text-sm bg-accent hover:bg-accent/80 text-white rounded transition-colors"
+              (click)="onStartBulkWizard()"
+            >
+              Yes
+            </button>
+            <button
+              class="flex-1 px-3 py-2 text-sm bg-surface-hover hover:bg-border text-text-secondary rounded transition-colors"
+              (click)="onSkipBulkWizard()"
+            >
+              No thanks
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Bulk Image Wizard -->
+    @if (showBulkWizard()) {
+      <app-bulk-image-wizard
+        [pads]="bulkWizardPads()"
+        (selectImage)="onBulkSelectImage($event)"
+        (close)="onBulkWizardClose()"
+      />
+    }
   `,
   styles: []
 })
 export class SoundboardComponent implements OnInit, OnDestroy {
-  constructor(
-    public soundboard: SoundboardService,
-    private shortcutService: ShortcutService
-  ) {}
+  public soundboard = inject(SoundboardService);
+  private shortcutService = inject(ShortcutService);
+  private tauri = inject(TauriService);
+  private imageSearch = inject(ImageSearchService);
 
   isDragging = signal(false);
   dragFileCount = signal(0);
+
+  // State for auto-suggestion
+  showImageSuggestion = signal(false);
+  suggestionSoundName = '';
+  suggestionFilename = '';
+  suggestionPadId = '';
+
+  showBulkWizard = signal(false);
+  bulkWizardPads = signal<SoundPad[]>([]);
+  pendingBulkPads = signal<SoundPad[]>([]);
+  showBulkPrompt = signal(false);
 
   private readonly AUDIO_EXTENSIONS = ['mp3', 'ogg', 'wav', 'flac'];
   private unlistenDragEnter?: () => void;
@@ -155,10 +214,32 @@ export class SoundboardComponent implements OnInit, OnDestroy {
 
         if (audioPaths.length === 0) return;
 
+        // Take snapshot of pads before import
+        const padsBefore = this.soundboard.pads().map(p => ({ id: p.id, soundPath: p.sound?.path }));
+
         const result = await this.soundboard.importSoundsFromPaths(audioPaths);
 
         if (result.errors.length > 0) {
           console.warn(`Imported ${result.imported} files. Failed: ${result.errors.join(', ')}`);
+        }
+
+        // If successful imports, find newly imported pads and trigger suggestion
+        if (result.imported > 0) {
+          const padsAfter = this.soundboard.pads();
+          const newPads = padsAfter.filter(padAfter => {
+            const padBeforeIndex = padsBefore.findIndex(pb => pb.id === padAfter.id);
+            if (padBeforeIndex === -1) return false;
+            const padBefore = padsBefore[padBeforeIndex];
+            return padAfter.sound && padAfter.sound.path !== padBefore.soundPath;
+          });
+
+          if (newPads.length === 1) {
+            // Single import: show toast
+            this.triggerSingleImportSuggestion(newPads[0]);
+          } else if (newPads.length > 1) {
+            // Bulk import: show prompt
+            this.triggerBulkImportSuggestion(newPads);
+          }
         }
       }
     );
@@ -202,10 +283,32 @@ export class SoundboardComponent implements OnInit, OnDestroy {
   }
 
   async importMultiple(): Promise<void> {
+    // Take snapshot of pads before import
+    const padsBefore = this.soundboard.pads().map(p => ({ id: p.id, soundPath: p.sound?.path }));
+
     const result = await this.soundboard.importMultipleSounds();
 
     if (result.errors.length > 0) {
       console.warn(`Imported ${result.imported} files.\nFailed (${result.errors.length}):\n${result.errors.join('\n')}`);
+    }
+
+    // If successful imports, find newly imported pads and trigger suggestion
+    if (result.imported > 0) {
+      const padsAfter = this.soundboard.pads();
+      const newPads = padsAfter.filter(padAfter => {
+        const padBeforeIndex = padsBefore.findIndex(pb => pb.id === padAfter.id);
+        if (padBeforeIndex === -1) return false;
+        const padBefore = padsBefore[padBeforeIndex];
+        return padAfter.sound && padAfter.sound.path !== padBefore.soundPath;
+      });
+
+      if (newPads.length === 1) {
+        // Single import: show toast
+        this.triggerSingleImportSuggestion(newPads[0]);
+      } else if (newPads.length > 1) {
+        // Bulk import: show prompt
+        this.triggerBulkImportSuggestion(newPads);
+      }
     }
   }
 
@@ -230,6 +333,101 @@ export class SoundboardComponent implements OnInit, OnDestroy {
 
   onImageChange(padId: string, image: PadImage | null): void {
     this.soundboard.setPadImage(padId, image);
+  }
+
+  /**
+   * Handle accepting a suggested image from the toast
+   */
+  async onAcceptSuggestion(result: ImageSearchResult): Promise<void> {
+    try {
+      const { data, extension } = await this.imageSearch.downloadImage(result.fullUrl);
+      const localPath = await this.tauri.savePadImage(this.suggestionPadId, data, extension);
+
+      const image: PadImage = {
+        localPath,
+        originalUrl: result.fullUrl,
+        attribution: result.attribution
+      };
+      this.soundboard.setPadImage(this.suggestionPadId, image);
+    } catch (err) {
+      console.error('Failed to save suggested image:', err);
+    } finally {
+      this.showImageSuggestion.set(false);
+    }
+  }
+
+  /**
+   * Handle ignoring the image suggestion
+   */
+  onIgnoreSuggestion(): void {
+    this.showImageSuggestion.set(false);
+  }
+
+  /**
+   * Handle starting the bulk wizard
+   */
+  onStartBulkWizard(): void {
+    this.showBulkPrompt.set(false);
+    this.bulkWizardPads.set(this.pendingBulkPads());
+    this.showBulkWizard.set(true);
+  }
+
+  /**
+   * Handle skipping the bulk wizard
+   */
+  onSkipBulkWizard(): void {
+    this.showBulkPrompt.set(false);
+    this.pendingBulkPads.set([]);
+  }
+
+  /**
+   * Handle selecting an image in the bulk wizard
+   */
+  async onBulkSelectImage(event: { padId: string; image: ImageSearchResult }): Promise<void> {
+    try {
+      const { data, extension } = await this.imageSearch.downloadImage(event.image.fullUrl);
+      const localPath = await this.tauri.savePadImage(event.padId, data, extension);
+
+      const image: PadImage = {
+        localPath,
+        originalUrl: event.image.fullUrl,
+        attribution: event.image.attribution
+      };
+      this.soundboard.setPadImage(event.padId, image);
+    } catch (err) {
+      console.error('Failed to save image:', err);
+    }
+  }
+
+  /**
+   * Handle closing the bulk wizard
+   */
+  onBulkWizardClose(): void {
+    this.showBulkWizard.set(false);
+    this.bulkWizardPads.set([]);
+    this.pendingBulkPads.set([]);
+  }
+
+  /**
+   * Trigger single import suggestion after a sound is imported
+   */
+  private triggerSingleImportSuggestion(pad: SoundPad): void {
+    if (!this.imageSearch.hasApiKey() || !pad.sound) return;
+
+    this.suggestionPadId = pad.id;
+    this.suggestionSoundName = pad.sound.name;
+    this.suggestionFilename = pad.sound.path.split('/').pop() || pad.sound.name;
+    this.showImageSuggestion.set(true);
+  }
+
+  /**
+   * Trigger bulk import suggestion after multiple sounds are imported
+   */
+  private triggerBulkImportSuggestion(importedPads: SoundPad[]): void {
+    if (!this.imageSearch.hasApiKey() || importedPads.length === 0) return;
+
+    this.pendingBulkPads.set(importedPads);
+    this.showBulkPrompt.set(true);
   }
 
 }
