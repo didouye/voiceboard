@@ -187,6 +187,13 @@ pub fn run() {
                                     }),
                                 );
                             }
+                            AudioEngineEvent::SoundFinished { id } => {
+                                tracing::debug!("[AudioEngine] Sound finished: {}", id);
+                                let _ = app_handle.emit(
+                                    "sound-finished",
+                                    serde_json::json!({ "id": id }),
+                                );
+                            }
                         }
                     }
                 }

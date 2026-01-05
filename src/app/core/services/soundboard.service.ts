@@ -2,6 +2,7 @@ import { Injectable, signal, computed } from '@angular/core';
 import { TauriService } from './tauri.service';
 import { SoundFile, SoundPad, Folder } from '../models';
 import { open } from '@tauri-apps/plugin-dialog';
+import { listen } from '@tauri-apps/api/event';
 
 const PAD_COLORS = [
   '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71',
@@ -62,6 +63,21 @@ export class SoundboardService {
     // Load saved state on construction
     this.loadState();
     this.initPreviewListeners();
+    this.initSoundFinishedListener();
+  }
+
+  private async initSoundFinishedListener(): Promise<void> {
+    try {
+      await listen<{ id: string }>('sound-finished', (event) => {
+        const soundId = event.payload.id;
+        // Find the pad that has this sound and mark it as not playing
+        this._pads.update(pads => pads.map(p =>
+          p.sound?.id === soundId ? { ...p, isPlaying: false } : p
+        ));
+      });
+    } catch (e) {
+      console.error('Failed to initialize sound-finished listener:', e);
+    }
   }
 
   private async initPreviewListeners(): Promise<void> {
@@ -414,15 +430,8 @@ export class SoundboardService {
       ));
 
       // Play the sound with pad volume and speed
+      // The backend will emit 'sound-finished' when playback completes
       await this.tauri.playSound(pad.sound.id, pad.sound.path, pad.volume, pad.speed);
-
-      // Auto-stop after duration adjusted for speed (with small buffer)
-      const adjustedDuration = pad.sound.duration / pad.speed;
-      setTimeout(() => {
-        this._pads.update(pads => pads.map(p =>
-          p.id === padId ? { ...p, isPlaying: false } : p
-        ));
-      }, (adjustedDuration + 0.5) * 1000);
 
     } catch (err) {
       this._error.set(err instanceof Error ? err.message : 'Failed to play sound');

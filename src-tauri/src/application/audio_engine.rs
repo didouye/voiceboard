@@ -75,6 +75,8 @@ pub enum AudioEngineEvent {
         output_peak: f32,
         monitoring_rms: f32,
     },
+    /// Sound finished playing naturally
+    SoundFinished { id: String },
 }
 
 /// A sound that is currently playing
@@ -221,6 +223,9 @@ fn run_engine_thread(
     let ring_buffer = Arc::new(Mutex::new(
         None::<(ringbuf::HeapProd<f32>, ringbuf::HeapCons<f32>)>,
     ));
+
+    // Shared list of finished sounds (populated by output callback, consumed by main loop)
+    let finished_sounds: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
 
     // Atomic volume controls (for lock-free access in callbacks)
     let mic_volume = Arc::new(AtomicU32::new(f32::to_bits(1.0)));
@@ -524,6 +529,7 @@ fn run_engine_thread(
                         let output_level_for_callback = output_level.clone();
                         let producer_monitoring_for_output = producer_monitoring.clone();
                         let mic_monitoring_for_output = mic_monitoring.clone();
+                        let finished_sounds_for_callback = finished_sounds.clone();
                         // Input may be mono, output may be stereo - we handle conversion in callback
                         let _input_ch = input_channels;
                         let output_ch = output_channels;
@@ -619,8 +625,16 @@ fn run_engine_thread(
                                         }
                                     }
 
-                                    for id in finished {
-                                        state.playing_sounds.remove(&id);
+                                    // Remove finished sounds and notify
+                                    if !finished.is_empty() {
+                                        if let Ok(mut fs) = finished_sounds_for_callback.try_lock() {
+                                            for id in &finished {
+                                                fs.push(id.clone());
+                                            }
+                                        }
+                                        for id in finished {
+                                            state.playing_sounds.remove(&id);
+                                        }
                                     }
                                 } else {
                                     sounds_mixed = 0;
@@ -1127,6 +1141,13 @@ fn run_engine_thread(
                 // Channel closed, shutdown
                 tracing::info!("Command channel closed, shutting down");
                 return;
+            }
+        }
+
+        // Check for finished sounds and emit events
+        if let Ok(mut fs) = finished_sounds.try_lock() {
+            for id in fs.drain(..) {
+                let _ = event_tx.send(AudioEngineEvent::SoundFinished { id });
             }
         }
     }
