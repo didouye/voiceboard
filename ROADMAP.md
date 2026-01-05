@@ -96,7 +96,7 @@
 
 ---
 
-## Phase 3 - UI/UX Redesign - 55% Complete
+## Phase 3 - UI/UX Redesign - 60% Complete
 
 ### Stack
 - **Tailwind CSS** (Tailwind Plus account available)
@@ -131,6 +131,11 @@
   - Conflict detection (warn if shortcut already used)
   - Global hotkeys (work even when app is not focused)
 
+- [x] **Sound Renaming**
+  - Custom name per sound (editable in pad settings)
+  - Original filename displayed smaller below custom name
+  - Fallback to filename if no custom name set
+
 ### To Do
 - [ ] **Interface Enhancements**
   - Compact / extended mode
@@ -143,11 +148,6 @@
   - Integration with image search APIs (Unsplash, Pexels, or similar)
   - Image cropping/positioning within pad
   - Fallback to icon/color when no image set
-
-- [ ] **Sound Renaming**
-  - Custom name per sound (editable in pad settings)
-  - Original filename displayed smaller below custom name
-  - Fallback to filename if no custom name set
 
 - [ ] **Sound Organization**
   - Folders/categories to organize sounds
