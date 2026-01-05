@@ -10,449 +10,137 @@ import { SoundboardService } from '../../../core/services/soundboard.service';
   imports: [CommonModule, FormsModule],
   template: `
     <div
-      class="sound-pad"
-      [class.has-sound]="pad.sound"
-      [class.playing]="pad.isPlaying"
-      [class.previewing]="isPreviewing"
-      [class.loading]="loading"
+      class="aspect-square rounded-xl cursor-pointer relative overflow-visible transition-all duration-150 flex items-center justify-center group"
+      [class]="padClasses"
       [style.--pad-color]="pad.color"
       (click)="onClick($event)"
       (contextmenu)="onRightClick($event)"
     >
+      <!-- Hotkey badge -->
       @if (hotkey) {
-        <span class="hotkey-badge">{{ hotkey }}</span>
+        <span class="absolute top-2 left-2 px-1.5 py-0.5 bg-black/50 text-white/80 text-[10px] font-semibold rounded font-mono uppercase">
+          {{ hotkey }}
+        </span>
       }
+
       @if (pad.sound) {
-        <div class="pad-content">
-          <span class="sound-name">{{ pad.sound.name }}</span>
-          <span class="sound-duration">{{ formatDuration(pad.sound.duration) }}</span>
+        <!-- Sound content -->
+        <div class="text-center px-2 w-full">
+          <span class="block text-xs font-semibold text-white truncate mb-1 drop-shadow-md">
+            {{ pad.sound.name }}
+          </span>
+          <span class="block text-[10px] text-white/70">
+            {{ formatDuration(pad.sound.duration) }}
+          </span>
         </div>
+
+        <!-- Playing indicator -->
         @if (pad.isPlaying) {
-          <div class="playing-indicator">
-            <span class="bar"></span>
-            <span class="bar"></span>
-            <span class="bar"></span>
+          <div class="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-0.5 items-end h-4">
+            <span class="w-1 bg-white rounded-sm animate-[soundbar_0.4s_ease-in-out_infinite_alternate]" style="height: 8px"></span>
+            <span class="w-1 bg-white rounded-sm animate-[soundbar_0.4s_ease-in-out_infinite_alternate_0.1s]" style="height: 14px"></span>
+            <span class="w-1 bg-white rounded-sm animate-[soundbar_0.4s_ease-in-out_infinite_alternate_0.2s]" style="height: 10px"></span>
           </div>
         }
-        <div class="action-buttons">
-          <button class="action-btn volume-btn"
-                  [class.adjusted]="pad.volume !== 1.0"
-                  (click)="toggleVolumePopup($event)"
-                  title="Volume ({{ Math.round(pad.volume * 100) }}%)">
-            🔊
+
+        <!-- Action buttons -->
+        <div class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] transition-colors"
+            [class]="pad.volume !== 1.0 ? 'bg-status-warning text-black' : 'bg-black/50 text-white hover:bg-accent'"
+            (click)="toggleSettingsPopup($event)"
+            title="Settings"
+          >
+            &#9881;
           </button>
-          <button class="action-btn preview-btn"
-                  [class.active]="isPreviewing"
-                  (click)="onPreview($event)"
-                  [title]="isPreviewing ? 'Stop preview' : 'Preview (system output)'">
-            {{ isPreviewing ? '⏹' : '▶' }}
+          <button
+            class="w-6 h-6 bg-black/50 hover:bg-status-success rounded-full flex items-center justify-center text-[10px] text-white transition-colors"
+            [class.bg-status-info]="isPreviewing"
+            (click)="onPreview($event)"
+            [title]="isPreviewing ? 'Stop preview' : 'Preview'"
+          >
+            {{ isPreviewing ? '&#9632;' : '&#9654;' }}
           </button>
-          <button class="action-btn remove-btn" (click)="onRemove($event)" title="Remove sound">
-            ×
+          <button
+            class="w-6 h-6 bg-black/50 hover:bg-status-error rounded-full flex items-center justify-center text-xs text-white transition-colors"
+            (click)="onRemove($event)"
+            title="Remove"
+          >
+            &times;
           </button>
         </div>
 
-        <!-- Volume & Speed Popup -->
-        @if (showVolumePopup) {
-          <div class="volume-popup" (click)="$event.stopPropagation()">
-            <div class="volume-header">
-              <span>Volume</span>
-              <span class="volume-value">{{ Math.round(pad.volume * 100) }}%</span>
-            </div>
-            <input type="range"
-                   class="volume-slider"
-                   [ngModel]="pad.volume"
-                   (ngModelChange)="onVolumeChange($event)"
-                   min="0"
-                   max="2"
-                   step="0.05">
-            <div class="volume-marks">
-              <span>0%</span>
-              <span>100%</span>
-              <span>200%</span>
+        <!-- Settings popup -->
+        @if (showSettingsPopup) {
+          <div
+            class="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-surface border border-border rounded-lg p-3 min-w-[180px] z-50 shadow-xl"
+            (click)="$event.stopPropagation()"
+          >
+            <!-- Volume -->
+            <div class="mb-3">
+              <div class="flex justify-between items-center mb-2 text-xs">
+                <span class="text-text-secondary">Volume</span>
+                <span class="text-text-primary font-semibold">{{ Math.round(pad.volume * 100) }}%</span>
+              </div>
+              <input
+                type="range"
+                [ngModel]="pad.volume"
+                (ngModelChange)="onVolumeChange($event)"
+                min="0" max="2" step="0.05"
+                class="w-full h-1.5 bg-surface-hover rounded-full appearance-none cursor-pointer
+                       [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3
+                       [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer"
+              >
+              <div class="flex justify-between text-[10px] text-text-muted mt-1">
+                <span>0%</span>
+                <span>100%</span>
+                <span>200%</span>
+              </div>
             </div>
 
-            <div class="speed-section">
-              <div class="speed-header">
-                <span>Speed</span>
-                <span class="speed-value">{{ pad.speed }}x</span>
+            <!-- Speed -->
+            <div class="pt-3 border-t border-border">
+              <div class="flex justify-between items-center mb-2 text-xs">
+                <span class="text-text-secondary">Speed</span>
+                <span class="text-text-primary font-semibold">{{ pad.speed }}x</span>
               </div>
-              <div class="speed-buttons">
+              <div class="flex flex-wrap gap-1">
                 @for (s of speedOptions; track s) {
-                  <button class="speed-btn"
-                          [class.active]="pad.speed === s"
-                          (click)="onSpeedChange(s)">
+                  <button
+                    class="flex-1 min-w-[40px] px-2 py-1 text-[10px] rounded border transition-colors"
+                    [class]="pad.speed === s
+                      ? 'bg-accent border-accent text-white'
+                      : 'bg-surface-hover border-border text-text-secondary hover:text-text-primary'"
+                    (click)="onSpeedChange(s)"
+                  >
                     {{ s }}x
                   </button>
                 }
               </div>
             </div>
 
-            <button class="reset-btn" (click)="resetAll()">Reset to defaults</button>
+            <!-- Reset button -->
+            <button
+              class="w-full mt-3 py-1.5 text-xs text-text-secondary hover:text-text-primary bg-surface-hover hover:bg-border rounded transition-colors"
+              (click)="resetAll()"
+            >
+              Reset to defaults
+            </button>
           </div>
         }
       } @else {
-        <div class="empty-pad">
-          <span class="plus-icon">+</span>
-          <span class="import-text">Import</span>
+        <!-- Empty pad -->
+        <div class="flex flex-col items-center text-text-muted group-hover:text-text-secondary transition-colors">
+          <span class="text-3xl font-light">+</span>
+          <span class="text-[10px] uppercase tracking-wide">Import</span>
         </div>
       }
     </div>
   `,
   styles: [`
-    :host {
-      position: relative;
-      z-index: 1;
-    }
-
-    :host.popup-open {
-      z-index: 100;
-    }
-
-    .sound-pad {
-      --pad-color: #7b2cbf;
-      aspect-ratio: 1;
-      background: linear-gradient(145deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
-      border: 2px solid rgba(255, 255, 255, 0.1);
-      border-radius: 12px;
-      cursor: pointer;
-      position: relative;
-      overflow: visible;
-      transition: all 0.2s ease;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .sound-pad:hover {
-      border-color: rgba(255, 255, 255, 0.25);
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    }
-
-    .sound-pad:active {
-      transform: translateY(0);
-    }
-
-    .sound-pad.has-sound {
-      background: linear-gradient(145deg, var(--pad-color), color-mix(in srgb, var(--pad-color) 70%, black));
-      border-color: var(--pad-color);
-    }
-
-    .sound-pad.has-sound:hover {
-      box-shadow: 0 4px 20px color-mix(in srgb, var(--pad-color) 50%, transparent);
-    }
-
-    .sound-pad.playing {
-      animation: pulse 0.5s ease-in-out infinite alternate;
-      border-color: #fff;
-    }
-
-    .sound-pad.loading {
-      opacity: 0.5;
-      pointer-events: none;
-    }
-
-    @keyframes pulse {
-      from { box-shadow: 0 0 10px var(--pad-color); }
-      to { box-shadow: 0 0 25px var(--pad-color); }
-    }
-
-    .pad-content {
-      text-align: center;
-      padding: 10px;
-      width: 100%;
-    }
-
-    .sound-name {
-      display: block;
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: #fff;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      margin-bottom: 4px;
-      text-shadow: 0 1px 2px rgba(0,0,0,0.3);
-    }
-
-    .sound-duration {
-      display: block;
-      font-size: 0.7rem;
-      color: rgba(255,255,255,0.7);
-    }
-
-    .playing-indicator {
-      position: absolute;
-      bottom: 8px;
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      gap: 3px;
-      align-items: flex-end;
-      height: 16px;
-    }
-
-    .bar {
-      width: 4px;
-      background: #fff;
-      border-radius: 2px;
-      animation: soundbar 0.4s ease-in-out infinite alternate;
-    }
-
-    .bar:nth-child(1) { animation-delay: 0s; height: 8px; }
-    .bar:nth-child(2) { animation-delay: 0.1s; height: 14px; }
-    .bar:nth-child(3) { animation-delay: 0.2s; height: 10px; }
-
     @keyframes soundbar {
       from { height: 4px; }
       to { height: 16px; }
-    }
-
-    .action-buttons {
-      position: absolute;
-      top: 4px;
-      right: 4px;
-      display: flex;
-      gap: 4px;
-      opacity: 0;
-      transition: opacity 0.2s;
-    }
-
-    .sound-pad:hover .action-buttons {
-      opacity: 1;
-    }
-
-    .action-btn {
-      width: 20px;
-      height: 20px;
-      background: rgba(0,0,0,0.5);
-      border: none;
-      border-radius: 50%;
-      color: #fff;
-      font-size: 10px;
-      line-height: 1;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: background 0.2s;
-    }
-
-    .volume-btn:hover {
-      background: #3498db;
-    }
-
-    .volume-btn.adjusted {
-      background: #f39c12;
-    }
-
-    .preview-btn:hover {
-      background: #27ae60;
-    }
-
-    .preview-btn.active {
-      background: #00d4ff;
-      color: #000;
-    }
-
-    .remove-btn:hover {
-      background: #e74c3c;
-    }
-
-    .sound-pad.previewing {
-      animation: preview-pulse 1s ease-in-out infinite;
-      border-color: #00d4ff;
-    }
-
-    @keyframes preview-pulse {
-      0%, 100% {
-        box-shadow: 0 0 8px rgba(0, 212, 255, 0.4);
-      }
-      50% {
-        box-shadow: 0 0 16px rgba(0, 212, 255, 0.7);
-      }
-    }
-
-    .empty-pad {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      color: rgba(255,255,255,0.3);
-    }
-
-    .plus-icon {
-      font-size: 2rem;
-      font-weight: 300;
-    }
-
-    .import-text {
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    .sound-pad:hover .empty-pad {
-      color: rgba(255,255,255,0.6);
-    }
-
-    .hotkey-badge {
-      position: absolute;
-      top: 4px;
-      left: 4px;
-      background: rgba(0, 0, 0, 0.6);
-      color: rgba(255, 255, 255, 0.8);
-      font-size: 0.65rem;
-      font-weight: 600;
-      padding: 2px 5px;
-      border-radius: 3px;
-      text-transform: uppercase;
-      font-family: monospace;
-    }
-
-    .sound-pad.has-sound .hotkey-badge {
-      background: rgba(0, 0, 0, 0.4);
-    }
-
-    /* Volume Popup Styles */
-    .volume-popup {
-      position: absolute;
-      top: 100%;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #1a1a2e;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: 8px;
-      padding: 12px;
-      min-width: 160px;
-      z-index: 100;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-      margin-top: 4px;
-    }
-
-    .volume-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 8px;
-      font-size: 0.75rem;
-      color: rgba(255, 255, 255, 0.8);
-    }
-
-    .volume-value {
-      font-weight: 600;
-      color: #fff;
-    }
-
-    .volume-slider {
-      width: 100%;
-      height: 6px;
-      -webkit-appearance: none;
-      appearance: none;
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 3px;
-      outline: none;
-      cursor: pointer;
-    }
-
-    .volume-slider::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 14px;
-      height: 14px;
-      background: #fff;
-      border-radius: 50%;
-      cursor: pointer;
-      transition: transform 0.1s;
-    }
-
-    .volume-slider::-webkit-slider-thumb:hover {
-      transform: scale(1.2);
-    }
-
-    .volume-slider::-moz-range-thumb {
-      width: 14px;
-      height: 14px;
-      background: #fff;
-      border-radius: 50%;
-      cursor: pointer;
-      border: none;
-    }
-
-    .volume-marks {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.6rem;
-      color: rgba(255, 255, 255, 0.4);
-      margin-top: 4px;
-    }
-
-    .speed-section {
-      margin-top: 12px;
-      padding-top: 12px;
-      border-top: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    .speed-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 8px;
-      font-size: 0.75rem;
-      color: rgba(255, 255, 255, 0.8);
-    }
-
-    .speed-value {
-      font-weight: 600;
-      color: #fff;
-    }
-
-    .speed-buttons {
-      display: flex;
-      gap: 4px;
-      flex-wrap: wrap;
-    }
-
-    .speed-btn {
-      flex: 1;
-      min-width: 40px;
-      padding: 4px 6px;
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: 4px;
-      color: rgba(255, 255, 255, 0.7);
-      font-size: 0.65rem;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .speed-btn:hover {
-      background: rgba(255, 255, 255, 0.2);
-      color: #fff;
-    }
-
-    .speed-btn.active {
-      background: #3498db;
-      border-color: #3498db;
-      color: #fff;
-    }
-
-    .reset-btn {
-      width: 100%;
-      margin-top: 8px;
-      padding: 4px 8px;
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: 4px;
-      color: rgba(255, 255, 255, 0.7);
-      font-size: 0.7rem;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .reset-btn:hover {
-      background: rgba(255, 255, 255, 0.2);
-      color: #fff;
     }
   `]
 })
@@ -469,17 +157,44 @@ export class SoundPadComponent {
   @Output() volumeChange = new EventEmitter<number>();
   @Output() speedChange = new EventEmitter<number>();
 
-  @HostBinding('class.popup-open') showVolumePopup = false;
-  Math = Math; // Expose Math to template
+  @HostBinding('class') hostClass = 'relative';
+  @HostBinding('class.z-50') get isPopupOpen() { return this.showSettingsPopup; }
+
+  showSettingsPopup = false;
+  Math = Math;
   speedOptions = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
   constructor(private soundboardService: SoundboardService) {}
 
-  @HostListener('document:click', ['$event'])
-  onDocumentClick(event: MouseEvent): void {
-    // Close popup when clicking outside
-    if (this.showVolumePopup) {
-      this.showVolumePopup = false;
+  get padClasses(): string {
+    const base = 'border-2';
+
+    if (!this.pad.sound) {
+      return `${base} border-dashed border-white/10 bg-white/5 hover:border-white/25 hover:bg-white/10`;
+    }
+
+    let classes = `${base} border-[var(--pad-color)] hover:scale-[1.02] hover:glow-subtle`;
+    classes += ` bg-gradient-to-br from-[var(--pad-color)] to-[color-mix(in_srgb,var(--pad-color)_70%,black)]`;
+
+    if (this.pad.isPlaying) {
+      classes += ' animate-glow-pulse border-white';
+    }
+
+    if (this.isPreviewing) {
+      classes += ' border-status-info';
+    }
+
+    if (this.loading) {
+      classes += ' opacity-50 pointer-events-none';
+    }
+
+    return classes;
+  }
+
+  @HostListener('document:click')
+  onDocumentClick(): void {
+    if (this.showSettingsPopup) {
+      this.showSettingsPopup = false;
     }
   }
 
@@ -493,9 +208,6 @@ export class SoundPadComponent {
 
   onRightClick(event: MouseEvent): void {
     event.preventDefault();
-    if (this.pad.sound) {
-      // Could show context menu in future
-    }
   }
 
   onPreview(event: MouseEvent): void {
@@ -508,9 +220,9 @@ export class SoundPadComponent {
     this.remove.emit();
   }
 
-  toggleVolumePopup(event: MouseEvent): void {
+  toggleSettingsPopup(event: MouseEvent): void {
     event.stopPropagation();
-    this.showVolumePopup = !this.showVolumePopup;
+    this.showSettingsPopup = !this.showSettingsPopup;
   }
 
   onVolumeChange(volume: number): void {
