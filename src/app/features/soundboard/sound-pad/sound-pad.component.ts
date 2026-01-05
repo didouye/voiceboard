@@ -72,111 +72,6 @@ import { ShortcutService } from '../../../core/services/shortcut.service';
             &times;
           </button>
         </div>
-
-        <!-- Settings modal (centered) -->
-        @if (showSettingsPopup) {
-          <div
-            class="fixed inset-0 z-50 flex items-center justify-center animate-fade-in"
-            (click)="closePopup($event)"
-          >
-            <!-- Dark backdrop -->
-            <div class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
-
-            <!-- Modal content -->
-            <div
-              class="relative bg-surface border border-border rounded-xl p-4 w-[280px] shadow-xl"
-              (click)="$event.stopPropagation()"
-            >
-              <!-- Header -->
-              <div class="flex items-center justify-between mb-4">
-                <h3 class="text-sm font-semibold text-text-primary truncate">{{ pad.sound.name }}</h3>
-                <button
-                  class="w-6 h-6 flex items-center justify-center rounded hover:bg-surface-hover text-text-secondary hover:text-text-primary transition-colors"
-                  (click)="closePopup($event)"
-                >
-                  &#10005;
-                </button>
-              </div>
-
-              <!-- Volume -->
-              <div class="mb-4">
-                <div class="flex justify-between items-center mb-2 text-xs">
-                  <span class="text-text-secondary">Volume</span>
-                  <span class="text-text-primary font-semibold">{{ Math.round(pad.volume * 100) }}%</span>
-                </div>
-                <input
-                  type="range"
-                  [ngModel]="pad.volume"
-                  (ngModelChange)="onVolumeChange($event)"
-                  min="0" max="2" step="0.05"
-                  class="w-full h-1.5 bg-surface-hover rounded-full appearance-none cursor-pointer
-                         [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3
-                         [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer"
-                >
-                <div class="flex justify-between text-[10px] text-text-muted mt-1">
-                  <span>0%</span>
-                  <span>100%</span>
-                  <span>200%</span>
-                </div>
-              </div>
-
-              <!-- Speed -->
-              <div class="mb-4 pt-4 border-t border-border">
-                <div class="flex justify-between items-center mb-2 text-xs">
-                  <span class="text-text-secondary">Speed</span>
-                  <span class="text-text-primary font-semibold">{{ pad.speed }}x</span>
-                </div>
-                <div class="flex flex-wrap gap-1">
-                  @for (s of speedOptions; track s) {
-                    <button
-                      class="flex-1 min-w-[40px] px-2 py-1.5 text-xs rounded border transition-colors"
-                      [class]="pad.speed === s
-                        ? 'bg-accent border-accent text-white'
-                        : 'bg-surface-hover border-border text-text-secondary hover:text-text-primary'"
-                      (click)="onSpeedChange(s)"
-                    >
-                      {{ s }}x
-                    </button>
-                  }
-                </div>
-              </div>
-
-              <!-- Shortcut -->
-              <div class="mb-4 pt-4 border-t border-border">
-                <div class="flex justify-between items-center mb-2 text-xs">
-                  <span class="text-text-secondary">Shortcut</span>
-                </div>
-                <div class="flex gap-1">
-                  <button
-                    class="flex-1 px-3 py-2 text-xs rounded border transition-colors text-left"
-                    [class]="isRecording
-                      ? 'bg-accent border-accent text-white animate-pulse'
-                      : 'bg-surface-hover border-border text-text-primary hover:border-text-muted'"
-                    (click)="startRecording($event)"
-                  >
-                    {{ isRecording ? 'Press keys...' : (pad.hotkey || 'Click to set') }}
-                  </button>
-                  @if (pad.hotkey) {
-                    <button
-                      class="px-2 text-text-muted hover:text-status-error transition-colors"
-                      (click)="clearShortcut($event)"
-                      title="Clear shortcut"
-                    >&times;</button>
-                  }
-                </div>
-                <p class="text-[10px] text-text-muted mt-1">Use Ctrl, Alt, Shift or Cmd + key</p>
-              </div>
-
-              <!-- Reset button -->
-              <button
-                class="w-full py-2 text-xs text-text-secondary hover:text-text-primary bg-surface-hover hover:bg-border rounded transition-colors"
-                (click)="resetAll()"
-              >
-                Reset to defaults
-              </button>
-            </div>
-          </div>
-        }
       } @else {
         <!-- Empty pad -->
         <div class="flex flex-col items-center text-text-muted group-hover:text-text-secondary transition-colors">
@@ -185,6 +80,113 @@ import { ShortcutService } from '../../../core/services/shortcut.service';
         </div>
       }
     </div>
+
+    <!-- Settings modal (outside pad div to avoid transform issues with fixed positioning) -->
+    @if (showSettingsPopup && pad.sound) {
+      <div
+        class="fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-150"
+        [class]="modalVisible ? 'opacity-100' : 'opacity-0'"
+        (click)="closePopup($event)"
+      >
+        <!-- Dark backdrop -->
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+
+        <!-- Modal content -->
+        <div
+          class="relative bg-surface border border-border rounded-xl p-4 w-[280px] shadow-xl transition-all duration-150"
+          [class]="modalVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'"
+          (click)="$event.stopPropagation()"
+        >
+          <!-- Header -->
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-sm font-semibold text-text-primary truncate">{{ pad.sound.name }}</h3>
+            <button
+              class="w-6 h-6 flex items-center justify-center rounded hover:bg-surface-hover text-text-secondary hover:text-text-primary transition-colors"
+              (click)="closePopup($event)"
+            >
+              &#10005;
+            </button>
+          </div>
+
+          <!-- Volume -->
+          <div class="mb-4">
+            <div class="flex justify-between items-center mb-2 text-xs">
+              <span class="text-text-secondary">Volume</span>
+              <span class="text-text-primary font-semibold">{{ Math.round(pad.volume * 100) }}%</span>
+            </div>
+            <input
+              type="range"
+              [ngModel]="pad.volume"
+              (ngModelChange)="onVolumeChange($event)"
+              min="0" max="2" step="0.05"
+              class="w-full h-1.5 bg-surface-hover rounded-full appearance-none cursor-pointer
+                     [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3
+                     [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer"
+            >
+            <div class="flex justify-between text-[10px] text-text-muted mt-1">
+              <span>0%</span>
+              <span>100%</span>
+              <span>200%</span>
+            </div>
+          </div>
+
+          <!-- Speed -->
+          <div class="mb-4 pt-4 border-t border-border">
+            <div class="flex justify-between items-center mb-2 text-xs">
+              <span class="text-text-secondary">Speed</span>
+              <span class="text-text-primary font-semibold">{{ pad.speed }}x</span>
+            </div>
+            <div class="flex flex-wrap gap-1">
+              @for (s of speedOptions; track s) {
+                <button
+                  class="flex-1 min-w-[40px] px-2 py-1.5 text-xs rounded border transition-colors"
+                  [class]="pad.speed === s
+                    ? 'bg-accent border-accent text-white'
+                    : 'bg-surface-hover border-border text-text-secondary hover:text-text-primary'"
+                  (click)="onSpeedChange(s)"
+                >
+                  {{ s }}x
+                </button>
+              }
+            </div>
+          </div>
+
+          <!-- Shortcut -->
+          <div class="mb-4 pt-4 border-t border-border">
+            <div class="flex justify-between items-center mb-2 text-xs">
+              <span class="text-text-secondary">Shortcut</span>
+            </div>
+            <div class="flex gap-1">
+              <button
+                class="flex-1 px-3 py-2 text-xs rounded border transition-colors text-left"
+                [class]="isRecording
+                  ? 'bg-accent border-accent text-white animate-pulse'
+                  : 'bg-surface-hover border-border text-text-primary hover:border-text-muted'"
+                (click)="startRecording($event)"
+              >
+                {{ isRecording ? 'Press keys...' : (pad.hotkey || 'Click to set') }}
+              </button>
+              @if (pad.hotkey) {
+                <button
+                  class="px-2 text-text-muted hover:text-status-error transition-colors"
+                  (click)="clearShortcut($event)"
+                  title="Clear shortcut"
+                >&times;</button>
+              }
+            </div>
+            <p class="text-[10px] text-text-muted mt-1">Use Ctrl, Alt, Shift or Cmd + key</p>
+          </div>
+
+          <!-- Reset button -->
+          <button
+            class="w-full py-2 text-xs text-text-secondary hover:text-text-primary bg-surface-hover hover:bg-border rounded transition-colors"
+            (click)="resetAll()"
+          >
+            Reset to defaults
+          </button>
+        </div>
+      </div>
+    }
   `,
   styles: [`
     @keyframes soundbar {
@@ -211,6 +213,7 @@ export class SoundPadComponent {
   @HostBinding('class.z-50') get isPopupOpen() { return this.showSettingsPopup; }
 
   showSettingsPopup = false;
+  modalVisible = false;
   isRecording = false;
   Math = Math;
   speedOptions = [0.5, 0.75, 1, 1.25, 1.5, 2];
@@ -302,13 +305,27 @@ export class SoundPadComponent {
 
   toggleSettingsPopup(event: MouseEvent): void {
     event.stopPropagation();
-    this.showSettingsPopup = !this.showSettingsPopup;
+    if (!this.showSettingsPopup) {
+      // Opening: show structure first, then fade in after a tick
+      this.showSettingsPopup = true;
+      this.modalVisible = false;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          this.modalVisible = true;
+        });
+      });
+    } else {
+      // Closing
+      this.showSettingsPopup = false;
+      this.modalVisible = false;
+    }
   }
 
   closePopup(event: MouseEvent): void {
     event.stopPropagation();
     event.preventDefault();
     this.showSettingsPopup = false;
+    this.modalVisible = false;
     this.isRecording = false;
   }
 
