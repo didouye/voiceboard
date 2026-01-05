@@ -20,6 +20,9 @@ interface UpdateInfo {
   standalone: true,
   imports: [MixerComponent, ToastComponent, DebugConsoleComponent, SetupWizardComponent],
   template: `
+    <!-- Grain overlay -->
+    <div class="grain-overlay"></div>
+
     @if (showSetupWizard()) {
       <app-setup-wizard (completed)="onSetupCompleted($event)" />
     } @else {
@@ -30,8 +33,7 @@ interface UpdateInfo {
   `,
   styles: [`
     :host {
-      display: block;
-      min-height: 100vh;
+      @apply block min-h-screen;
     }
   `]
 })
