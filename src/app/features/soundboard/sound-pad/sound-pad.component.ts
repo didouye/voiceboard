@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { SoundPad } from '../../../core/models';
 import { SoundboardService } from '../../../core/services/soundboard.service';
+import { ShortcutService } from '../../../core/services/shortcut.service';
 
 @Component({
   selector: 'app-sound-pad',
@@ -119,6 +120,32 @@ import { SoundboardService } from '../../../core/services/soundboard.service';
               </div>
             </div>
 
+            <!-- Shortcut -->
+            <div class="pt-3 border-t border-border">
+              <div class="flex justify-between items-center mb-2 text-xs">
+                <span class="text-text-secondary">Shortcut</span>
+              </div>
+              <div class="flex gap-1">
+                <button
+                  class="flex-1 px-3 py-1.5 text-xs rounded border transition-colors text-left"
+                  [class]="isRecording
+                    ? 'bg-accent border-accent text-white animate-pulse'
+                    : 'bg-surface-hover border-border text-text-primary hover:border-text-muted'"
+                  (click)="startRecording($event)"
+                  (keydown)="onRecordKeydown($event)"
+                >
+                  {{ isRecording ? 'Press keys...' : (pad.hotkey || 'Click to set') }}
+                </button>
+                @if (pad.hotkey) {
+                  <button
+                    class="px-2 text-text-muted hover:text-status-error transition-colors"
+                    (click)="clearShortcut($event)"
+                    title="Clear shortcut"
+                  >&times;</button>
+                }
+              </div>
+            </div>
+
             <!-- Reset button -->
             <button
               class="w-full mt-3 py-1.5 text-xs text-text-secondary hover:text-text-primary bg-surface-hover hover:bg-border rounded transition-colors"
@@ -156,15 +183,20 @@ export class SoundPadComponent {
   @Output() remove = new EventEmitter<void>();
   @Output() volumeChange = new EventEmitter<number>();
   @Output() speedChange = new EventEmitter<number>();
+  @Output() shortcutChange = new EventEmitter<string | null>();
 
   @HostBinding('class') hostClass = 'relative';
   @HostBinding('class.z-50') get isPopupOpen() { return this.showSettingsPopup; }
 
   showSettingsPopup = false;
+  isRecording = false;
   Math = Math;
   speedOptions = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
-  constructor(private soundboardService: SoundboardService) {}
+  constructor(
+    private soundboardService: SoundboardService,
+    private shortcutService: ShortcutService
+  ) {}
 
   get padClasses(): string {
     const base = 'border-2';
@@ -236,6 +268,43 @@ export class SoundPadComponent {
   resetAll(): void {
     this.volumeChange.emit(1.0);
     this.speedChange.emit(1.0);
+  }
+
+  startRecording(event: MouseEvent): void {
+    event.stopPropagation();
+    this.isRecording = true;
+  }
+
+  onRecordKeydown(event: KeyboardEvent): void {
+    if (!this.isRecording) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const shortcut = this.shortcutService.formatEventAsShortcut(event);
+    if (!shortcut) return; // Ignore modifier-only presses
+
+    this.isRecording = false;
+
+    // Check for conflicts
+    const conflictPadId = this.shortcutService.checkConflict(shortcut, this.pad.id);
+    if (conflictPadId) {
+      const pads = this.soundboardService.pads();
+      const conflictPad = pads.find(p => p.id === conflictPadId);
+      const conflictName = conflictPad?.sound?.name || conflictPadId;
+
+      if (!confirm(`"${shortcut}" is already assigned to "${conflictName}". Replace?`)) {
+        return;
+      }
+      // User confirmed replacement - the old pad will lose its shortcut
+    }
+
+    this.shortcutChange.emit(shortcut);
+  }
+
+  clearShortcut(event: MouseEvent): void {
+    event.stopPropagation();
+    this.shortcutChange.emit(null);
   }
 
   formatDuration(seconds: number): string {
