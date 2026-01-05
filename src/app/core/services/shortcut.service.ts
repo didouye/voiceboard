@@ -137,12 +137,19 @@ export class ShortcutService implements OnDestroy {
   }
 
   /**
-   * Format a keyboard event as a shortcut string for recording
+   * Format a keyboard event as a shortcut string for recording.
+   * Requires at least one modifier key (Ctrl, Alt, Shift, Meta/Cmd).
    */
   formatEventAsShortcut(event: KeyboardEvent): string | null {
     if (isModifierKey(event.key)) {
       return null; // Don't record modifier-only presses
     }
+
+    // Require at least one modifier key
+    if (!event.ctrlKey && !event.altKey && !event.shiftKey && !event.metaKey) {
+      return null; // No modifiers pressed - invalid shortcut
+    }
+
     const shortcut = shortcutFromEvent(event);
     return formatShortcut(shortcut);
   }

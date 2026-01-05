@@ -6,8 +6,6 @@ import { SoundPadComponent } from './sound-pad/sound-pad.component';
 import { listen, TauriEvent } from '@tauri-apps/api/event';
 import { eventMatchesShortcut } from '../../core/models';
 
-const DEFAULT_HOTKEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '='];
-
 @Component({
   selector: 'app-soundboard',
   standalone: true,
@@ -188,31 +186,15 @@ export class SoundboardComponent implements OnInit, OnDestroy {
         }
       }
     }
-
-    // Fallback to default hotkeys (no modifiers, for backwards compatibility)
-    if (!event.ctrlKey && !event.altKey && !event.shiftKey && !event.metaKey) {
-      const padIndex = pads.findIndex(p => {
-        const defaultHotkey = DEFAULT_HOTKEYS[pads.indexOf(p)];
-        return !p.hotkey && defaultHotkey === event.key;
-      });
-
-      if (padIndex >= 0) {
-        const pad = pads[padIndex];
-        if (pad.sound) {
-          event.preventDefault();
-          this.soundboard.playSound(pad.id);
-        }
-      }
-    }
   }
 
   /**
-   * Get the display hotkey for a pad
+   * Get the display hotkey for a pad (only custom hotkeys, no defaults)
    */
   getHotkey(padIndex: number): string | undefined {
     const pads = this.soundboard.pads();
     if (padIndex < pads.length) {
-      return pads[padIndex].hotkey || DEFAULT_HOTKEYS[padIndex];
+      return pads[padIndex].hotkey;
     }
     return undefined;
   }
