@@ -505,7 +505,10 @@ export class SoundPadComponent implements OnInit, OnChanges {
 
   onRemove(event: MouseEvent): void {
     event.stopPropagation();
-    this.remove.emit();
+    const soundName = this.pad.customName || this.pad.sound?.name || 'this sound';
+    if (confirm(`Supprimer "${soundName}" ?`)) {
+      this.remove.emit();
+    }
   }
 
   toggleSettingsPopup(event: MouseEvent): void {
