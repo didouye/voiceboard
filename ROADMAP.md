@@ -329,6 +329,15 @@
   - Reduce CPU usage during idle
   - Optimize ring buffer size based on latency requirements
 
+### Hardware Integration
+- [ ] **Stream Deck Support**
+  - Official Elgato Stream Deck plugin
+  - Trigger sounds from physical buttons
+  - Display pad name/icon on Stream Deck LCD
+  - Show playing state (button glow/animation)
+  - Actions: Play sound, Stop sound, Stop all, Toggle mixing
+  - Multi-action support (play multiple sounds)
+
 ### Advanced Features
 - [ ] **Team Synchronized Sound Playback**
   - Alternative to sending sounds through virtual microphone
