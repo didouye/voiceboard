@@ -8,7 +8,7 @@ use crate::domain::{
 };
 use crate::ports::DeviceManager;
 use serde::{Deserialize, Serialize};
-use tauri::State;
+use tauri::{Emitter, State};
 use tauri_plugin_store::StoreExt;
 
 /// Settings store key
@@ -1251,6 +1251,9 @@ pub fn set_debug_mode(app: tauri::AppHandle, enabled: bool) -> Result<(), String
     let store = app.store(DEBUG_STORE).map_err(|e| e.to_string())?;
     store.set(DEBUG_MODE_KEY, serde_json::json!(enabled));
     store.save().map_err(|e| e.to_string())?;
+
+    // Emit event to update frontend UI
+    let _ = app.emit("debug-mode-changed", enabled);
 
     tracing::info!(enabled = enabled, "Debug mode toggled");
     Ok(())
