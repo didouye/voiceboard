@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TauriService } from '../../../core/services/tauri.service';
 import { MixerService } from '../../../core/services/mixer.service';
+import { ShortcutService } from '../../../core/services/shortcut.service';
 import { AudioDevice, AppSettings } from '../../../core/models';
 
 @Component({
@@ -160,6 +161,28 @@ import { AudioDevice, AppSettings } from '../../../core/models';
               </button>
             </div>
           </div>
+
+          <!-- Keyboard Section -->
+          <div class="pt-6 border-t border-border">
+            <h3 class="text-xs font-semibold text-text-muted uppercase tracking-wider mb-4">Keyboard</h3>
+
+            <div class="flex items-center justify-between py-3 px-4 bg-background rounded-lg">
+              <div>
+                <span class="text-sm text-text-primary">Global Hotkeys</span>
+                <p class="text-xs text-text-muted mt-0.5">Trigger sounds when app is in background</p>
+              </div>
+              <button
+                class="w-12 h-6 rounded-full transition-colors relative"
+                [class]="globalHotkeysEnabled() ? 'bg-accent' : 'bg-surface'"
+                (click)="toggleGlobalHotkeys()"
+              >
+                <div
+                  class="absolute top-1 w-4 h-4 bg-white rounded-full transition-transform"
+                  [class]="globalHotkeysEnabled() ? 'left-7' : 'left-1'"
+                ></div>
+              </button>
+            </div>
+          </div>
         }
       </div>
     </div>
@@ -197,11 +220,15 @@ export class SettingsPopupComponent implements OnInit {
   readonly micVolume = this._micVolume.asReadonly();
   readonly micMuted = this._micMuted.asReadonly();
 
+  // Global hotkeys enabled state
+  readonly globalHotkeysEnabled = computed(() => this.shortcutService.enabled());
+
   Math = Math;
 
   constructor(
     private tauri: TauriService,
-    private mixer: MixerService
+    private mixer: MixerService,
+    private shortcutService: ShortcutService
   ) {}
 
   async ngOnInit(): Promise<void> {
@@ -275,6 +302,15 @@ export class SettingsPopupComponent implements OnInit {
     const newValue = !this.micMonitoring();
     await this.tauri.setMicMonitoring(newValue);
     await this.updateSettingsLocal('micMonitoring', newValue);
+  }
+
+  async toggleGlobalHotkeys(): Promise<void> {
+    const newValue = !this.globalHotkeysEnabled();
+    try {
+      await this.shortcutService.setEnabled(newValue);
+    } catch (err) {
+      console.error('Failed to toggle global hotkeys:', err);
+    }
   }
 
   private async updateSettingsLocal(key: string, value: unknown): Promise<void> {
