@@ -57,11 +57,14 @@ interface AudioLevels {
           <span class="text-sm">&#127911;</span>
           <span class="text-xs text-text-secondary truncate flex-1">{{ previewDeviceName() }}</span>
           <span class="flex items-center gap-1">
-            <span class="w-2 h-2 rounded-full bg-text-muted"></span>
-            <span class="text-[10px] text-text-muted">Ready</span>
+            <span class="w-2 h-2 rounded-full bg-status-info"></span>
+            <span class="text-[10px] text-text-muted">Monitor</span>
           </span>
         </div>
-        <app-vu-meter [level]="0" />
+        <!-- Preview doesn't have VU meter - it's a local monitor output -->
+        <div class="h-1.5 bg-surface rounded-full flex items-center justify-center">
+          <span class="text-[8px] text-text-muted">Local preview only</span>
+        </div>
       </div>
     </div>
   `,

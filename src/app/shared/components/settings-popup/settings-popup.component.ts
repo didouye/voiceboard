@@ -160,17 +160,6 @@ import { AudioDevice, AppSettings } from '../../../core/models';
               </button>
             </div>
           </div>
-
-          <!-- Start/Stop Button -->
-          <button
-            class="w-full py-4 rounded-lg font-semibold text-white transition-all"
-            [class]="isRunning()
-              ? 'bg-accent-hot hover:bg-accent-hot/80 animate-glow-pulse'
-              : 'bg-accent hover:bg-accent-glow'"
-            (click)="toggleMixing()"
-          >
-            {{ isRunning() ? '&#9632; STOP MIXING' : '&#9654; START MIXING' }}
-          </button>
         }
       </div>
     </div>
@@ -201,7 +190,6 @@ export class SettingsPopupComponent implements OnInit {
 
   // Mixer state from service
   readonly masterVolume = computed(() => this.mixer.masterVolume());
-  readonly isRunning = computed(() => this.mixer.isRunning());
 
   // Local state for mic controls (not persisted)
   private _micVolume = signal(1.0);
@@ -246,7 +234,7 @@ export class SettingsPopupComponent implements OnInit {
     const deviceId = select.value || null;
     await this.tauri.setInputDevice(deviceId);
     await this.updateSettingsLocal('inputDeviceId', deviceId);
-    await this.mixer.restartIfRunning();
+    await this.mixer.startOrRestartWithDevices();
   }
 
   async onOutputChange(event: Event): Promise<void> {
@@ -254,7 +242,7 @@ export class SettingsPopupComponent implements OnInit {
     const deviceId = select.value || null;
     await this.tauri.setOutputDevice(deviceId);
     await this.updateSettingsLocal('outputDeviceId', deviceId);
-    await this.mixer.restartIfRunning();
+    await this.mixer.startOrRestartWithDevices();
   }
 
   async onPreviewChange(event: Event): Promise<void> {
@@ -287,14 +275,6 @@ export class SettingsPopupComponent implements OnInit {
     const newValue = !this.micMonitoring();
     await this.tauri.setMicMonitoring(newValue);
     await this.updateSettingsLocal('micMonitoring', newValue);
-  }
-
-  async toggleMixing(): Promise<void> {
-    if (this.isRunning()) {
-      await this.mixer.stop();
-    } else {
-      await this.mixer.start();
-    }
   }
 
   private async updateSettingsLocal(key: string, value: unknown): Promise<void> {

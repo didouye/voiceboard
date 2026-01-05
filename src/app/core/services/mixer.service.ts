@@ -213,6 +213,41 @@ export class MixerService {
   }
 
   /**
+   * Start or restart mixing when devices are configured
+   * Called after device selection changes - automatically starts if both devices are set
+   */
+  async startOrRestartWithDevices(): Promise<void> {
+    try {
+      const settings = await this.tauri.loadSettings();
+      const hasInput = !!settings.audio.inputDeviceId;
+      const hasOutput = !!settings.audio.outputDeviceId;
+
+      if (!hasInput || !hasOutput) {
+        console.log('[MixerService] Cannot start: missing input or output device');
+        // Stop if running with incomplete config
+        if (this._isRunning()) {
+          await this.stop();
+        }
+        return;
+      }
+
+      // Both devices configured - start or restart
+      if (this._isRunning()) {
+        console.log('[MixerService] Restarting mixer with new devices...');
+        await this.tauri.stopMixing();
+      }
+
+      console.log('[MixerService] Starting mixer...');
+      await this.tauri.startMixing();
+      this._isRunning.set(true);
+      console.log('[MixerService] Mixer started successfully');
+    } catch (err) {
+      this._error.set(err instanceof Error ? err.message : 'Failed to start/restart mixer');
+      this._isRunning.set(false);
+    }
+  }
+
+  /**
    * Clear the current error
    */
   clearError(): void {
