@@ -19,7 +19,7 @@ import { AudioDevice, AppSettings } from '../../../core/models';
 
       <!-- Modal -->
       <div
-        class="relative bg-surface border border-border rounded-xl p-6 w-full max-w-md animate-scale-in"
+        class="relative bg-surface border border-border rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto animate-scale-in"
         (click)="$event.stopPropagation()"
       >
         <!-- Header -->
