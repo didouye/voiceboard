@@ -115,7 +115,12 @@ impl PreviewEngine {
         let preview_level_clone = preview_level.clone();
 
         let thread_handle = thread::spawn(move || {
-            run_preview_thread(command_rx, current_pad_id_clone, preview_level_clone, app_handle);
+            run_preview_thread(
+                command_rx,
+                current_pad_id_clone,
+                preview_level_clone,
+                app_handle,
+            );
         });
 
         Self {

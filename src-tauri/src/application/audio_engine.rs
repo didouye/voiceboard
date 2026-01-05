@@ -975,8 +975,9 @@ fn run_engine_thread(
                                     f32::from_bits(input_level_monitor.load(Ordering::Relaxed));
                                 let output_rms =
                                     f32::from_bits(output_level_monitor.load(Ordering::Relaxed));
-                                let monitoring_rms =
-                                    f32::from_bits(monitoring_level_monitor.load(Ordering::Relaxed));
+                                let monitoring_rms = f32::from_bits(
+                                    monitoring_level_monitor.load(Ordering::Relaxed),
+                                );
 
                                 // Update peaks
                                 if input_rms > input_peak {
