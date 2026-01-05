@@ -85,6 +85,7 @@ export class StatusBarComponent implements OnInit, OnDestroy {
   private _settings = signal<AppSettings | null>(null);
   private _inputDevices = signal<AudioDevice[]>([]);
   private _outputDevices = signal<AudioDevice[]>([]);
+  private _previewDevices = signal<AudioDevice[]>([]);
 
   // Computed device names
   readonly inputDeviceName = computed(() => {
@@ -103,8 +104,9 @@ export class StatusBarComponent implements OnInit, OnDestroy {
 
   readonly previewDeviceName = computed(() => {
     const settings = this._settings();
+    const devices = this._previewDevices();
     if (!settings?.audio.previewDeviceId) return 'System Default';
-    return 'Custom';
+    return devices.find(d => d.id === settings.audio.previewDeviceId)?.name || 'Custom';
   });
 
   private unlistenAudioLevels?: UnlistenFn;
@@ -117,15 +119,17 @@ export class StatusBarComponent implements OnInit, OnDestroy {
 
   async ngOnInit(): Promise<void> {
     // Load device info
-    const [settings, inputDevices, outputDevices] = await Promise.all([
+    const [settings, inputDevices, outputDevices, previewDevices] = await Promise.all([
       this.tauri.loadSettings(),
       this.tauri.getInputDevices(),
-      this.tauri.getVirtualOutputsByPriority()
+      this.tauri.getVirtualOutputsByPriority(),
+      this.tauri.getPhysicalOutputDevices()
     ]);
 
     this._settings.set(settings);
     this._inputDevices.set(inputDevices);
     this._outputDevices.set(outputDevices);
+    this._previewDevices.set(previewDevices);
 
     // Listen for audio levels (input/output/monitoring from mixing engine)
     this.unlistenAudioLevels = await listen<AudioLevels>('audio-levels', (event) => {
