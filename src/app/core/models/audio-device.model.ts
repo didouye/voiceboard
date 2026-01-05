@@ -74,3 +74,12 @@ export interface SoundPad {
   /** Playback speed (0.5-2.0, default 1.0 = normal) */
   speed: number;
 }
+
+/**
+ * Folder for organizing sounds
+ */
+export interface Folder {
+  id: string;
+  name: string;
+  createdAt: number; // timestamp
+}

@@ -1,6 +1,6 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { TauriService } from './tauri.service';
-import { SoundFile, SoundPad } from '../models';
+import { SoundFile, SoundPad, Folder } from '../models';
 import { open } from '@tauri-apps/plugin-dialog';
 
 const PAD_COLORS = [
@@ -37,6 +37,17 @@ export class SoundboardService {
 
   private unlistenPreviewStarted?: () => void;
   private unlistenPreviewStopped?: () => void;
+
+  // Folder state
+  private _folders = signal<Folder[]>([{ id: 'default', name: 'Default', createdAt: Date.now() }]);
+  private _activeFolderId = signal<string>('default');
+
+  // Public readonly signals for folders
+  readonly folders = this._folders.asReadonly();
+  readonly activeFolderId = this._activeFolderId.asReadonly();
+  readonly activeFolder = computed(() =>
+    this._folders().find(f => f.id === this._activeFolderId()) || this._folders()[0]
+  );
 
   // Public readonly signals
   readonly pads = this._pads.asReadonly();
@@ -554,6 +565,15 @@ export class SoundboardService {
    */
   clearError(): void {
     this._error.set(null);
+  }
+
+  /**
+   * Switch to a different folder
+   */
+  setActiveFolder(folderId: string): void {
+    if (this._folders().some(f => f.id === folderId)) {
+      this._activeFolderId.set(folderId);
+    }
   }
 
   /**
