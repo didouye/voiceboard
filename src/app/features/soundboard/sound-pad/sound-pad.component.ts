@@ -1,10 +1,11 @@
 import { Component, Input, Output, EventEmitter, HostListener, HostBinding, inject, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { SoundPad } from '../../../core/models';
+import { SoundPad, PadImage } from '../../../core/models';
 import { SoundboardService } from '../../../core/services/soundboard.service';
 import { ShortcutService } from '../../../core/services/shortcut.service';
 import { TauriService } from '../../../core/services/tauri.service';
+import { ImageSearchService, ImageSearchResult } from '../../../core/services/image-search.service';
 import { convertFileSrc } from '@tauri-apps/api/core';
 
 @Component({
@@ -140,6 +141,106 @@ import { convertFileSrc } from '@tauri-apps/api/core';
             >
           </div>
 
+          <!-- Image -->
+          <div class="mb-4 pt-4 border-t border-border">
+            <div class="flex justify-between items-center mb-2 text-xs">
+              <span class="text-text-secondary">Image</span>
+            </div>
+
+            <!-- Preview -->
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-16 h-16 rounded-lg overflow-hidden bg-surface-hover flex items-center justify-center border border-border">
+                @if (imageUrl()) {
+                  <img [src]="imageUrl()" alt="" class="w-full h-full object-cover">
+                } @else {
+                  <span class="text-2xl text-text-muted">&#128247;</span>
+                }
+              </div>
+              <div class="flex flex-col gap-1">
+                <input
+                  #imageUpload
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  class="hidden"
+                  (change)="uploadImage($event)"
+                >
+                <button
+                  class="px-3 py-1.5 text-xs bg-surface-hover hover:bg-border rounded transition-colors text-text-secondary hover:text-text-primary"
+                  (click)="imageUpload.click()"
+                  [disabled]="imageLoading()"
+                >
+                  Upload
+                </button>
+                @if (imageSearchService.hasApiKey()) {
+                  <button
+                    class="px-3 py-1.5 text-xs bg-surface-hover hover:bg-border rounded transition-colors text-text-secondary hover:text-text-primary"
+                    (click)="showImageSearch = !showImageSearch"
+                    [disabled]="imageLoading()"
+                  >
+                    {{ showImageSearch ? 'Close search' : 'Search' }}
+                  </button>
+                }
+                @if (pad.image) {
+                  <button
+                    class="px-3 py-1.5 text-xs text-status-error hover:bg-status-error/10 rounded transition-colors"
+                    (click)="removeImage()"
+                    [disabled]="imageLoading()"
+                  >
+                    Remove
+                  </button>
+                }
+              </div>
+            </div>
+
+            <!-- Search Section (expandable) -->
+            @if (showImageSearch) {
+              <div class="p-3 bg-background rounded-lg border border-border">
+                <div class="flex gap-2 mb-3">
+                  <input
+                    type="text"
+                    [(ngModel)]="imageSearchQuery"
+                    (keydown.enter)="searchImages()"
+                    placeholder="Search images..."
+                    class="flex-1 px-3 py-2 text-sm bg-surface-hover border border-border rounded text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
+                  >
+                  <button
+                    class="px-4 py-2 text-sm bg-accent hover:bg-accent/80 text-white rounded transition-colors"
+                    [disabled]="imageLoading()"
+                    (click)="searchImages()"
+                  >
+                    {{ imageLoading() ? '...' : 'Search' }}
+                  </button>
+                </div>
+
+                <!-- Results Grid -->
+                @if (imageSearchResults().length > 0) {
+                  <div class="grid grid-cols-3 gap-2">
+                    @for (result of imageSearchResults(); track result.id) {
+                      <button
+                        class="aspect-square rounded overflow-hidden border-2 transition-all hover:scale-105"
+                        [class]="selectedImageId() === result.id ? 'border-accent' : 'border-transparent'"
+                        (click)="selectImage(result)"
+                        [disabled]="imageLoading()"
+                      >
+                        <img [src]="result.thumbnailUrl" alt="" class="w-full h-full object-cover">
+                      </button>
+                    }
+                  </div>
+                } @else if (!imageLoading()) {
+                  <p class="text-xs text-text-muted text-center py-4">
+                    Search for images on Pexels
+                  </p>
+                }
+              </div>
+            }
+
+            @if (!imageSearchService.hasApiKey()) {
+              <p class="text-[10px] text-text-muted mt-2">
+                Configure Pexels API key in Settings to search images
+              </p>
+            }
+          </div>
+
           <!-- Volume -->
           <div class="mb-4">
             <div class="flex justify-between items-center mb-2 text-xs">
@@ -241,12 +342,14 @@ export class SoundPadComponent implements OnInit {
   @Output() speedChange = new EventEmitter<number>();
   @Output() shortcutChange = new EventEmitter<string | null>();
   @Output() customNameChange = new EventEmitter<string | null>();
+  @Output() imageChange = new EventEmitter<PadImage | null>();
 
   @HostBinding('class') hostClass = 'relative';
   @HostBinding('class.z-50') get isPopupOpen() { return this.showSettingsPopup; }
 
   private tauri = inject(TauriService);
   private _imagesDir = signal<string>('');
+  imageSearchService = inject(ImageSearchService);
 
   readonly imageUrl = computed(() => {
     const pad = this.pad;
@@ -261,6 +364,13 @@ export class SoundPadComponent implements OnInit {
   isRecording = false;
   Math = Math;
   speedOptions = [0.5, 0.75, 1, 1.25, 1.5, 2];
+
+  // Image management properties
+  showImageSearch = false;
+  imageSearchQuery = '';
+  imageSearchResults = signal<ImageSearchResult[]>([]);
+  selectedImageId = signal<string | null>(null);
+  imageLoading = signal(false);
 
   constructor(
     private soundboardService: SoundboardService,
@@ -398,10 +508,98 @@ export class SoundPadComponent implements OnInit {
     this.customNameChange.emit(name.trim() || null);
   }
 
+  async searchImages(): Promise<void> {
+    if (!this.imageSearchQuery.trim()) return;
+
+    try {
+      this.imageLoading.set(true);
+      const results = await this.imageSearchService.search(this.imageSearchQuery);
+      this.imageSearchResults.set(results);
+    } catch (err) {
+      console.error('Image search failed:', err);
+    } finally {
+      this.imageLoading.set(false);
+    }
+  }
+
+  async selectImage(result: ImageSearchResult): Promise<void> {
+    try {
+      this.imageLoading.set(true);
+      this.selectedImageId.set(result.id);
+
+      // Download image
+      const { data, extension } = await this.imageSearchService.downloadImage(result.fullUrl);
+
+      // Save to backend
+      const localPath = await this.tauri.savePadImage(this.pad.id, data, extension);
+
+      // Update pad
+      const image: PadImage = {
+        localPath,
+        originalUrl: result.fullUrl,
+        attribution: result.attribution
+      };
+      this.imageChange.emit(image);
+
+      this.showImageSearch = false;
+      this.selectedImageId.set(null);
+    } catch (err) {
+      console.error('Failed to save image:', err);
+    } finally {
+      this.imageLoading.set(false);
+    }
+  }
+
+  async uploadImage(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!validTypes.includes(file.type)) {
+      alert('Unsupported image format. Use JPG, PNG, WebP, or GIF.');
+      return;
+    }
+
+    // Validate file size (10MB max)
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Image too large. Maximum size is 10MB.');
+      return;
+    }
+
+    try {
+      this.imageLoading.set(true);
+
+      const data = new Uint8Array(await file.arrayBuffer());
+      const extension = file.name.split('.').pop() || 'jpg';
+
+      const localPath = await this.tauri.savePadImage(this.pad.id, data, extension);
+
+      const image: PadImage = { localPath };
+      this.imageChange.emit(image);
+    } catch (err) {
+      console.error('Failed to upload image:', err);
+    } finally {
+      this.imageLoading.set(false);
+      input.value = ''; // Reset input
+    }
+  }
+
+  async removeImage(): Promise<void> {
+    try {
+      await this.tauri.deletePadImage(this.pad.id);
+      this.imageChange.emit(null);
+    } catch (err) {
+      console.error('Failed to remove image:', err);
+    }
+  }
+
   resetAll(): void {
     this.volumeChange.emit(1.0);
     this.speedChange.emit(1.0);
     this.customNameChange.emit(null);
+    this.removeImage();
   }
 
   startRecording(event: MouseEvent): void {
