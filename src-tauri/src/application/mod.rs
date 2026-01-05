@@ -7,6 +7,7 @@ pub mod audio_engine;
 pub mod commands;
 pub mod preview_engine;
 mod services;
+pub mod shortcut_commands;
 mod state;
 
 pub use audio_engine::*;

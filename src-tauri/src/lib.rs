@@ -74,6 +74,10 @@ use application::{
         stop_sound,
         toggle_channel_mute,
     },
+    shortcut_commands::{
+        get_global_hotkeys_enabled, register_global_shortcut, set_global_hotkeys_enabled,
+        unregister_all_shortcuts, unregister_global_shortcut, ShortcutRegistry,
+    },
     AppState, PreviewEngine,
 };
 use tauri::menu::{Menu, MenuItem, Submenu};
@@ -101,6 +105,7 @@ pub fn run() {
         .setup(|app| {
             let state = AppState::new();
             app.manage(state);
+            app.manage(ShortcutRegistry::default());
 
             // Create application menu with Debug toggle
             let toggle_debug =
@@ -256,6 +261,12 @@ pub fn run() {
             // VB-Cable setup
             check_vb_cable_installed,
             download_and_install_vb_cable,
+            // Shortcut management
+            register_global_shortcut,
+            unregister_global_shortcut,
+            unregister_all_shortcuts,
+            set_global_hotkeys_enabled,
+            get_global_hotkeys_enabled,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
