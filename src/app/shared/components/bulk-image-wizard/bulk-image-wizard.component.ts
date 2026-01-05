@@ -19,17 +19,17 @@ interface PadImageSelection {
       <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" (click)="close.emit()"></div>
 
       <!-- Modal -->
-      <div class="relative bg-surface border border-border rounded-xl p-6 w-full max-w-lg animate-scale-in" (click)="$event.stopPropagation()">
+      <div class="relative bg-surface border border-border rounded-xl p-6 w-full max-w-2xl animate-scale-in" (click)="$event.stopPropagation()">
         <!-- Header -->
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-lg font-semibold text-text-primary">
-            Image for "{{ currentPad()?.sound?.name }}" ({{ currentIndex() + 1 }}/{{ pads.length }})
+            Image pour "{{ currentPad()?.sound?.name }}" ({{ currentIndex() + 1 }}/{{ pads.length }})
           </h2>
           <button
             class="text-text-muted hover:text-text-primary"
             (click)="skip()"
           >
-            Skip
+            Passer
           </button>
         </div>
 
@@ -39,20 +39,35 @@ interface PadImageSelection {
             type="text"
             [(ngModel)]="searchQuery"
             (keydown.enter)="search()"
-            placeholder="Search images..."
+            placeholder="Rechercher des images..."
             class="flex-1 px-3 py-2 text-sm bg-surface-hover border border-border rounded text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
           >
           <button
             class="px-4 py-2 text-sm bg-accent hover:bg-accent/80 text-white rounded transition-colors"
             (click)="search()"
           >
-            Search
+            Chercher
           </button>
+        </div>
+
+        <!-- Selected Image Preview -->
+        <div class="mb-4">
+          <div class="w-36 h-36 mx-auto rounded-xl overflow-hidden border-2 transition-all"
+               [class]="selectedImage() ? 'border-accent bg-surface-hover' : 'border-dashed border-border bg-surface-hover'">
+            @if (selectedImage()) {
+              <img [src]="selectedImage()!.thumbnailUrl" alt="" class="w-full h-full object-cover">
+            } @else {
+              <div class="w-full h-full flex flex-col items-center justify-center text-text-muted">
+                <span class="text-3xl mb-1">&#128247;</span>
+                <span class="text-xs">Sélectionnez une image</span>
+              </div>
+            }
+          </div>
         </div>
 
         <!-- Results Grid -->
         @if (searchResults().length > 0) {
-          <div class="grid grid-cols-3 gap-3 mb-4 max-h-80 overflow-y-auto p-1">
+          <div class="grid grid-cols-4 gap-2 mb-4 max-h-64 overflow-y-auto p-1">
             @for (result of searchResults(); track result.id) {
               <button
                 class="aspect-square rounded-lg overflow-hidden border-2 transition-all hover:scale-105 flex-shrink-0"
@@ -64,7 +79,7 @@ interface PadImageSelection {
             }
           </div>
         } @else {
-          <div class="h-48 flex items-center justify-center text-text-muted">
+          <div class="h-32 flex items-center justify-center text-text-muted">
             Recherchez des images
           </div>
         }
@@ -76,7 +91,7 @@ interface PadImageSelection {
             [disabled]="currentIndex() === 0"
             (click)="previous()"
           >
-            &larr; Previous
+            &larr; Précédent
           </button>
 
           <div class="flex gap-2">
@@ -85,14 +100,14 @@ interface PadImageSelection {
                 class="px-4 py-2 text-sm bg-accent hover:bg-accent/80 text-white rounded transition-colors"
                 (click)="selectAndNext()"
               >
-                {{ isLast() ? 'Finish' : 'Select & Next' }}
+                {{ isLast() ? 'Terminer' : 'Valider & Suivant' }}
               </button>
             }
             <button
               class="px-4 py-2 text-sm bg-surface-hover hover:bg-border text-text-secondary rounded transition-colors"
               (click)="nextOrFinish()"
             >
-              {{ isLast() ? 'Finish' : 'Next &rarr;' }}
+              {{ isLast() ? 'Terminer' : 'Suivant &rarr;' }}
             </button>
           </div>
         </div>
@@ -102,7 +117,7 @@ interface PadImageSelection {
           class="w-full mt-4 py-2 text-sm text-text-muted hover:text-text-primary transition-colors"
           (click)="finish()"
         >
-          Finish and keep selected images
+          Terminer et garder les images sélectionnées
         </button>
       </div>
     </div>
