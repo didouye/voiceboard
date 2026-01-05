@@ -1,9 +1,11 @@
 import { Component, Input, Output, EventEmitter, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { invoke } from '@tauri-apps/api/core';
 import { TauriService } from '../../../core/services/tauri.service';
 import { MixerService } from '../../../core/services/mixer.service';
 import { ShortcutService } from '../../../core/services/shortcut.service';
+import { DebugConsoleService } from '../../../core/services/debug-console.service';
 import { AudioDevice, AppSettings } from '../../../core/models';
 
 @Component({
@@ -183,6 +185,28 @@ import { AudioDevice, AppSettings } from '../../../core/models';
               </button>
             </div>
           </div>
+
+          <!-- Debug Section -->
+          <div class="pt-6 border-t border-border">
+            <h3 class="text-xs font-semibold text-text-muted uppercase tracking-wider mb-4">Advanced</h3>
+
+            <div class="flex items-center justify-between py-3 px-4 bg-background rounded-lg">
+              <div>
+                <span class="text-sm text-text-primary">Debug Mode</span>
+                <p class="text-xs text-text-muted mt-0.5">Show debug console for troubleshooting</p>
+              </div>
+              <button
+                class="w-12 h-6 rounded-full transition-colors relative"
+                [class]="debugEnabled() ? 'bg-accent' : 'bg-surface'"
+                (click)="toggleDebugMode()"
+              >
+                <div
+                  class="absolute top-1 w-4 h-4 bg-white rounded-full transition-transform"
+                  [class]="debugEnabled() ? 'left-7' : 'left-1'"
+                ></div>
+              </button>
+            </div>
+          </div>
         }
       </div>
     </div>
@@ -223,12 +247,16 @@ export class SettingsPopupComponent implements OnInit {
   // Global hotkeys enabled state
   readonly globalHotkeysEnabled = computed(() => this.shortcutService.enabled());
 
+  // Debug mode enabled state
+  readonly debugEnabled = computed(() => this.debugConsole.isEnabled());
+
   Math = Math;
 
   constructor(
     private tauri: TauriService,
     private mixer: MixerService,
-    private shortcutService: ShortcutService
+    private shortcutService: ShortcutService,
+    private debugConsole: DebugConsoleService
   ) {}
 
   async ngOnInit(): Promise<void> {
@@ -310,6 +338,15 @@ export class SettingsPopupComponent implements OnInit {
       await this.shortcutService.setEnabled(newValue);
     } catch (err) {
       console.error('Failed to toggle global hotkeys:', err);
+    }
+  }
+
+  async toggleDebugMode(): Promise<void> {
+    const newValue = !this.debugEnabled();
+    try {
+      await invoke('set_debug_mode', { enabled: newValue });
+    } catch (err) {
+      console.error('Failed to toggle debug mode:', err);
     }
   }
 
