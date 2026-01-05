@@ -109,6 +109,18 @@
   - Customizable themes (dark/light/custom)
   - Drag & drop to reorganize pads
 
+- [ ] **Pad Settings Popup**
+  - Rename volume/speed popup to "Pad Settings"
+  - Change button icon from speaker to gear/cog icon
+  - Unified configuration UI for all pad settings
+
+- [ ] **Custom Keyboard Shortcuts**
+  - Configurable shortcut per pad (in Pad Settings popup)
+  - Support for modifier key combinations (Ctrl+1, Alt+Shift+0, etc.)
+  - Key combination recorder (press keys to set shortcut)
+  - Conflict detection (warn if shortcut already used)
+  - Global hotkeys (work even when app is not focused)
+
 - [ ] **Pad Images**
   - User-defined images for each pad (upload or paste URL)
   - Auto-fetch images from internet based on sound name
