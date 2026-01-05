@@ -1,4 +1,4 @@
-import { inject, Injectable } from '@angular/core';
+import { inject, Injectable, signal } from '@angular/core';
 import { invoke } from '@tauri-apps/api/core';
 import {
   AudioDevice,
@@ -28,6 +28,8 @@ import {
 })
 export class TauriService {
   private demoService = inject(DemoService);
+  private _imagesDirCache = signal<string | null>(null);
+  private _imagesDirPromise: Promise<string> | null = null;
   private demoMixing = false;
 
   // =========================================================================
@@ -494,13 +496,37 @@ export class TauriService {
   // =========================================================================
 
   /**
-   * Get the images directory path
+   * Signal for the cached images directory path
+   * Returns null if not yet loaded, use in templates for reactivity
+   */
+  readonly imagesDir = this._imagesDirCache.asReadonly();
+
+  /**
+   * Get the images directory path (cached)
    */
   async getImagesDir(): Promise<string> {
     if (this.demoService.isDemoMode) {
       return '/demo/images';
     }
-    return invoke<string>('get_images_dir');
+
+    // Return cached value if available
+    const cached = this._imagesDirCache();
+    if (cached) {
+      return cached;
+    }
+
+    // Return existing promise if already loading
+    if (this._imagesDirPromise) {
+      return this._imagesDirPromise;
+    }
+
+    // Load and cache
+    this._imagesDirPromise = invoke<string>('get_images_dir').then(dir => {
+      this._imagesDirCache.set(dir);
+      return dir;
+    });
+
+    return this._imagesDirPromise;
   }
 
   /**

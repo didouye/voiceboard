@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, HostListener, HostBinding, inject, OnInit, signal, computed } from '@angular/core';
+import { Component, Input, Output, EventEmitter, HostListener, HostBinding, inject, OnInit, OnChanges, SimpleChanges, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { SoundPad, PadImage } from '../../../core/models';
@@ -320,7 +320,7 @@ import { convertFileSrc } from '@tauri-apps/api/core';
     }
   `]
 })
-export class SoundPadComponent implements OnInit {
+export class SoundPadComponent implements OnInit, OnChanges {
   @Input({ required: true }) pad!: SoundPad;
   @Input() hotkey?: string;
   @Input() loading = false;
@@ -340,15 +340,19 @@ export class SoundPadComponent implements OnInit {
   @HostBinding('class.z-50') get isPopupOpen() { return this.showSettingsPopup; }
 
   private tauri = inject(TauriService);
-  private _imagesDir = signal<string>('');
   imageSearchService = inject(ImageSearchService);
 
+  // Track pad image changes with a signal
+  private _padImage = signal<PadImage | undefined>(undefined);
+
+  // Computed image URL that reacts to both imagesDir and pad image changes
   readonly imageUrl = computed(() => {
-    const pad = this.pad;
-    if (!pad.image?.localPath) return null;
-    const dir = this._imagesDir();
-    if (!dir) return null;
-    return convertFileSrc(`${dir}/${pad.image.localPath}`);
+    const image = this._padImage();
+    const dir = this.tauri.imagesDir();
+    if (!image?.localPath || !dir) {
+      return null;
+    }
+    return convertFileSrc(`${dir}/${image.localPath}`);
   });
 
   showSettingsPopup = false;
@@ -369,10 +373,20 @@ export class SoundPadComponent implements OnInit {
     private shortcutService: ShortcutService
   ) {}
 
+  ngOnChanges(changes: SimpleChanges): void {
+    // Sync pad.image to signal when input changes
+    if (changes['pad']) {
+      this._padImage.set(this.pad.image);
+    }
+  }
+
   async ngOnInit(): Promise<void> {
+    // Initialize image signal
+    this._padImage.set(this.pad.image);
+
+    // Pre-load images dir into cache
     try {
-      const dir = await this.tauri.getImagesDir();
-      this._imagesDir.set(dir);
+      await this.tauri.getImagesDir();
     } catch (e) {
       console.error('Failed to get images dir:', e);
     }
