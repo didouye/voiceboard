@@ -96,7 +96,7 @@
 
 ---
 
-## Phase 3 - UI/UX Redesign - 60% Complete
+## Phase 3 - UI/UX Redesign - 70% Complete
 
 ### Stack
 - **Tailwind CSS** (Tailwind Plus account available)
@@ -136,18 +136,16 @@
   - Original filename displayed smaller below custom name
   - Fallback to filename if no custom name set
 
+- [x] **Pad Images** *(see docs/plans/archive/2026-01-05-pad-images-design.md)*
+  - Upload, URL, and Pexels search
+  - Local image storage
+  - Auto-suggestion on import
+
 ### To Do
 - [ ] **Interface Enhancements**
   - Compact / extended mode
   - Customizable themes (dark/light/custom)
   - Drag & drop to reorganize pads
-
-- [ ] **Pad Images**
-  - User-defined images for each pad (upload or paste URL)
-  - Auto-fetch images from internet based on sound name
-  - Integration with image search APIs (Unsplash, Pexels, or similar)
-  - Image cropping/positioning within pad
-  - Fallback to icon/color when no image set
 
 - [ ] **Sound Organization**
   - Folders/categories to organize sounds
