@@ -9,6 +9,12 @@
     "dialog:default",
     "store:default",
     "os:default",
-    "process:default"
+    "process:default",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "https://duckduckgo.com/*" }
+      ]
+    }
   ]
 }

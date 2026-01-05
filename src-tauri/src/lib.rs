@@ -85,7 +85,7 @@ use application::{
     },
     AppState, PreviewEngine,
 };
-use tauri::menu::{Menu, MenuItem, Submenu};
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{Emitter, Manager};
 
 /// Run the Tauri application
@@ -107,6 +107,7 @@ pub fn run() {
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_http::init())
         .setup(|app| {
             let state = AppState::new();
             app.manage(state);
@@ -116,7 +117,24 @@ pub fn run() {
             let toggle_debug =
                 MenuItem::with_id(app, "toggle_debug", "Toggle Debug Mode", true, None::<&str>)?;
             let app_submenu = Submenu::with_items(app, "Voiceboard", true, &[&toggle_debug])?;
-            let menu = Menu::with_items(app, &[&app_submenu])?;
+
+            // Create Edit menu with standard items (required for Cmd+V on macOS)
+            let edit_submenu = Submenu::with_items(
+                app,
+                "Edit",
+                true,
+                &[
+                    &PredefinedMenuItem::undo(app, None)?,
+                    &PredefinedMenuItem::redo(app, None)?,
+                    &PredefinedMenuItem::separator(app)?,
+                    &PredefinedMenuItem::cut(app, None)?,
+                    &PredefinedMenuItem::copy(app, None)?,
+                    &PredefinedMenuItem::paste(app, None)?,
+                    &PredefinedMenuItem::select_all(app, None)?,
+                ],
+            )?;
+
+            let menu = Menu::with_items(app, &[&app_submenu, &edit_submenu])?;
             app.set_menu(menu)?;
 
             // Initialize preview engine with app handle
