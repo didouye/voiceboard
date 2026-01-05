@@ -62,6 +62,18 @@ export interface SoundFile {
 }
 
 /**
+ * Image attached to a sound pad
+ */
+export interface PadImage {
+  /** Relative path in ~/.voiceboard/images/ */
+  localPath: string;
+  /** Original URL source (for attribution) */
+  originalUrl?: string;
+  /** Attribution text (e.g., "Photo by X on Pexels") */
+  attribution?: string;
+}
+
+/**
  * Sound pad configuration (position + sound)
  */
 export interface SoundPad {
@@ -76,6 +88,8 @@ export interface SoundPad {
   speed: number;
   /** User-defined custom name (optional, fallback to sound.name) */
   customName?: string;
+  /** Custom image for the pad */
+  image?: PadImage;
 }
 
 /**
