@@ -76,7 +76,7 @@ import { ShortcutService } from '../../../core/services/shortcut.service';
         <!-- Settings modal (centered) -->
         @if (showSettingsPopup) {
           <div
-            class="fixed inset-0 z-50 flex items-center justify-center"
+            class="fixed inset-0 z-50 flex items-center justify-center animate-fade-in"
             (click)="closePopup($event)"
           >
             <!-- Dark backdrop -->
@@ -84,7 +84,7 @@ import { ShortcutService } from '../../../core/services/shortcut.service';
 
             <!-- Modal content -->
             <div
-              class="relative bg-surface border border-border rounded-xl p-4 w-[280px] shadow-xl animate-scale-in"
+              class="relative bg-surface border border-border rounded-xl p-4 w-[280px] shadow-xl"
               (click)="$event.stopPropagation()"
             >
               <!-- Header -->
