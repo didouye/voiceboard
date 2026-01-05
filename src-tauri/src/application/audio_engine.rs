@@ -73,6 +73,7 @@ pub enum AudioEngineEvent {
         input_peak: f32,
         output_rms: f32,
         output_peak: f32,
+        monitoring_rms: f32,
     },
 }
 
@@ -437,6 +438,7 @@ fn run_engine_thread(
                         // Atomic level values for lock-free reading
                         let input_level = Arc::new(AtomicU32::new(0));
                         let output_level = Arc::new(AtomicU32::new(0));
+                        let monitoring_level = Arc::new(AtomicU32::new(0));
                         let input_level_clone = input_level.clone();
 
                         // Clone references for callbacks
@@ -574,8 +576,10 @@ fn run_engine_thread(
 
                                 // Mix in playing sounds (sounds are stored as MONO)
                                 // Use fractional position with linear interpolation for speed control
+                                let sounds_mixed;
                                 if let Ok(mut state) = audio_state_clone.try_lock() {
                                     let mut finished = Vec::new();
+                                    sounds_mixed = state.playing_sounds.len();
 
                                     for (id, sound) in state.playing_sounds.iter_mut() {
                                         for frame in 0..num_frames {
@@ -618,6 +622,8 @@ fn run_engine_thread(
                                     for id in finished {
                                         state.playing_sounds.remove(&id);
                                     }
+                                } else {
+                                    sounds_mixed = 0;
                                 }
 
                                 // Write to monitoring buffer BEFORE adding mic to main output
@@ -701,15 +707,16 @@ fn run_engine_thread(
                                     output_level_for_callback
                                         .store(rms.to_bits(), Ordering::Relaxed);
 
-                                    // Log first few callbacks
-                                    if count < 5 || count.is_multiple_of(1000) {
+                                    // Log first few callbacks and when sounds are playing
+                                    if count < 5 || count.is_multiple_of(1000) || (sounds_mixed > 0 && count.is_multiple_of(100)) {
                                         let max_sample = data.iter().fold(0.0f32, |a, &b| a.max(b.abs()));
                                         tracing::info!(
-                                            "[AudioEngine] Output callback #{}: {} samples, max amplitude: {:.6}, rms: {:.6}",
+                                            "[AudioEngine] Output callback #{}: {} samples, max: {:.6}, rms: {:.6}, sounds: {}",
                                             count,
                                             data_len,
                                             max_sample,
-                                            rms
+                                            rms,
+                                            sounds_mixed
                                         );
                                     }
                                 }
@@ -802,6 +809,9 @@ fn run_engine_thread(
                             let mon_callback_count = Arc::new(AtomicU32::new(0));
                             let mon_callback_count_clone = mon_callback_count.clone();
 
+                            // Clone monitoring level for callback
+                            let monitoring_level_for_callback = monitoring_level.clone();
+
                             let monitoring_result = monitoring_dev.build_output_stream(
                                 &mon_stream_config,
                                 move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
@@ -853,11 +863,23 @@ fn run_engine_thread(
                                                 *curr_sample = cons.try_pop().unwrap_or(0.0);
                                             }
                                         }
+
+                                        // Calculate monitoring RMS after writing data
+                                        if !data.is_empty() {
+                                            let mut sum_squares = 0.0f32;
+                                            for sample in data.iter() {
+                                                sum_squares += sample * sample;
+                                            }
+                                            let rms = (sum_squares / data.len() as f32).sqrt();
+                                            monitoring_level_for_callback.store(rms.to_bits(), Ordering::Relaxed);
+                                        }
                                     } else {
                                         // Couldn't acquire locks, output silence
                                         for sample in data.iter_mut() {
                                             *sample = 0.0;
                                         }
+                                        // Reset monitoring level when no data
+                                        monitoring_level_for_callback.store(0, Ordering::Relaxed);
                                     }
                                 },
                                 move |err| {
@@ -939,6 +961,7 @@ fn run_engine_thread(
                         // Start level monitoring thread
                         let input_level_monitor = input_level.clone();
                         let output_level_monitor = output_level.clone();
+                        let monitoring_level_monitor = monitoring_level.clone();
                         let event_tx_monitor = event_tx.clone();
                         let is_running_monitor = is_running.clone();
 
@@ -952,6 +975,8 @@ fn run_engine_thread(
                                     f32::from_bits(input_level_monitor.load(Ordering::Relaxed));
                                 let output_rms =
                                     f32::from_bits(output_level_monitor.load(Ordering::Relaxed));
+                                let monitoring_rms =
+                                    f32::from_bits(monitoring_level_monitor.load(Ordering::Relaxed));
 
                                 // Update peaks
                                 if input_rms > input_peak {
@@ -971,6 +996,7 @@ fn run_engine_thread(
                                     input_peak,
                                     output_rms,
                                     output_peak,
+                                    monitoring_rms,
                                 });
 
                                 std::thread::sleep(std::time::Duration::from_millis(
@@ -1018,9 +1044,10 @@ fn run_engine_thread(
                         volume,
                         speed,
                     } => {
+                        let samples_len = samples.len();
                         if let Ok(mut state) = audio_state.lock() {
                             state.playing_sounds.insert(
-                                id,
+                                id.clone(),
                                 PlayingSound {
                                     samples,
                                     position: 0,
@@ -1028,6 +1055,14 @@ fn run_engine_thread(
                                     volume: volume.clamp(0.0, 2.0),
                                     speed: speed.clamp(0.5, 2.0),
                                 },
+                            );
+                            tracing::info!(
+                                "[AudioEngine] Added sound '{}' ({} samples, vol: {:.0}%, speed: {:.2}x), total playing: {}",
+                                id,
+                                samples_len,
+                                volume * 100.0,
+                                speed,
+                                state.playing_sounds.len()
                             );
                         }
                     }
@@ -1302,6 +1337,7 @@ mod tests {
             input_peak: 0.8,
             output_rms: 0.3,
             output_peak: 0.6,
+            monitoring_rms: 0.4,
         };
 
         let cloned = event.clone();
@@ -1310,12 +1346,14 @@ mod tests {
             input_peak,
             output_rms,
             output_peak,
+            monitoring_rms,
         } = cloned
         {
             assert_eq!(input_rms, 0.5);
             assert_eq!(input_peak, 0.8);
             assert_eq!(output_rms, 0.3);
             assert_eq!(output_peak, 0.6);
+            assert_eq!(monitoring_rms, 0.4);
         } else {
             panic!("Expected LevelUpdate event");
         }

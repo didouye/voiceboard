@@ -11,6 +11,7 @@ interface AudioLevels {
   inputPeak: number;
   outputRms: number;
   outputPeak: number;
+  monitoringRms: number;
 }
 
 @Component({
@@ -57,14 +58,14 @@ interface AudioLevels {
           <span class="text-sm">&#127911;</span>
           <span class="text-xs text-text-secondary truncate flex-1">{{ previewDeviceName() }}</span>
           <span class="flex items-center gap-1">
-            <span class="w-2 h-2 rounded-full bg-status-info"></span>
-            <span class="text-[10px] text-text-muted">Monitor</span>
+            <span
+              class="w-2 h-2 rounded-full"
+              [class]="previewLevel() > 0 ? 'bg-status-info animate-pulse' : 'bg-text-muted'"
+            ></span>
+            <span class="text-[10px] text-text-muted">{{ previewLevel() > 0 ? 'Playing' : 'Monitor' }}</span>
           </span>
         </div>
-        <!-- Preview doesn't have VU meter - it's a local monitor output -->
-        <div class="h-1.5 bg-surface rounded-full flex items-center justify-center">
-          <span class="text-[8px] text-text-muted">Local preview only</span>
-        </div>
+        <app-vu-meter [level]="previewLevel()" />
       </div>
     </div>
   `,
@@ -74,6 +75,11 @@ export class StatusBarComponent implements OnInit, OnDestroy {
   // Audio levels
   inputLevel = signal(0);
   outputLevel = signal(0);
+  // Two sources for preview: preview engine (right-click) and monitoring (normal play)
+  private previewEngineLevel = signal(0);
+  private monitoringLevel = signal(0);
+  // Combined preview level: max of preview engine and monitoring
+  readonly previewLevel = computed(() => Math.max(this.previewEngineLevel(), this.monitoringLevel()));
 
   // Device info
   private _settings = signal<AppSettings | null>(null);
@@ -101,7 +107,8 @@ export class StatusBarComponent implements OnInit, OnDestroy {
     return 'Custom';
   });
 
-  private unlisten?: UnlistenFn;
+  private unlistenAudioLevels?: UnlistenFn;
+  private unlistenPreviewLevel?: UnlistenFn;
 
   constructor(
     private tauri: TauriService,
@@ -120,14 +127,25 @@ export class StatusBarComponent implements OnInit, OnDestroy {
     this._inputDevices.set(inputDevices);
     this._outputDevices.set(outputDevices);
 
-    // Listen for audio levels
-    this.unlisten = await listen<AudioLevels>('audio-levels', (event) => {
-      this.inputLevel.set(Math.min(event.payload.inputRms * 3, 1));
-      this.outputLevel.set(Math.min(event.payload.outputRms * 3, 1));
+    // Listen for audio levels (input/output/monitoring from mixing engine)
+    this.unlistenAudioLevels = await listen<AudioLevels>('audio-levels', (event) => {
+      const inputVal = Math.min(event.payload.inputRms * 3, 1);
+      const outputVal = Math.min(event.payload.outputRms * 3, 1);
+      const monitoringVal = Math.min(event.payload.monitoringRms * 3, 1);
+      this.inputLevel.set(inputVal);
+      this.outputLevel.set(outputVal);
+      this.monitoringLevel.set(monitoringVal);
+    });
+
+    // Listen for preview level (from preview engine - right-click preview)
+    this.unlistenPreviewLevel = await listen<number>('preview-level', (event) => {
+      const previewVal = Math.min(event.payload * 3, 1);
+      this.previewEngineLevel.set(previewVal);
     });
   }
 
   ngOnDestroy(): void {
-    this.unlisten?.();
+    this.unlistenAudioLevels?.();
+    this.unlistenPreviewLevel?.();
   }
 }

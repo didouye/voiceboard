@@ -2,13 +2,85 @@
 
 use cpal::traits::{DeviceTrait, HostTrait};
 use crossbeam_channel::{bounded, Receiver, Sender};
+use rodio::source::Source;
 use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink};
 use std::fs::File;
 use std::io::BufReader;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
+
+/// A Source wrapper that tracks audio levels
+struct LevelTrackingSource<S> {
+    inner: S,
+    level: Arc<AtomicU32>,
+    sample_count: usize,
+    sum_squares: f32,
+    update_interval: usize, // Update level every N samples
+}
+
+impl<S> LevelTrackingSource<S>
+where
+    S: Source<Item = f32>,
+{
+    fn new(inner: S, level: Arc<AtomicU32>) -> Self {
+        Self {
+            inner,
+            level,
+            sample_count: 0,
+            sum_squares: 0.0,
+            update_interval: 4800, // ~100ms at 48kHz
+        }
+    }
+}
+
+impl<S> Iterator for LevelTrackingSource<S>
+where
+    S: Source<Item = f32>,
+{
+    type Item = f32;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let sample = self.inner.next()?;
+
+        // Accumulate for RMS calculation
+        self.sum_squares += sample * sample;
+        self.sample_count += 1;
+
+        // Update level periodically
+        if self.sample_count >= self.update_interval {
+            let rms = (self.sum_squares / self.sample_count as f32).sqrt();
+            self.level.store(rms.to_bits(), Ordering::Relaxed);
+            self.sample_count = 0;
+            self.sum_squares = 0.0;
+        }
+
+        Some(sample)
+    }
+}
+
+impl<S> Source for LevelTrackingSource<S>
+where
+    S: Source<Item = f32>,
+{
+    fn current_frame_len(&self) -> Option<usize> {
+        self.inner.current_frame_len()
+    }
+
+    fn channels(&self) -> u16 {
+        self.inner.channels()
+    }
+
+    fn sample_rate(&self) -> u32 {
+        self.inner.sample_rate()
+    }
+
+    fn total_duration(&self) -> Option<Duration> {
+        self.inner.total_duration()
+    }
+}
 
 /// Commands that can be sent to the preview engine
 #[derive(Debug)]
@@ -29,6 +101,7 @@ pub enum PreviewCommand {
 pub struct PreviewEngine {
     command_tx: Sender<PreviewCommand>,
     current_pad_id: Arc<Mutex<Option<String>>>,
+    preview_level: Arc<AtomicU32>,
     thread_handle: Option<JoinHandle<()>>,
 }
 
@@ -38,16 +111,24 @@ impl PreviewEngine {
         let (command_tx, command_rx) = bounded(16);
         let current_pad_id = Arc::new(Mutex::new(None::<String>));
         let current_pad_id_clone = current_pad_id.clone();
+        let preview_level = Arc::new(AtomicU32::new(0));
+        let preview_level_clone = preview_level.clone();
 
         let thread_handle = thread::spawn(move || {
-            run_preview_thread(command_rx, current_pad_id_clone, app_handle);
+            run_preview_thread(command_rx, current_pad_id_clone, preview_level_clone, app_handle);
         });
 
         Self {
             command_tx,
             current_pad_id,
+            preview_level,
             thread_handle: Some(thread_handle),
         }
+    }
+
+    /// Get the current preview audio level (RMS)
+    pub fn get_level(&self) -> f32 {
+        f32::from_bits(self.preview_level.load(Ordering::Relaxed))
     }
 
     /// Send a command to the preview engine
@@ -108,12 +189,14 @@ fn is_default_device(name: &str) -> bool {
 fn run_preview_thread(
     command_rx: Receiver<PreviewCommand>,
     current_pad_id: Arc<Mutex<Option<String>>>,
+    preview_level: Arc<AtomicU32>,
     app_handle: AppHandle,
 ) {
     // Current playback state - these must stay alive during playback
     let mut current_sink: Option<Sink> = None;
     let mut _current_stream: Option<OutputStream> = None;
     let mut _current_stream_handle: Option<OutputStreamHandle> = None;
+    let mut is_playing = false;
 
     loop {
         // Check if current sound finished naturally
@@ -128,10 +211,21 @@ fn run_preview_thread(
                 current_sink = None;
                 _current_stream = None;
                 _current_stream_handle = None;
+                is_playing = false;
+                // Reset level when stopped and emit final 0
+                preview_level.store(0, Ordering::Relaxed);
+                let _ = app_handle.emit("preview-level", 0.0f32);
             }
         }
 
-        match command_rx.recv_timeout(Duration::from_millis(50)) {
+        // Emit preview level event when playing
+        if is_playing {
+            let level = f32::from_bits(preview_level.load(Ordering::Relaxed));
+            let _ = app_handle.emit("preview-level", level);
+        }
+
+        match command_rx.recv_timeout(Duration::from_millis(33)) {
+            // ~30 FPS for level updates
             Ok(command) => match command {
                 PreviewCommand::Play {
                     path,
@@ -149,6 +243,8 @@ fn run_preview_thread(
                     }
                     _current_stream = None;
                     _current_stream_handle = None;
+                    is_playing = false;
+                    preview_level.store(0, Ordering::Relaxed);
 
                     // Find the output device
                     let device = match find_output_device(&device_name) {
@@ -194,13 +290,20 @@ fn run_preview_thread(
                         }
                     };
 
-                    // Play the sound
-                    sink.append(source);
+                    // Wrap source with level tracking and convert to f32
+                    use rodio::Source;
+                    let source_f32 = source.convert_samples::<f32>();
+                    let level_tracking_source =
+                        LevelTrackingSource::new(source_f32, preview_level.clone());
+
+                    // Play the sound with level tracking
+                    sink.append(level_tracking_source);
 
                     // Store state
                     current_sink = Some(sink);
                     _current_stream = Some(stream);
                     _current_stream_handle = Some(stream_handle);
+                    is_playing = true;
 
                     if let Ok(mut current) = current_pad_id.lock() {
                         *current = Some(pad_id.clone());
@@ -222,6 +325,10 @@ fn run_preview_thread(
                     }
                     _current_stream = None;
                     _current_stream_handle = None;
+                    is_playing = false;
+                    preview_level.store(0, Ordering::Relaxed);
+                    // Emit final level 0 to reset the VU meter
+                    let _ = app_handle.emit("preview-level", 0.0f32);
                 }
 
                 PreviewCommand::Shutdown => {

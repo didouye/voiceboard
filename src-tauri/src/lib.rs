@@ -128,6 +128,7 @@ pub fn run() {
                                 input_peak,
                                 output_rms,
                                 output_peak,
+                                monitoring_rms,
                             } => {
                                 let _ = app_handle.emit(
                                     "audio-levels",
@@ -136,6 +137,7 @@ pub fn run() {
                                         "inputPeak": input_peak,
                                         "outputRms": output_rms,
                                         "outputPeak": output_peak,
+                                        "monitoringRms": monitoring_rms,
                                     }),
                                 );
                             }
