@@ -72,92 +72,108 @@ import { ShortcutService } from '../../../core/services/shortcut.service';
           </button>
         </div>
 
-        <!-- Settings popup with backdrop -->
+        <!-- Settings modal (centered) -->
         @if (showSettingsPopup) {
-          <!-- Invisible backdrop to capture clicks outside popup -->
           <div
-            class="fixed inset-0 z-40"
+            class="fixed inset-0 z-50 flex items-center justify-center"
             (click)="closePopup($event)"
-          ></div>
-          <div
-            class="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-surface border border-border rounded-lg p-3 min-w-[180px] z-50 shadow-xl"
-            (click)="$event.stopPropagation()"
           >
-            <!-- Volume -->
-            <div class="mb-3">
-              <div class="flex justify-between items-center mb-2 text-xs">
-                <span class="text-text-secondary">Volume</span>
-                <span class="text-text-primary font-semibold">{{ Math.round(pad.volume * 100) }}%</span>
-              </div>
-              <input
-                type="range"
-                [ngModel]="pad.volume"
-                (ngModelChange)="onVolumeChange($event)"
-                min="0" max="2" step="0.05"
-                class="w-full h-1.5 bg-surface-hover rounded-full appearance-none cursor-pointer
-                       [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3
-                       [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer"
-              >
-              <div class="flex justify-between text-[10px] text-text-muted mt-1">
-                <span>0%</span>
-                <span>100%</span>
-                <span>200%</span>
-              </div>
-            </div>
+            <!-- Dark backdrop -->
+            <div class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
 
-            <!-- Speed -->
-            <div class="pt-3 border-t border-border">
-              <div class="flex justify-between items-center mb-2 text-xs">
-                <span class="text-text-secondary">Speed</span>
-                <span class="text-text-primary font-semibold">{{ pad.speed }}x</span>
-              </div>
-              <div class="flex flex-wrap gap-1">
-                @for (s of speedOptions; track s) {
-                  <button
-                    class="flex-1 min-w-[40px] px-2 py-1 text-[10px] rounded border transition-colors"
-                    [class]="pad.speed === s
-                      ? 'bg-accent border-accent text-white'
-                      : 'bg-surface-hover border-border text-text-secondary hover:text-text-primary'"
-                    (click)="onSpeedChange(s)"
-                  >
-                    {{ s }}x
-                  </button>
-                }
-              </div>
-            </div>
-
-            <!-- Shortcut -->
-            <div class="pt-3 border-t border-border">
-              <div class="flex justify-between items-center mb-2 text-xs">
-                <span class="text-text-secondary">Shortcut</span>
-              </div>
-              <div class="flex gap-1">
-                <button
-                  class="flex-1 px-3 py-1.5 text-xs rounded border transition-colors text-left"
-                  [class]="isRecording
-                    ? 'bg-accent border-accent text-white animate-pulse'
-                    : 'bg-surface-hover border-border text-text-primary hover:border-text-muted'"
-                  (click)="startRecording($event)"
-                >
-                  {{ isRecording ? 'Press keys...' : (pad.hotkey || 'Click to set') }}
-                </button>
-                @if (pad.hotkey) {
-                  <button
-                    class="px-2 text-text-muted hover:text-status-error transition-colors"
-                    (click)="clearShortcut($event)"
-                    title="Clear shortcut"
-                  >&times;</button>
-                }
-              </div>
-            </div>
-
-            <!-- Reset button -->
-            <button
-              class="w-full mt-3 py-1.5 text-xs text-text-secondary hover:text-text-primary bg-surface-hover hover:bg-border rounded transition-colors"
-              (click)="resetAll()"
+            <!-- Modal content -->
+            <div
+              class="relative bg-surface border border-border rounded-xl p-4 w-[280px] shadow-xl animate-scale-in"
+              (click)="$event.stopPropagation()"
             >
-              Reset to defaults
-            </button>
+              <!-- Header -->
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-semibold text-text-primary truncate">{{ pad.sound.name }}</h3>
+                <button
+                  class="w-6 h-6 flex items-center justify-center rounded hover:bg-surface-hover text-text-secondary hover:text-text-primary transition-colors"
+                  (click)="closePopup($event)"
+                >
+                  &#10005;
+                </button>
+              </div>
+
+              <!-- Volume -->
+              <div class="mb-4">
+                <div class="flex justify-between items-center mb-2 text-xs">
+                  <span class="text-text-secondary">Volume</span>
+                  <span class="text-text-primary font-semibold">{{ Math.round(pad.volume * 100) }}%</span>
+                </div>
+                <input
+                  type="range"
+                  [ngModel]="pad.volume"
+                  (ngModelChange)="onVolumeChange($event)"
+                  min="0" max="2" step="0.05"
+                  class="w-full h-1.5 bg-surface-hover rounded-full appearance-none cursor-pointer
+                         [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3
+                         [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer"
+                >
+                <div class="flex justify-between text-[10px] text-text-muted mt-1">
+                  <span>0%</span>
+                  <span>100%</span>
+                  <span>200%</span>
+                </div>
+              </div>
+
+              <!-- Speed -->
+              <div class="mb-4 pt-4 border-t border-border">
+                <div class="flex justify-between items-center mb-2 text-xs">
+                  <span class="text-text-secondary">Speed</span>
+                  <span class="text-text-primary font-semibold">{{ pad.speed }}x</span>
+                </div>
+                <div class="flex flex-wrap gap-1">
+                  @for (s of speedOptions; track s) {
+                    <button
+                      class="flex-1 min-w-[40px] px-2 py-1.5 text-xs rounded border transition-colors"
+                      [class]="pad.speed === s
+                        ? 'bg-accent border-accent text-white'
+                        : 'bg-surface-hover border-border text-text-secondary hover:text-text-primary'"
+                      (click)="onSpeedChange(s)"
+                    >
+                      {{ s }}x
+                    </button>
+                  }
+                </div>
+              </div>
+
+              <!-- Shortcut -->
+              <div class="mb-4 pt-4 border-t border-border">
+                <div class="flex justify-between items-center mb-2 text-xs">
+                  <span class="text-text-secondary">Shortcut</span>
+                </div>
+                <div class="flex gap-1">
+                  <button
+                    class="flex-1 px-3 py-2 text-xs rounded border transition-colors text-left"
+                    [class]="isRecording
+                      ? 'bg-accent border-accent text-white animate-pulse'
+                      : 'bg-surface-hover border-border text-text-primary hover:border-text-muted'"
+                    (click)="startRecording($event)"
+                  >
+                    {{ isRecording ? 'Press keys...' : (pad.hotkey || 'Click to set') }}
+                  </button>
+                  @if (pad.hotkey) {
+                    <button
+                      class="px-2 text-text-muted hover:text-status-error transition-colors"
+                      (click)="clearShortcut($event)"
+                      title="Clear shortcut"
+                    >&times;</button>
+                  }
+                </div>
+                <p class="text-[10px] text-text-muted mt-1">Use Ctrl, Alt, Shift or Cmd + key</p>
+              </div>
+
+              <!-- Reset button -->
+              <button
+                class="w-full py-2 text-xs text-text-secondary hover:text-text-primary bg-surface-hover hover:bg-border rounded transition-colors"
+                (click)="resetAll()"
+              >
+                Reset to defaults
+              </button>
+            </div>
           </div>
         }
       } @else {
