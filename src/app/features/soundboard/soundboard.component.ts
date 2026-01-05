@@ -4,7 +4,6 @@ import { SoundboardService } from '../../core/services/soundboard.service';
 import { SoundPadComponent } from './sound-pad/sound-pad.component';
 import { listen, TauriEvent } from '@tauri-apps/api/event';
 
-// Default hotkeys for first 12 pads: 1-9, 0, -, =
 const DEFAULT_HOTKEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '='];
 
 @Component({
@@ -12,27 +11,40 @@ const DEFAULT_HOTKEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', 
   standalone: true,
   imports: [CommonModule, SoundPadComponent],
   template: `
-    <div class="soundboard-container">
-      <div class="soundboard-header">
-        <h2>Soundboard</h2>
-        <div class="header-actions">
+    <div class="h-full flex flex-col">
+      <!-- Header -->
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-semibold text-text-primary">
+          {{ soundboard.activeFolder()?.name || 'Soundboard' }}
+        </h2>
+        <div class="flex items-center gap-2">
           @if (soundboard.playingCount() > 0) {
-            <button class="btn-stop-all" (click)="soundboard.stopAll()">
-              Stop All ({{ soundboard.playingCount() }})
+            <button
+              class="px-4 py-2 bg-status-error hover:bg-status-error/80 text-white rounded-lg text-sm font-medium transition-colors"
+              (click)="soundboard.stopAll()"
+            >
+              &#9632; Stop All ({{ soundboard.playingCount() }})
             </button>
           }
         </div>
       </div>
 
+      <!-- Error message -->
       @if (soundboard.error()) {
-        <div class="error-message">
-          {{ soundboard.error() }}
-          <button (click)="soundboard.clearError()">Dismiss</button>
+        <div class="mb-4 px-4 py-3 bg-status-error/20 border border-status-error/50 rounded-lg flex items-center justify-between">
+          <span class="text-status-error text-sm">{{ soundboard.error() }}</span>
+          <button
+            class="px-3 py-1 text-xs text-status-error border border-status-error/50 rounded hover:bg-status-error/20 transition-colors"
+            (click)="soundboard.clearError()"
+          >
+            Dismiss
+          </button>
         </div>
       }
 
-      <div class="pads-container">
-        <div class="pads-grid">
+      <!-- Pads grid -->
+      <div class="flex-1 relative">
+        <div class="grid grid-cols-4 gap-3">
           @for (pad of soundboard.pads(); track pad.id; let i = $index) {
             <app-sound-pad
               [pad]="pad"
@@ -49,157 +61,32 @@ const DEFAULT_HOTKEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', 
           }
         </div>
 
+        <!-- Drop overlay -->
         @if (isDragging()) {
-          <div class="drop-overlay">
-            <span>Drop to import {{ dragFileCount() }} file{{ dragFileCount() > 1 ? 's' : '' }}</span>
+          <div class="absolute inset-0 bg-accent/80 border-2 border-dashed border-white rounded-xl flex items-center justify-center z-10">
+            <span class="text-white text-lg font-medium">
+              Drop to import {{ dragFileCount() }} file{{ dragFileCount() > 1 ? 's' : '' }}
+            </span>
           </div>
         }
       </div>
 
-      <div class="soundboard-footer">
+      <!-- Footer -->
+      <div class="mt-4 flex justify-center">
         <button
-          class="btn-import-multiple"
-          (click)="importMultiple()"
+          class="px-6 py-3 bg-surface-hover border border-dashed border-border hover:border-accent text-text-secondary hover:text-text-primary rounded-lg text-sm transition-all flex items-center gap-2"
+          [class.opacity-50]="soundboard.loading()"
+          [class.cursor-not-allowed]="soundboard.loading()"
           [disabled]="soundboard.loading()"
+          (click)="importMultiple()"
         >
-          <span class="icon">📁</span>
+          <span>&#128193;</span>
           Import Multiple
         </button>
       </div>
     </div>
   `,
-  styles: [`
-    .soundboard-container {
-      background: rgba(255, 255, 255, 0.03);
-      border-radius: 12px;
-      padding: 20px;
-    }
-
-    .soundboard-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-    }
-
-    .soundboard-header h2 {
-      margin: 0;
-      font-size: 1.2rem;
-      color: #aaa;
-    }
-
-    .header-actions {
-      display: flex;
-      gap: 10px;
-    }
-
-    .btn-stop-all {
-      background: #e74c3c;
-      border: none;
-      color: white;
-      padding: 8px 16px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 0.85rem;
-      transition: background 0.2s;
-    }
-
-    .btn-stop-all:hover {
-      background: #c0392b;
-    }
-
-    .error-message {
-      background: rgba(231, 76, 60, 0.2);
-      border: 1px solid #e74c3c;
-      color: #e74c3c;
-      padding: 10px 15px;
-      border-radius: 6px;
-      margin-bottom: 15px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 0.9rem;
-    }
-
-    .error-message button {
-      background: transparent;
-      border: 1px solid #e74c3c;
-      color: #e74c3c;
-      padding: 4px 10px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 0.8rem;
-    }
-
-    .pads-container {
-      position: relative;
-    }
-
-    .pads-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-      gap: 12px;
-    }
-
-    .drop-overlay {
-      position: absolute;
-      inset: 0;
-      background: rgba(52, 152, 219, 0.85);
-      border: 3px dashed #fff;
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 10;
-    }
-
-    .drop-overlay span {
-      color: #fff;
-      font-size: 1.2rem;
-      font-weight: 500;
-    }
-
-    .soundboard-footer {
-      display: flex;
-      justify-content: center;
-      margin-top: 16px;
-    }
-
-    .btn-import-multiple {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px dashed rgba(255, 255, 255, 0.3);
-      color: #aaa;
-      padding: 10px 20px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 0.9rem;
-      transition: all 0.2s;
-    }
-
-    .btn-import-multiple:hover:not(:disabled) {
-      background: rgba(255, 255, 255, 0.12);
-      border-color: rgba(255, 255, 255, 0.5);
-      color: #fff;
-    }
-
-    .btn-import-multiple:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .btn-import-multiple .icon {
-      font-size: 1.1rem;
-    }
-
-    @media (max-width: 600px) {
-      .pads-grid {
-        grid-template-columns: repeat(3, 1fr);
-      }
-    }
-  `]
+  styles: []
 })
 export class SoundboardComponent implements OnInit, OnDestroy {
   constructor(public soundboard: SoundboardService) {}
@@ -311,16 +198,11 @@ export class SoundboardComponent implements OnInit, OnDestroy {
     return undefined;
   }
 
-  /**
-   * Handle Import Multiple button click
-   */
   async importMultiple(): Promise<void> {
     const result = await this.soundboard.importMultipleSounds();
 
     if (result.errors.length > 0) {
-      const errorMessage = `Imported ${result.imported} files.\nFailed (${result.errors.length}):\n${result.errors.join('\n')}`;
-      console.warn(errorMessage);
-      // TODO: Show toast notification instead of console
+      console.warn(`Imported ${result.imported} files.\nFailed (${result.errors.length}):\n${result.errors.join('\n')}`);
     }
   }
 
