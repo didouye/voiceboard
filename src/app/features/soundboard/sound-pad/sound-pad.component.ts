@@ -160,7 +160,7 @@ import { convertFileSrc } from '@tauri-apps/api/core';
                 <input
                   #imageUpload
                   type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  accept="image/*,.jpg,.jpeg,.png,.webp,.gif"
                   class="hidden"
                   (change)="uploadImage($event)"
                 >
