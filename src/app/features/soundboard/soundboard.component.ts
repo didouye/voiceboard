@@ -214,8 +214,13 @@ export class SoundboardComponent implements OnInit, OnDestroy {
 
         if (audioPaths.length === 0) return;
 
-        // Take snapshot of pads before import
-        const padsBefore = this.soundboard.pads().map(p => ({ id: p.id, soundPath: p.sound?.path }));
+        // Take snapshot of existing sound paths before import
+        // We track paths because pads get reorganized after import (sorted alphabetically)
+        const existingPaths = new Set(
+          this.soundboard.pads()
+            .filter(p => p.sound)
+            .map(p => p.sound!.path)
+        );
 
         const result = await this.soundboard.importSoundsFromPaths(audioPaths);
 
@@ -223,15 +228,13 @@ export class SoundboardComponent implements OnInit, OnDestroy {
           console.warn(`Imported ${result.imported} files. Failed: ${result.errors.join(', ')}`);
         }
 
-        // If successful imports, find newly imported pads and trigger suggestion
+        // If successful imports, find pads with newly imported sounds
+        // A "new" sound is one whose path didn't exist before import
         if (result.imported > 0) {
           const padsAfter = this.soundboard.pads();
-          const newPads = padsAfter.filter(padAfter => {
-            const padBeforeIndex = padsBefore.findIndex(pb => pb.id === padAfter.id);
-            if (padBeforeIndex === -1) return false;
-            const padBefore = padsBefore[padBeforeIndex];
-            return padAfter.sound && padAfter.sound.path !== padBefore.soundPath;
-          });
+          const newPads = padsAfter.filter(pad =>
+            pad.sound && !existingPaths.has(pad.sound.path)
+          );
 
           if (newPads.length === 1) {
             // Single import: show toast
@@ -283,8 +286,13 @@ export class SoundboardComponent implements OnInit, OnDestroy {
   }
 
   async importMultiple(): Promise<void> {
-    // Take snapshot of pads before import
-    const padsBefore = this.soundboard.pads().map(p => ({ id: p.id, soundPath: p.sound?.path }));
+    // Take snapshot of existing sound paths before import
+    // We track paths because pads get reorganized after import (sorted alphabetically)
+    const existingPaths = new Set(
+      this.soundboard.pads()
+        .filter(p => p.sound)
+        .map(p => p.sound!.path)
+    );
 
     const result = await this.soundboard.importMultipleSounds();
 
@@ -292,15 +300,13 @@ export class SoundboardComponent implements OnInit, OnDestroy {
       console.warn(`Imported ${result.imported} files.\nFailed (${result.errors.length}):\n${result.errors.join('\n')}`);
     }
 
-    // If successful imports, find newly imported pads and trigger suggestion
+    // If successful imports, find pads with newly imported sounds
+    // A "new" sound is one whose path didn't exist before import
     if (result.imported > 0) {
       const padsAfter = this.soundboard.pads();
-      const newPads = padsAfter.filter(padAfter => {
-        const padBeforeIndex = padsBefore.findIndex(pb => pb.id === padAfter.id);
-        if (padBeforeIndex === -1) return false;
-        const padBefore = padsBefore[padBeforeIndex];
-        return padAfter.sound && padAfter.sound.path !== padBefore.soundPath;
-      });
+      const newPads = padsAfter.filter(pad =>
+        pad.sound && !existingPaths.has(pad.sound.path)
+      );
 
       if (newPads.length === 1) {
         // Single import: show toast

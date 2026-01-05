@@ -148,51 +148,80 @@ import { open } from '@tauri-apps/plugin-dialog';
               <span class="text-text-secondary">Image</span>
             </div>
 
-            <!-- Preview -->
-            <div class="flex items-center gap-3 mb-3">
-              <div class="w-16 h-16 rounded-lg overflow-hidden bg-surface-hover flex items-center justify-center border border-border">
+            <!-- Image Preview (clickable) -->
+            <div class="relative">
+              <button
+                class="relative w-full aspect-video rounded-lg overflow-hidden bg-surface-hover border border-border transition-all hover:border-accent group/img"
+                [disabled]="imageLoading()"
+                (click)="toggleImageOptions()"
+              >
                 @if (imageUrl()) {
                   <img [src]="imageUrl()" alt="" class="w-full h-full object-cover">
                 } @else {
-                  <span class="text-2xl text-text-muted">&#128247;</span>
+                  <!-- Placeholder -->
+                  <div class="flex flex-col items-center justify-center h-full text-text-muted">
+                    <span class="text-3xl mb-1">&#128247;</span>
+                    <span class="text-xs">Cliquez pour ajouter</span>
+                  </div>
                 }
-              </div>
-              <div class="flex flex-col gap-1">
+                <!-- Hover overlay -->
+                <div class="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity">
+                  <span class="text-white text-sm font-medium">Modifier</span>
+                </div>
+              </button>
+
+              <!-- Remove button (top-right, only when image exists) -->
+              @if (pad.image && !imageLoading()) {
                 <button
-                  class="px-3 py-1.5 text-xs bg-surface-hover hover:bg-border rounded transition-colors text-text-secondary hover:text-text-primary"
-                  (click)="uploadImage()"
-                  [disabled]="imageLoading()"
+                  class="absolute top-2 right-2 w-6 h-6 bg-status-error/90 hover:bg-status-error rounded-full flex items-center justify-center text-white text-xs shadow-lg transition-colors"
+                  (click)="removeImage(); $event.stopPropagation()"
+                  title="Supprimer l'image"
                 >
-                  Upload
+                  &#128465;
                 </button>
-                <button
-                  class="px-3 py-1.5 text-xs bg-surface-hover hover:bg-border rounded transition-colors text-text-secondary hover:text-text-primary"
-                  (click)="showImageSearch = !showImageSearch"
-                  [disabled]="imageLoading()"
-                >
-                  {{ showImageSearch ? 'Close search' : 'Search' }}
-                </button>
-                @if (pad.image) {
+              }
+
+              <!-- Loading overlay -->
+              @if (imageLoading()) {
+                <div class="absolute inset-0 bg-black/50 flex items-center justify-center rounded-lg">
+                  <span class="text-white text-sm">Chargement...</span>
+                </div>
+              }
+            </div>
+
+            <!-- Image Options Modal -->
+            @if (showImageOptions) {
+              <div class="mt-2 p-3 bg-background rounded-lg border border-border animate-fade-in">
+                <div class="flex gap-2 mb-3">
                   <button
-                    class="px-3 py-1.5 text-xs text-status-error hover:bg-status-error/10 rounded transition-colors"
-                    (click)="removeImage()"
+                    class="flex-1 px-3 py-2 text-sm bg-surface-hover hover:bg-border rounded transition-colors text-text-secondary hover:text-text-primary flex items-center justify-center gap-2"
+                    (click)="uploadImage()"
                     [disabled]="imageLoading()"
                   >
-                    Remove
+                    <span>&#128193;</span>
+                    <span>Fichier local</span>
                   </button>
-                }
+                  <button
+                    class="flex-1 px-3 py-2 text-sm bg-surface-hover hover:bg-border rounded transition-colors text-text-secondary hover:text-text-primary flex items-center justify-center gap-2"
+                    (click)="showImageSearch = !showImageSearch; showImageOptions = false"
+                    [disabled]="imageLoading()"
+                  >
+                    <span>&#128269;</span>
+                    <span>Recherche en ligne</span>
+                  </button>
+                </div>
               </div>
-            </div>
+            }
 
             <!-- Search Section (expandable) -->
             @if (showImageSearch) {
-              <div class="p-3 bg-background rounded-lg border border-border">
+              <div class="mt-2 p-3 bg-background rounded-lg border border-border animate-fade-in">
                 <div class="flex gap-2 mb-3">
                   <input
                     type="text"
                     [(ngModel)]="imageSearchQuery"
                     (keydown.enter)="searchImages()"
-                    placeholder="Search images..."
+                    placeholder="Rechercher des images..."
                     class="flex-1 px-3 py-2 text-sm bg-surface-hover border border-border rounded text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
                   >
                   <button
@@ -200,7 +229,7 @@ import { open } from '@tauri-apps/plugin-dialog';
                     [disabled]="imageLoading()"
                     (click)="searchImages()"
                   >
-                    {{ imageLoading() ? '...' : 'Search' }}
+                    {{ imageLoading() ? '...' : 'Chercher' }}
                   </button>
                 </div>
 
@@ -220,9 +249,17 @@ import { open } from '@tauri-apps/plugin-dialog';
                   </div>
                 } @else if (!imageLoading()) {
                   <p class="text-xs text-text-muted text-center py-4">
-                    Search for images
+                    Recherchez des images
                   </p>
                 }
+
+                <!-- Close button -->
+                <button
+                  class="w-full mt-3 py-1.5 text-xs text-text-muted hover:text-text-primary transition-colors"
+                  (click)="showImageSearch = false"
+                >
+                  Fermer
+                </button>
               </div>
             }
           </div>
@@ -356,6 +393,7 @@ export class SoundPadComponent implements OnInit, OnChanges {
   speedOptions = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
   // Image management properties
+  showImageOptions = false;
   showImageSearch = false;
   imageSearchQuery = '';
   imageSearchResults = signal<ImageSearchResult[]>([]);
@@ -508,6 +546,14 @@ export class SoundPadComponent implements OnInit, OnChanges {
     this.customNameChange.emit(name.trim() || null);
   }
 
+  toggleImageOptions(): void {
+    this.showImageOptions = !this.showImageOptions;
+    // Close search when toggling options
+    if (this.showImageOptions) {
+      this.showImageSearch = false;
+    }
+  }
+
   async searchImages(): Promise<void> {
     if (!this.imageSearchQuery.trim()) return;
 
@@ -568,6 +614,9 @@ export class SoundPadComponent implements OnInit, OnChanges {
   }
 
   async uploadImage(): Promise<void> {
+    // Close options modal immediately
+    this.showImageOptions = false;
+
     try {
       // Open native file picker with image filter
       const selected = await open({
