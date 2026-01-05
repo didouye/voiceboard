@@ -519,8 +519,23 @@ export class SoundPadComponent implements OnInit {
       this.imageLoading.set(true);
       this.selectedImageId.set(result.id);
 
-      // Download image
-      const { data, extension } = await this.imageSearchService.downloadImage(result.fullUrl);
+      // Try full URL first, fall back to thumbnail if it fails
+      let data: Uint8Array;
+      let extension: string;
+      let usedUrl = result.fullUrl;
+
+      try {
+        const downloaded = await this.imageSearchService.downloadImage(result.fullUrl);
+        data = downloaded.data;
+        extension = downloaded.extension;
+      } catch (fullUrlErr) {
+        console.warn('Full URL failed, trying thumbnail:', fullUrlErr);
+        // Fall back to thumbnail
+        const downloaded = await this.imageSearchService.downloadImage(result.thumbnailUrl);
+        data = downloaded.data;
+        extension = downloaded.extension;
+        usedUrl = result.thumbnailUrl;
+      }
 
       // Save to backend
       const localPath = await this.tauri.savePadImage(this.pad.id, data, extension);
@@ -528,7 +543,7 @@ export class SoundPadComponent implements OnInit {
       // Update pad
       const image: PadImage = {
         localPath,
-        originalUrl: result.fullUrl,
+        originalUrl: usedUrl,
         attribution: result.title
       };
       this.imageChange.emit(image);
@@ -537,6 +552,8 @@ export class SoundPadComponent implements OnInit {
       this.selectedImageId.set(null);
     } catch (err) {
       console.error('Failed to save image:', err);
+      this.selectedImageId.set(null);
+      alert('Failed to download image. Try another one.');
     } finally {
       this.imageLoading.set(false);
     }
