@@ -11,9 +11,10 @@ import { ShortcutService } from '../../../core/services/shortcut.service';
   imports: [CommonModule, FormsModule],
   template: `
     <div
-      class="aspect-square rounded-xl cursor-pointer relative overflow-visible transition-all duration-150 flex items-center justify-center group"
+      class="aspect-square max-w-[140px] rounded-xl cursor-pointer relative overflow-visible transition-all duration-150 flex items-center justify-center group"
       [class]="padClasses"
       [style.--pad-color]="pad.color"
+      [title]="pad.sound?.name || ''"
       (click)="onClick($event)"
       (contextmenu)="onRightClick($event)"
     >
