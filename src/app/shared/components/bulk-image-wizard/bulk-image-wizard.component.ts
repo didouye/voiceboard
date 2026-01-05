@@ -65,7 +65,7 @@ interface PadImageSelection {
           </div>
         } @else {
           <div class="h-48 flex items-center justify-center text-text-muted">
-            Search for images on Pexels
+            Search for images
           </div>
         }
 

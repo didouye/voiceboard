@@ -69,7 +69,7 @@ export interface PadImage {
   localPath: string;
   /** Original URL source (for attribution) */
   originalUrl?: string;
-  /** Attribution text (e.g., "Photo by X on Pexels") */
+  /** Attribution text for the image source */
   attribution?: string;
 }
 

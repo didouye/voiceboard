@@ -137,8 +137,4 @@ export class ImageSearchService {
     return words.slice(0, 3).join(' ').toLowerCase();
   }
 
-  // Removed Pexels-specific methods:
-  // - setApiKey()
-  // - testApiKey()
-  // - apiKey signal
 }
