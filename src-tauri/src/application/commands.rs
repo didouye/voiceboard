@@ -119,6 +119,12 @@ pub struct AudioSettingsDto {
     pub buffer_size: u32,
     #[serde(default)]
     pub mic_monitoring: bool,
+    #[serde(default = "default_global_hotkeys")]
+    pub global_hotkeys_enabled: bool,
+}
+
+fn default_global_hotkeys() -> bool {
+    true
 }
 
 impl From<&AudioSettings> for AudioSettingsDto {
@@ -131,6 +137,7 @@ impl From<&AudioSettings> for AudioSettingsDto {
             sample_rate: settings.sample_rate,
             buffer_size: settings.buffer_size,
             mic_monitoring: settings.mic_monitoring,
+            global_hotkeys_enabled: settings.global_hotkeys_enabled,
         }
     }
 }
@@ -145,6 +152,7 @@ impl From<AudioSettingsDto> for AudioSettings {
             sample_rate: dto.sample_rate,
             buffer_size: dto.buffer_size,
             mic_monitoring: dto.mic_monitoring,
+            global_hotkeys_enabled: dto.global_hotkeys_enabled,
         }
     }
 }
@@ -1625,6 +1633,7 @@ mod tests {
             sample_rate: 48000,
             buffer_size: 512,
             mic_monitoring: true,
+            global_hotkeys_enabled: true,
         };
 
         let dto = AudioSettingsDto::from(&settings);
@@ -1648,6 +1657,7 @@ mod tests {
             sample_rate: 44100,
             buffer_size: 256,
             mic_monitoring: false,
+            global_hotkeys_enabled: true,
         };
 
         let settings = AudioSettings::from(dto);
@@ -1671,6 +1681,7 @@ mod tests {
             sample_rate: 48000,
             buffer_size: 1024,
             mic_monitoring: true,
+            global_hotkeys_enabled: true,
         };
 
         let dto = AudioSettingsDto::from(&original);
@@ -1712,6 +1723,7 @@ mod tests {
                 sample_rate: 48000,
                 buffer_size: 512,
                 mic_monitoring: false,
+                global_hotkeys_enabled: true,
             },
             start_minimized: false,
             auto_start_mixing: true,
@@ -1734,6 +1746,7 @@ mod tests {
                 sample_rate: 44100,
                 buffer_size: 256,
                 mic_monitoring: true,
+                global_hotkeys_enabled: true,
             },
             start_minimized: true,
             auto_start_mixing: true,
@@ -1866,6 +1879,7 @@ mod tests {
             sample_rate: 48000,
             buffer_size: 512,
             mic_monitoring: true,
+            global_hotkeys_enabled: true,
         };
 
         let json = serde_json::to_string(&dto).unwrap();

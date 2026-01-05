@@ -2,6 +2,10 @@
 
 use serde::{Deserialize, Serialize};
 
+fn default_global_hotkeys() -> bool {
+    true
+}
+
 /// User preferences for audio devices
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AudioSettings {
@@ -20,6 +24,9 @@ pub struct AudioSettings {
     /// Enable mic monitoring on preview output
     #[serde(default)]
     pub mic_monitoring: bool,
+    /// Enable global hotkeys for keyboard shortcuts
+    #[serde(default = "default_global_hotkeys")]
+    pub global_hotkeys_enabled: bool,
 }
 
 impl AudioSettings {
@@ -32,6 +39,7 @@ impl AudioSettings {
             sample_rate: 48000,
             buffer_size: 1024,
             mic_monitoring: false,
+            global_hotkeys_enabled: true,
         }
     }
 }

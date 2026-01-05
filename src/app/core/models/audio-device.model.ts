@@ -34,6 +34,7 @@ export interface AudioSettings {
   sampleRate: number;
   bufferSize: number;
   micMonitoring: boolean;
+  globalHotkeysEnabled: boolean;
 }
 
 export interface AppSettings {
