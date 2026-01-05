@@ -1174,6 +1174,29 @@ pub async fn delete_pad_image(
     Ok(())
 }
 
+/// Read an image file from disk
+/// Used for uploading local images
+#[tauri::command]
+pub async fn read_image_file(path: String) -> Result<Vec<u8>, String> {
+    // Validate file extension
+    let path_lower = path.to_lowercase();
+    let valid_extensions = [".jpg", ".jpeg", ".png", ".webp", ".gif"];
+    if !valid_extensions.iter().any(|ext| path_lower.ends_with(ext)) {
+        return Err("Invalid image format. Use JPG, PNG, WebP, or GIF.".to_string());
+    }
+
+    // Read file
+    let data = std::fs::read(&path)
+        .map_err(|e| format!("Failed to read image: {}", e))?;
+
+    // Validate file size (10MB max)
+    if data.len() > 10 * 1024 * 1024 {
+        return Err("Image too large. Maximum size is 10MB.".to_string());
+    }
+
+    Ok(data)
+}
+
 /// Clean up orphaned images (not referenced by any pad)
 /// Called on app startup
 #[tauri::command]

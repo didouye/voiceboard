@@ -6,7 +6,8 @@ import { SoundboardService } from '../../../core/services/soundboard.service';
 import { ShortcutService } from '../../../core/services/shortcut.service';
 import { TauriService } from '../../../core/services/tauri.service';
 import { ImageSearchService, ImageSearchResult } from '../../../core/services/image-search.service';
-import { convertFileSrc } from '@tauri-apps/api/core';
+import { convertFileSrc, invoke } from '@tauri-apps/api/core';
+import { open } from '@tauri-apps/plugin-dialog';
 
 @Component({
   selector: 'app-sound-pad',
@@ -157,16 +158,9 @@ import { convertFileSrc } from '@tauri-apps/api/core';
                 }
               </div>
               <div class="flex flex-col gap-1">
-                <input
-                  #imageUpload
-                  type="file"
-                  accept="image/*,.jpg,.jpeg,.png,.webp,.gif"
-                  class="hidden"
-                  (change)="uploadImage($event)"
-                >
                 <button
                   class="px-3 py-1.5 text-xs bg-surface-hover hover:bg-border rounded transition-colors text-text-secondary hover:text-text-primary"
-                  (click)="imageUpload.click()"
+                  (click)="uploadImage()"
                   [disabled]="imageLoading()"
                 >
                   Upload
@@ -573,39 +567,43 @@ export class SoundPadComponent implements OnInit, OnChanges {
     }
   }
 
-  async uploadImage(event: Event): Promise<void> {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file) return;
-
-    // Validate file type
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-    if (!validTypes.includes(file.type)) {
-      alert('Unsupported image format. Use JPG, PNG, WebP, or GIF.');
-      return;
-    }
-
-    // Validate file size (10MB max)
-    if (file.size > 10 * 1024 * 1024) {
-      alert('Image too large. Maximum size is 10MB.');
-      return;
-    }
-
+  async uploadImage(): Promise<void> {
     try {
+      // Open native file picker with image filter
+      const selected = await open({
+        multiple: false,
+        filters: [{
+          name: 'Images',
+          extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif']
+        }]
+      });
+
+      if (!selected) return; // User cancelled
+
+      const filePath = selected as string;
       this.imageLoading.set(true);
 
-      const data = new Uint8Array(await file.arrayBuffer());
-      const extension = file.name.split('.').pop() || 'jpg';
+      // Read file via backend (validates format and size)
+      const data = await invoke<number[]>('read_image_file', { path: filePath });
 
-      const localPath = await this.tauri.savePadImage(this.pad.id, data, extension);
+      // Get extension from path
+      const extension = filePath.split('.').pop()?.toLowerCase() || 'jpg';
+
+      // Save image
+      const localPath = await this.tauri.savePadImage(
+        this.pad.id,
+        new Uint8Array(data),
+        extension
+      );
 
       const image: PadImage = { localPath };
       this.imageChange.emit(image);
     } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
       console.error('Failed to upload image:', err);
+      alert(message);
     } finally {
       this.imageLoading.set(false);
-      input.value = ''; // Reset input
     }
   }
 

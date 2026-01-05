@@ -60,6 +60,7 @@ use application::{
         preview_sound,
         remove_channel,
         save_pad_image,
+        read_image_file,
         save_settings,
         // Soundboard persistence
         save_soundboard,
@@ -284,6 +285,7 @@ pub fn run() {
             // Image management
             get_images_dir,
             save_pad_image,
+            read_image_file,
             delete_pad_image,
             cleanup_orphaned_images,
             // Updates
