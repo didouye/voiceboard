@@ -44,6 +44,7 @@ anyhow = "1"
 
 # Utilities
 uuid = { version = "1", features = ["v4"] }
+sha2 = "0.10"
 
 # VB-Cable installer download
 reqwest = { version = "0.12", features = ["stream"] }

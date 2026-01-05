@@ -30,11 +30,15 @@ use application::{
         // VB-Cable setup
         check_vb_cable_installed,
         check_virtual_driver,
+        cleanup_orphaned_images,
+        delete_pad_image,
         download_and_install_vb_cable,
         // Device management
         get_audio_devices,
         // Debug
         get_debug_mode,
+        // Image management
+        get_images_dir,
         get_input_devices,
         // Mixer configuration
         get_mixer_config,
@@ -55,6 +59,7 @@ use application::{
         play_sound,
         preview_sound,
         remove_channel,
+        save_pad_image,
         save_settings,
         // Soundboard persistence
         save_soundboard,
@@ -258,6 +263,11 @@ pub fn run() {
             // Soundboard persistence
             save_soundboard,
             load_soundboard,
+            // Image management
+            get_images_dir,
+            save_pad_image,
+            delete_pad_image,
+            cleanup_orphaned_images,
             // Updates
             check_for_update,
             install_update,

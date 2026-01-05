@@ -8,7 +8,7 @@ use crate::domain::{
 };
 use crate::ports::DeviceManager;
 use serde::{Deserialize, Serialize};
-use tauri::{Emitter, State};
+use tauri::{Emitter, Manager, State};
 use tauri_plugin_store::StoreExt;
 
 /// Settings store key
@@ -1076,6 +1076,152 @@ pub async fn load_soundboard(app: tauri::AppHandle) -> Result<Option<serde_json:
     let pads = store.get(SOUNDBOARD_KEY).map(|v| v.clone());
     tracing::debug!("Soundboard state loaded: {:?}", pads.is_some());
     Ok(pads)
+}
+
+// ============================================================================
+// Image Management Commands
+// ============================================================================
+
+/// Get the images directory path
+#[tauri::command]
+pub async fn get_images_dir(app: tauri::AppHandle) -> Result<String, String> {
+    let app_data_dir = app.path().app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+
+    let images_dir = app_data_dir.join("images");
+
+    // Create directory if it doesn't exist
+    std::fs::create_dir_all(&images_dir)
+        .map_err(|e| format!("Failed to create images directory: {}", e))?;
+
+    Ok(images_dir.to_string_lossy().to_string())
+}
+
+/// Save an image for a pad
+/// Returns the relative path to the saved image
+#[tauri::command]
+pub async fn save_pad_image(
+    app: tauri::AppHandle,
+    pad_id: String,
+    image_data: Vec<u8>,
+    extension: String,
+) -> Result<String, String> {
+    use sha2::{Sha256, Digest};
+
+    let app_data_dir = app.path().app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+
+    let images_dir = app_data_dir.join("images");
+    std::fs::create_dir_all(&images_dir)
+        .map_err(|e| format!("Failed to create images directory: {}", e))?;
+
+    // Generate hash of image content (first 8 chars)
+    let mut hasher = Sha256::new();
+    hasher.update(&image_data);
+    let hash = format!("{:x}", hasher.finalize());
+    let hash_short = &hash[..8];
+
+    // Clean extension (remove leading dot if present)
+    let ext = extension.trim_start_matches('.');
+
+    // Filename: {padId}-{hash8}.{ext}
+    let filename = format!("{}-{}.{}", pad_id, hash_short, ext);
+    let file_path = images_dir.join(&filename);
+
+    // Delete any existing images for this pad first
+    if let Ok(entries) = std::fs::read_dir(&images_dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with(&format!("{}-", pad_id)) && name != filename {
+                let _ = std::fs::remove_file(entry.path());
+            }
+        }
+    }
+
+    // Write new image
+    std::fs::write(&file_path, &image_data)
+        .map_err(|e| format!("Failed to save image: {}", e))?;
+
+    tracing::info!("Saved pad image: {}", filename);
+
+    // Return relative path (just filename)
+    Ok(filename)
+}
+
+/// Delete image for a pad
+#[tauri::command]
+pub async fn delete_pad_image(
+    app: tauri::AppHandle,
+    pad_id: String,
+) -> Result<(), String> {
+    let app_data_dir = app.path().app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+
+    let images_dir = app_data_dir.join("images");
+
+    // Delete all images for this pad
+    if let Ok(entries) = std::fs::read_dir(&images_dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with(&format!("{}-", pad_id)) {
+                std::fs::remove_file(entry.path())
+                    .map_err(|e| format!("Failed to delete image: {}", e))?;
+                tracing::info!("Deleted pad image: {}", name);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Clean up orphaned images (not referenced by any pad)
+/// Called on app startup
+#[tauri::command]
+pub async fn cleanup_orphaned_images(
+    app: tauri::AppHandle,
+) -> Result<u32, String> {
+    let app_data_dir = app.path().app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+
+    let images_dir = app_data_dir.join("images");
+
+    if !images_dir.exists() {
+        return Ok(0);
+    }
+
+    // Load soundboard to get referenced images
+    let store = app.store(SOUNDBOARD_STORE).map_err(|e| e.to_string())?;
+    let pads_value = store.get(SOUNDBOARD_KEY);
+
+    let mut referenced_images: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    if let Some(pads) = pads_value {
+        if let Some(pads_array) = pads.as_array() {
+            for pad in pads_array {
+                if let Some(image) = pad.get("image") {
+                    if let Some(local_path) = image.get("localPath").and_then(|v| v.as_str()) {
+                        referenced_images.insert(local_path.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    // Delete orphaned images
+    let mut deleted_count = 0u32;
+    if let Ok(entries) = std::fs::read_dir(&images_dir) {
+        for entry in entries.flatten() {
+            let filename = entry.file_name().to_string_lossy().to_string();
+            if !referenced_images.contains(&filename) {
+                if std::fs::remove_file(entry.path()).is_ok() {
+                    tracing::info!("Deleted orphaned image: {}", filename);
+                    deleted_count += 1;
+                }
+            }
+        }
+    }
+
+    Ok(deleted_count)
 }
 
 // ============================================================================
