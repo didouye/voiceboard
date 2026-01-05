@@ -6,6 +6,7 @@ import { TauriService } from '../../../core/services/tauri.service';
 import { MixerService } from '../../../core/services/mixer.service';
 import { ShortcutService } from '../../../core/services/shortcut.service';
 import { DebugConsoleService } from '../../../core/services/debug-console.service';
+import { ImageSearchService } from '../../../core/services/image-search.service';
 import { AudioDevice, AppSettings } from '../../../core/models';
 
 @Component({
@@ -207,6 +208,39 @@ import { AudioDevice, AppSettings } from '../../../core/models';
               </button>
             </div>
           </div>
+
+          <!-- Image Search Section -->
+          <div class="pt-6 border-t border-border">
+            <h3 class="text-xs font-semibold text-text-muted uppercase tracking-wider mb-4">Image Search</h3>
+
+            <div class="mb-4">
+              <label class="text-sm text-text-secondary mb-2 block">Pexels API Key</label>
+              <div class="flex gap-2">
+                <input
+                  type="password"
+                  [value]="pexelsApiKey()"
+                  (input)="pexelsKeyInput = $any($event.target).value"
+                  placeholder="Enter your API key"
+                  class="flex-1 px-3 py-2 text-sm bg-background border border-border rounded text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
+                >
+                <button
+                  class="px-3 py-2 text-sm bg-surface-hover hover:bg-border rounded transition-colors text-text-secondary hover:text-text-primary"
+                  [disabled]="testingKey()"
+                  (click)="testAndSaveApiKey()"
+                >
+                  {{ testingKey() ? 'Testing...' : 'Save' }}
+                </button>
+              </div>
+              @if (keyTestResult() === 'success') {
+                <p class="text-xs text-status-success mt-1">API key is valid</p>
+              } @else if (keyTestResult() === 'error') {
+                <p class="text-xs text-status-error mt-1">Invalid API key</p>
+              }
+              <p class="text-[10px] text-text-muted mt-2">
+                Get a free API key at <a href="https://www.pexels.com/api/" target="_blank" class="text-accent hover:underline">pexels.com/api</a> (200 requests/hour)
+              </p>
+            </div>
+          </div>
         }
       </div>
     </div>
@@ -250,13 +284,20 @@ export class SettingsPopupComponent implements OnInit {
   // Debug mode enabled state
   readonly debugEnabled = computed(() => this.debugConsole.isEnabled());
 
+  // Image search state
+  readonly pexelsApiKey = computed(() => this.imageSearch.apiKey() || '');
+  pexelsKeyInput = '';
+  testingKey = signal(false);
+  keyTestResult = signal<'success' | 'error' | null>(null);
+
   Math = Math;
 
   constructor(
     private tauri: TauriService,
     private mixer: MixerService,
     private shortcutService: ShortcutService,
-    private debugConsole: DebugConsoleService
+    private debugConsole: DebugConsoleService,
+    private imageSearch: ImageSearchService
   ) {}
 
   async ngOnInit(): Promise<void> {
@@ -347,6 +388,28 @@ export class SettingsPopupComponent implements OnInit {
       await invoke('set_debug_mode', { enabled: newValue });
     } catch (err) {
       console.error('Failed to toggle debug mode:', err);
+    }
+  }
+
+  async testAndSaveApiKey(): Promise<void> {
+    const key = this.pexelsKeyInput || this.pexelsApiKey();
+    if (!key) return;
+
+    this.testingKey.set(true);
+    this.keyTestResult.set(null);
+
+    try {
+      const valid = await this.imageSearch.testApiKey(key);
+      if (valid) {
+        this.imageSearch.setApiKey(key);
+        this.keyTestResult.set('success');
+      } else {
+        this.keyTestResult.set('error');
+      }
+    } catch {
+      this.keyTestResult.set('error');
+    } finally {
+      this.testingKey.set(false);
     }
   }
 
