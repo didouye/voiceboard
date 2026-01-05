@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { SoundboardService } from './soundboard.service';
 import { TauriService } from './tauri.service';
+import { PadImage } from '../models';
 
 describe('SoundboardService', () => {
   let service: SoundboardService;
@@ -188,6 +189,21 @@ describe('SoundboardService', () => {
       expect(service.formatDuration(60)).toBe('1:00');
       expect(service.formatDuration(90)).toBe('1:30');
       expect(service.formatDuration(125)).toBe('2:05');
+    });
+  });
+
+  describe('setPadImage', () => {
+    it('should set image on pad', () => {
+      const image: PadImage = { localPath: 'pad-0-abc123.jpg' };
+      service.setPadImage('pad-0', image);
+      expect(service.pads()[0].image).toEqual(image);
+    });
+
+    it('should clear image when set to null', () => {
+      const image: PadImage = { localPath: 'pad-0-abc123.jpg' };
+      service.setPadImage('pad-0', image);
+      service.setPadImage('pad-0', null);
+      expect(service.pads()[0].image).toBeUndefined();
     });
   });
 });
