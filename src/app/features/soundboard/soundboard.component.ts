@@ -1,6 +1,7 @@
 import { Component, HostListener, signal, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { SoundboardService } from '../../core/services/soundboard.service';
+import { ShortcutService } from '../../core/services/shortcut.service';
 import { SoundPadComponent } from './sound-pad/sound-pad.component';
 import { listen, TauriEvent } from '@tauri-apps/api/event';
 
@@ -57,6 +58,7 @@ const DEFAULT_HOTKEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', 
               (remove)="soundboard.removeSound(pad.id)"
               (volumeChange)="soundboard.setPadVolume(pad.id, $event)"
               (speedChange)="soundboard.setPadSpeed(pad.id, $event)"
+              (shortcutChange)="onShortcutChange(pad.id, $event)"
             />
           }
         </div>
@@ -89,7 +91,10 @@ const DEFAULT_HOTKEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', 
   styles: []
 })
 export class SoundboardComponent implements OnInit, OnDestroy {
-  constructor(public soundboard: SoundboardService) {}
+  constructor(
+    public soundboard: SoundboardService,
+    private shortcutService: ShortcutService
+  ) {}
 
   isDragging = signal(false);
   dragFileCount = signal(0);
@@ -203,6 +208,25 @@ export class SoundboardComponent implements OnInit, OnDestroy {
 
     if (result.errors.length > 0) {
       console.warn(`Imported ${result.imported} files.\nFailed (${result.errors.length}):\n${result.errors.join('\n')}`);
+    }
+  }
+
+  async onShortcutChange(padId: string, shortcut: string | null): Promise<void> {
+    // Update pad
+    this.soundboard.setPadHotkey(padId, shortcut);
+
+    // Update shortcut registry
+    if (shortcut) {
+      try {
+        await this.shortcutService.register(padId, shortcut);
+      } catch (err) {
+        console.error('Failed to register shortcut:', err);
+      }
+    } else {
+      const oldShortcut = this.shortcutService.getShortcutForPad(padId);
+      if (oldShortcut) {
+        await this.shortcutService.unregister(oldShortcut);
+      }
     }
   }
 

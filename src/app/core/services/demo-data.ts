@@ -28,6 +28,7 @@ export const DEMO_SETTINGS: AppSettings = {
     sampleRate: 48000,
     bufferSize: 1024,
     micMonitoring: false,
+    globalHotkeysEnabled: true,
   },
   startMinimized: false,
   autoStartMixing: true,

@@ -480,6 +480,25 @@ export class SoundboardService {
   }
 
   /**
+   * Set hotkey for a pad
+   */
+  setPadHotkey(padId: string, hotkey: string | null): void {
+    // If setting a new hotkey, clear it from any other pad first
+    if (hotkey) {
+      this._pads.update(pads => pads.map(p =>
+        p.hotkey === hotkey && p.id !== padId
+          ? { ...p, hotkey: undefined }
+          : p
+      ));
+    }
+
+    this._pads.update(pads => pads.map(p =>
+      p.id === padId ? { ...p, hotkey: hotkey || undefined } : p
+    ));
+    this.saveState();
+  }
+
+  /**
    * Preview a sound on the selected preview output device
    */
   async previewSound(padId: string): Promise<void> {
