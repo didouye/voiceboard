@@ -42,6 +42,9 @@
         "https://github.com/didouye/voiceboard/releases/latest/download/latest.json"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEIyODQxMkQ4QjgxM0ExNUEKUldSYW9STzQyQktFc3FPNE1VejhxYWR0UnNRUm11dDVsRUhtUDlON1l3UHFkWVZUeC9DSkxzbW0K"
+    },
+    "global-shortcut": {
+      "all": true
     }
   }
 }

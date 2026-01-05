@@ -22,6 +22,7 @@ tauri-plugin-dialog = "2"               # File open dialogs
 tauri-plugin-updater = "2"              # Auto-update functionality
 tauri-plugin-os = "2"                   # Platform detection
 tauri-plugin-process = "2"              # Process control (relaunch)
+tauri-plugin-global-shortcut = "2"     # Global keyboard shortcuts
 
 # Serialization
 serde = { version = "1", features = ["derive"] }
