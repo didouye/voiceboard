@@ -171,15 +171,13 @@ import { convertFileSrc } from '@tauri-apps/api/core';
                 >
                   Upload
                 </button>
-                @if (imageSearchService.hasApiKey()) {
-                  <button
-                    class="px-3 py-1.5 text-xs bg-surface-hover hover:bg-border rounded transition-colors text-text-secondary hover:text-text-primary"
-                    (click)="showImageSearch = !showImageSearch"
-                    [disabled]="imageLoading()"
-                  >
-                    {{ showImageSearch ? 'Close search' : 'Search' }}
-                  </button>
-                }
+                <button
+                  class="px-3 py-1.5 text-xs bg-surface-hover hover:bg-border rounded transition-colors text-text-secondary hover:text-text-primary"
+                  (click)="showImageSearch = !showImageSearch"
+                  [disabled]="imageLoading()"
+                >
+                  {{ showImageSearch ? 'Close search' : 'Search' }}
+                </button>
                 @if (pad.image) {
                   <button
                     class="px-3 py-1.5 text-xs text-status-error hover:bg-status-error/10 rounded transition-colors"
@@ -228,16 +226,10 @@ import { convertFileSrc } from '@tauri-apps/api/core';
                   </div>
                 } @else if (!imageLoading()) {
                   <p class="text-xs text-text-muted text-center py-4">
-                    Search for images on Pexels
+                    Search for images
                   </p>
                 }
               </div>
-            }
-
-            @if (!imageSearchService.hasApiKey()) {
-              <p class="text-[10px] text-text-muted mt-2">
-                Configure Pexels API key in Settings to search images
-              </p>
             }
           </div>
 
