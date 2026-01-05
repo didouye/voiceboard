@@ -100,19 +100,19 @@ import { convertFileSrc } from '@tauri-apps/api/core';
       }
     </div>
 
-    <!-- Settings modal (outside pad div to avoid transform issues with fixed positioning) -->
+    <!-- Settings modal (covers pad grid area only, leaving sidebar and status bar visible) -->
     @if (showSettingsPopup && pad.sound) {
       <div
-        class="fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-150"
+        class="fixed top-0 right-0 bottom-14 left-48 z-50 flex items-center justify-center transition-opacity duration-150 p-6"
         [class]="modalVisible ? 'opacity-100' : 'opacity-0'"
         (click)="closePopup($event)"
       >
         <!-- Dark backdrop -->
-        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm rounded-lg"></div>
 
-        <!-- Modal content -->
+        <!-- Modal content - fills available space with max width -->
         <div
-          class="relative bg-surface border border-border rounded-xl p-4 w-[280px] shadow-xl transition-all duration-150"
+          class="relative bg-surface border border-border rounded-xl p-6 w-full max-w-lg max-h-full overflow-y-auto shadow-xl transition-all duration-150"
           [class]="modalVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'"
           (click)="$event.stopPropagation()"
         >
@@ -537,7 +537,7 @@ export class SoundPadComponent implements OnInit {
       const image: PadImage = {
         localPath,
         originalUrl: result.fullUrl,
-        attribution: result.attribution
+        attribution: result.title
       };
       this.imageChange.emit(image);
 

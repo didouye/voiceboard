@@ -1,121 +1,92 @@
 import { Injectable, signal, computed } from '@angular/core';
+import { fetch } from '@tauri-apps/plugin-http';
 
 export interface ImageSearchResult {
   id: string;
   thumbnailUrl: string;
   fullUrl: string;
-  attribution: string;
-  photographer: string;
-}
-
-interface PexelsPhoto {
-  id: number;
-  photographer: string;
-  src: {
-    tiny: string;
-    small: string;
-    medium: string;
-  };
-}
-
-interface PexelsResponse {
-  photos: PexelsPhoto[];
-  next_page?: string;
+  title: string;
 }
 
 @Injectable({
   providedIn: 'root'
 })
 export class ImageSearchService {
-  private _apiKey = signal<string | null>(null);
   private _loading = signal(false);
   private _error = signal<string | null>(null);
 
-  readonly apiKey = this._apiKey.asReadonly();
   readonly loading = this._loading.asReadonly();
   readonly error = this._error.asReadonly();
-  readonly hasApiKey = computed(() => !!this._apiKey());
 
-  private readonly PEXELS_API_URL = 'https://api.pexels.com/v1';
-  private readonly STORAGE_KEY = 'pexels_api_key';
-
-  constructor() {
-    this.loadApiKey();
-  }
+  // Always available (no API key needed)
+  readonly hasApiKey = computed(() => true);
 
   /**
-   * Load API key from localStorage
+   * Get vqd token from DuckDuckGo
    */
-  private loadApiKey(): void {
-    const key = localStorage.getItem(this.STORAGE_KEY);
-    if (key) {
-      this._apiKey.set(key);
+  private async getVqdToken(query: string): Promise<string> {
+    const url = `https://duckduckgo.com/?q=${encodeURIComponent(query)}&iax=images&ia=images`;
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get search token');
     }
+
+    const html = await response.text();
+
+    // Extract vqd token from HTML
+    const vqdMatch = html.match(/vqd=["']([^"']+)["']/);
+    if (!vqdMatch) {
+      throw new Error('Could not extract search token');
+    }
+
+    return vqdMatch[1];
   }
 
   /**
-   * Set and persist the Pexels API key
-   */
-  setApiKey(key: string | null): void {
-    if (key) {
-      localStorage.setItem(this.STORAGE_KEY, key);
-      this._apiKey.set(key);
-    } else {
-      localStorage.removeItem(this.STORAGE_KEY);
-      this._apiKey.set(null);
-    }
-  }
-
-  /**
-   * Test if the API key is valid
-   */
-  async testApiKey(key: string): Promise<boolean> {
-    try {
-      const response = await fetch(`${this.PEXELS_API_URL}/search?query=test&per_page=1`, {
-        headers: { Authorization: key }
-      });
-      return response.ok;
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Search for images
+   * Search for images using DuckDuckGo
    */
   async search(query: string, page: number = 1, perPage: number = 12): Promise<ImageSearchResult[]> {
-    const apiKey = this._apiKey();
-    if (!apiKey) {
-      throw new Error('Pexels API key not configured');
-    }
-
     this._loading.set(true);
     this._error.set(null);
 
     try {
-      const url = `${this.PEXELS_API_URL}/search?query=${encodeURIComponent(query)}&page=${page}&per_page=${perPage}`;
+      // Get vqd token first
+      const vqd = await this.getVqdToken(query);
+
+      // Fetch images
+      const url = `https://duckduckgo.com/i.js?l=fr-fr&o=json&q=${encodeURIComponent(query)}&vqd=${vqd}&p=${page}`;
+
       const response = await fetch(url, {
-        headers: { Authorization: apiKey }
+        method: 'GET',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+          'Accept': 'application/json'
+        }
       });
 
       if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error('Invalid API key');
-        }
-        if (response.status === 429) {
-          throw new Error('Rate limit reached, try again in 1 hour');
-        }
-        throw new Error(`Search failed: ${response.statusText}`);
+        throw new Error('Search failed');
       }
 
-      const data: PexelsResponse = await response.json();
+      const data = await response.json() as { results?: Array<{ image: string; thumbnail: string; title: string }> };
 
-      return data.photos.map(photo => ({
-        id: photo.id.toString(),
-        thumbnailUrl: photo.src.tiny,
-        fullUrl: photo.src.medium,
-        attribution: `Photo by ${photo.photographer} on Pexels`,
-        photographer: photo.photographer
+      if (!data.results || data.results.length === 0) {
+        return [];
+      }
+
+      // Map to our interface, limit to perPage
+      return data.results.slice(0, perPage).map((item, index) => ({
+        id: `ddg-${index}-${Date.now()}`,
+        thumbnailUrl: item.thumbnail,
+        fullUrl: item.image,
+        title: item.title || 'Image'
       }));
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Search failed';
@@ -130,16 +101,23 @@ export class ImageSearchService {
    * Download an image and return as Uint8Array
    */
   async downloadImage(url: string): Promise<{ data: Uint8Array; extension: string }> {
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+      }
+    });
+
     if (!response.ok) {
       throw new Error('Failed to download image');
     }
 
+    // Determine extension from URL or content-type
     const contentType = response.headers.get('content-type') || '';
     let extension = 'jpg';
-    if (contentType.includes('png')) extension = 'png';
-    else if (contentType.includes('webp')) extension = 'webp';
-    else if (contentType.includes('gif')) extension = 'gif';
+    if (contentType.includes('png') || url.includes('.png')) extension = 'png';
+    else if (contentType.includes('webp') || url.includes('.webp')) extension = 'webp';
+    else if (contentType.includes('gif') || url.includes('.gif')) extension = 'gif';
 
     const buffer = await response.arrayBuffer();
     return {
@@ -154,11 +132,13 @@ export class ImageSearchService {
    * Takes first 3 words max
    */
   extractQueryFromFilename(filename: string): string {
-    // Remove extension
     const nameWithoutExt = filename.replace(/\.[^/.]+$/, '');
-    // Replace separators with spaces
     const words = nameWithoutExt.replace(/[-_]/g, ' ').split(/\s+/);
-    // Take first 3 words
     return words.slice(0, 3).join(' ').toLowerCase();
   }
+
+  // Removed Pexels-specific methods:
+  // - setApiKey()
+  // - testApiKey()
+  // - apiKey signal
 }

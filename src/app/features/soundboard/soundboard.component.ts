@@ -346,7 +346,7 @@ export class SoundboardComponent implements OnInit, OnDestroy {
       const image: PadImage = {
         localPath,
         originalUrl: result.fullUrl,
-        attribution: result.attribution
+        attribution: result.title
       };
       this.soundboard.setPadImage(this.suggestionPadId, image);
     } catch (err) {
@@ -391,7 +391,7 @@ export class SoundboardComponent implements OnInit, OnDestroy {
       const image: PadImage = {
         localPath,
         originalUrl: event.image.fullUrl,
-        attribution: event.image.attribution
+        attribution: event.image.title
       };
       this.soundboard.setPadImage(event.padId, image);
     } catch (err) {
