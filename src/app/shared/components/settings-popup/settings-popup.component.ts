@@ -46,12 +46,11 @@ import { AudioDevice, AppSettings } from '../../../core/models';
               </label>
               <select
                 class="w-full px-4 py-3 bg-background border border-border rounded-lg text-text-primary focus:outline-none focus:border-accent transition-colors"
-                [value]="selectedInputId()"
                 (change)="onInputChange($event)"
               >
-                <option value="">-- Select Microphone --</option>
+                <option value="" [selected]="!selectedInputId()">-- Select Microphone --</option>
                 @for (device of inputDevices(); track device.id) {
-                  <option [value]="device.id">
+                  <option [value]="device.id" [selected]="device.id === selectedInputId()">
                     {{ device.name }}{{ device.isDefault ? ' (Default)' : '' }}
                   </option>
                 }
@@ -65,11 +64,13 @@ import { AudioDevice, AppSettings } from '../../../core/models';
               </label>
               <select
                 class="w-full px-4 py-3 bg-background border border-border rounded-lg text-text-primary focus:outline-none focus:border-accent transition-colors"
-                [value]="selectedOutputId()"
                 (change)="onOutputChange($event)"
               >
+                <option value="" [selected]="!selectedOutputId()">-- Select Virtual Output --</option>
                 @for (device of virtualOutputDevices(); track device.id) {
-                  <option [value]="device.id">{{ device.name }}</option>
+                  <option [value]="device.id" [selected]="device.id === selectedOutputId()">
+                    {{ device.name }}
+                  </option>
                 }
               </select>
             </div>
@@ -81,12 +82,11 @@ import { AudioDevice, AppSettings } from '../../../core/models';
               </label>
               <select
                 class="w-full px-4 py-3 bg-background border border-border rounded-lg text-text-primary focus:outline-none focus:border-accent transition-colors"
-                [value]="selectedPreviewId()"
                 (change)="onPreviewChange($event)"
               >
-                <option value="">-- System Default --</option>
+                <option value="" [selected]="!selectedPreviewId()">-- System Default --</option>
                 @for (device of physicalOutputDevices(); track device.id) {
-                  <option [value]="device.id">
+                  <option [value]="device.id" [selected]="device.id === selectedPreviewId()">
                     {{ device.name }}{{ device.isDefault ? ' (Default)' : '' }}
                   </option>
                 }
