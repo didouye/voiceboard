@@ -71,8 +71,13 @@ import { ShortcutService } from '../../../core/services/shortcut.service';
           </button>
         </div>
 
-        <!-- Settings popup -->
+        <!-- Settings popup with backdrop -->
         @if (showSettingsPopup) {
+          <!-- Invisible backdrop to capture clicks outside popup -->
+          <div
+            class="fixed inset-0 z-40"
+            (click)="closePopup($event)"
+          ></div>
           <div
             class="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-surface border border-border rounded-lg p-3 min-w-[180px] z-50 shadow-xl"
             (click)="$event.stopPropagation()"
@@ -222,14 +227,6 @@ export class SoundPadComponent {
     return classes;
   }
 
-  @HostListener('document:click')
-  onDocumentClick(): void {
-    if (this.showSettingsPopup) {
-      this.showSettingsPopup = false;
-      this.isRecording = false;
-    }
-  }
-
   @HostListener('window:keydown', ['$event'])
   onWindowKeydown(event: KeyboardEvent): void {
     if (!this.isRecording) return;
@@ -283,6 +280,13 @@ export class SoundPadComponent {
   toggleSettingsPopup(event: MouseEvent): void {
     event.stopPropagation();
     this.showSettingsPopup = !this.showSettingsPopup;
+  }
+
+  closePopup(event: MouseEvent): void {
+    event.stopPropagation();
+    event.preventDefault();
+    this.showSettingsPopup = false;
+    this.isRecording = false;
   }
 
   onVolumeChange(volume: number): void {
