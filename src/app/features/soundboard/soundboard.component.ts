@@ -4,6 +4,7 @@ import { SoundboardService } from '../../core/services/soundboard.service';
 import { ShortcutService } from '../../core/services/shortcut.service';
 import { SoundPadComponent } from './sound-pad/sound-pad.component';
 import { listen, TauriEvent } from '@tauri-apps/api/event';
+import { eventMatchesShortcut } from '../../core/models';
 
 const DEFAULT_HOTKEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '='];
 
@@ -176,18 +177,31 @@ export class SoundboardComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Find pad by hotkey
+    // Check custom shortcuts (with modifiers)
     const pads = this.soundboard.pads();
-    const padIndex = pads.findIndex(p => {
-      const hotkey = p.hotkey || DEFAULT_HOTKEYS[pads.indexOf(p)];
-      return hotkey === event.key;
-    });
+    for (const pad of pads) {
+      if (pad.hotkey && pad.sound) {
+        if (eventMatchesShortcut(event, pad.hotkey)) {
+          event.preventDefault();
+          this.soundboard.playSound(pad.id);
+          return;
+        }
+      }
+    }
 
-    if (padIndex >= 0) {
-      const pad = pads[padIndex];
-      if (pad.sound) {
-        event.preventDefault();
-        this.soundboard.playSound(pad.id);
+    // Fallback to default hotkeys (no modifiers, for backwards compatibility)
+    if (!event.ctrlKey && !event.altKey && !event.shiftKey && !event.metaKey) {
+      const padIndex = pads.findIndex(p => {
+        const defaultHotkey = DEFAULT_HOTKEYS[pads.indexOf(p)];
+        return !p.hotkey && defaultHotkey === event.key;
+      });
+
+      if (padIndex >= 0) {
+        const pad = pads[padIndex];
+        if (pad.sound) {
+          event.preventDefault();
+          this.soundboard.playSound(pad.id);
+        }
       }
     }
   }
