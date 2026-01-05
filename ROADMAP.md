@@ -96,7 +96,7 @@
 
 ---
 
-## Phase 3 - UI/UX Redesign - 40% Complete
+## Phase 3 - UI/UX Redesign - 55% Complete
 
 ### Stack
 - **Tailwind CSS** (Tailwind Plus account available)
@@ -124,18 +124,18 @@
   - Gear icon button (replaces speaker icon)
   - Volume and speed controls in unified popup
 
-### To Do
-- [ ] **Interface Enhancements**
-  - Compact / extended mode
-  - Customizable themes (dark/light/custom)
-  - Drag & drop to reorganize pads
-
-- [ ] **Custom Keyboard Shortcuts**
+- [x] **Custom Keyboard Shortcuts**
   - Configurable shortcut per pad (in Pad Settings popup)
   - Support for modifier key combinations (Ctrl+1, Alt+Shift+0, etc.)
   - Key combination recorder (press keys to set shortcut)
   - Conflict detection (warn if shortcut already used)
   - Global hotkeys (work even when app is not focused)
+
+### To Do
+- [ ] **Interface Enhancements**
+  - Compact / extended mode
+  - Customizable themes (dark/light/custom)
+  - Drag & drop to reorganize pads
 
 - [ ] **Pad Images**
   - User-defined images for each pad (upload or paste URL)
