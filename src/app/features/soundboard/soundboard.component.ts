@@ -58,6 +58,7 @@ import { eventMatchesShortcut } from '../../core/models';
               (volumeChange)="soundboard.setPadVolume(pad.id, $event)"
               (speedChange)="soundboard.setPadSpeed(pad.id, $event)"
               (shortcutChange)="onShortcutChange(pad.id, $event)"
+              (customNameChange)="soundboard.setPadCustomName(pad.id, $event)"
             />
           }
         </div>

@@ -18,6 +18,7 @@ interface SavedPad {
   hotkey?: string;
   volume?: number; // Optional for backwards compatibility
   speed?: number;  // Optional for backwards compatibility
+  customName?: string; // Optional for backwards compatibility
 }
 
 @Injectable({
@@ -115,7 +116,8 @@ export class SoundboardService {
           ...p,
           isPlaying: false,
           volume: p.volume ?? 1.0,
-          speed: p.speed ?? 1.0
+          speed: p.speed ?? 1.0,
+          customName: p.customName
         }));
         this._pads.set(restoredPads);
         console.log(`Loaded ${saved.filter(p => p.sound).length} sounds from storage`);
@@ -142,7 +144,8 @@ export class SoundboardService {
         color: p.color,
         hotkey: p.hotkey,
         volume: p.volume,
-        speed: p.speed
+        speed: p.speed,
+        customName: p.customName
       }));
       await this.tauri.saveSoundboardState(padsToSave);
     } catch (err) {
@@ -484,6 +487,16 @@ export class SoundboardService {
     const clampedSpeed = Math.max(0.5, Math.min(2, speed));
     this._pads.update(pads => pads.map(p =>
       p.id === padId ? { ...p, speed: clampedSpeed } : p
+    ));
+    this.saveState();
+  }
+
+  /**
+   * Set custom name for a pad (null to clear)
+   */
+  setPadCustomName(padId: string, name: string | null): void {
+    this._pads.update(pads => pads.map(p =>
+      p.id === padId ? { ...p, customName: name || undefined } : p
     ));
     this.saveState();
   }

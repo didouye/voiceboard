@@ -28,10 +28,15 @@ import { ShortcutService } from '../../../core/services/shortcut.service';
       @if (pad.sound) {
         <!-- Sound content -->
         <div class="text-center px-2 w-full">
-          <span class="block text-xs font-semibold text-white truncate mb-1 drop-shadow-md">
-            {{ pad.sound.name }}
+          <span class="block text-xs font-semibold text-white truncate mb-0.5 drop-shadow-md">
+            {{ pad.customName || pad.sound.name }}
           </span>
-          <span class="block text-[10px] text-white/70">
+          @if (pad.customName) {
+            <span class="block text-[9px] text-white/50 truncate">
+              {{ pad.sound.name }}
+            </span>
+          }
+          <span class="block text-[10px] text-white/70 mt-0.5">
             {{ formatDuration(pad.sound.duration) }}
           </span>
         </div>
@@ -106,6 +111,20 @@ import { ShortcutService } from '../../../core/services/shortcut.service';
             >
               &#10005;
             </button>
+          </div>
+
+          <!-- Custom Name -->
+          <div class="mb-4">
+            <div class="flex justify-between items-center mb-2 text-xs">
+              <span class="text-text-secondary">Name</span>
+            </div>
+            <input
+              type="text"
+              [ngModel]="pad.customName || ''"
+              (ngModelChange)="onCustomNameChange($event)"
+              [placeholder]="pad.sound.name"
+              class="w-full px-3 py-2 text-sm bg-surface-hover border border-border rounded text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
+            >
           </div>
 
           <!-- Volume -->
@@ -208,6 +227,7 @@ export class SoundPadComponent {
   @Output() volumeChange = new EventEmitter<number>();
   @Output() speedChange = new EventEmitter<number>();
   @Output() shortcutChange = new EventEmitter<string | null>();
+  @Output() customNameChange = new EventEmitter<string | null>();
 
   @HostBinding('class') hostClass = 'relative';
   @HostBinding('class.z-50') get isPopupOpen() { return this.showSettingsPopup; }
@@ -337,9 +357,14 @@ export class SoundPadComponent {
     this.speedChange.emit(speed);
   }
 
+  onCustomNameChange(name: string): void {
+    this.customNameChange.emit(name.trim() || null);
+  }
+
   resetAll(): void {
     this.volumeChange.emit(1.0);
     this.speedChange.emit(1.0);
+    this.customNameChange.emit(null);
   }
 
   startRecording(event: MouseEvent): void {

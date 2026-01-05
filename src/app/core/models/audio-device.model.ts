@@ -74,6 +74,8 @@ export interface SoundPad {
   volume: number;
   /** Playback speed (0.5-2.0, default 1.0 = normal) */
   speed: number;
+  /** User-defined custom name (optional, fallback to sound.name) */
+  customName?: string;
 }
 
 /**
