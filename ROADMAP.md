@@ -107,8 +107,14 @@
   - Smooth animations
   - Compact / extended mode
   - Customizable themes (dark/light/custom)
-  - Icons and visuals for pads
   - Drag & drop to reorganize pads
+
+- [ ] **Pad Images**
+  - User-defined images for each pad (upload or paste URL)
+  - Auto-fetch images from internet based on sound name
+  - Integration with image search APIs (Unsplash, Pexels, or similar)
+  - Image cropping/positioning within pad
+  - Fallback to icon/color when no image set
 
 - [ ] **Sound Organization**
   - Folders/categories to organize sounds

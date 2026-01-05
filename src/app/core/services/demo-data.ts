@@ -43,12 +43,12 @@ export const DEMO_MIXER_CONFIG: MixerConfig = {
 };
 
 export const DEMO_SOUNDBOARD_PADS = [
-  { id: 'pad-1', name: 'Airhorn', path: '/sounds/airhorn.mp3', shortcut: '1', volume: 1.0, speed: 1.0 },
+  { id: 'pad-1', name: 'Air Horn', path: '/sounds/airhorn.mp3', shortcut: '1', volume: 1.0, speed: 1.0 },
   { id: 'pad-2', name: 'Sad Trombone', path: '/sounds/sad-trombone.mp3', shortcut: '2', volume: 0.8, speed: 1.0 },
   { id: 'pad-3', name: 'Applause', path: '/sounds/applause.mp3', shortcut: '3', volume: 1.0, speed: 1.0 },
   { id: 'pad-4', name: 'Drum Roll', path: '/sounds/drumroll.mp3', shortcut: '4', volume: 0.9, speed: 1.0 },
-  { id: 'pad-5', name: 'Wow', path: '/sounds/wow.mp3', shortcut: '5', volume: 1.0, speed: 1.0 },
-  { id: 'pad-6', name: 'Crickets', path: '/sounds/crickets.mp3', shortcut: '6', volume: 0.7, speed: 1.0 },
+  { id: 'pad-5', name: 'MLG Horn', path: '/sounds/mlg.mp3', shortcut: '5', volume: 1.0, speed: 1.0 },
+  { id: 'pad-6', name: 'Bruh', path: '/sounds/bruh.mp3', shortcut: '6', volume: 0.7, speed: 1.0 },
   { id: 'pad-7', name: 'Ba Dum Tss', path: '/sounds/badumtss.mp3', shortcut: '7', volume: 1.0, speed: 1.0 },
   { id: 'pad-8', name: 'Victory', path: '/sounds/victory.mp3', shortcut: '8', volume: 1.0, speed: 1.0 },
   { id: 'pad-9', name: 'Fail', path: '/sounds/fail.mp3', shortcut: '9', volume: 0.8, speed: 1.0 },
