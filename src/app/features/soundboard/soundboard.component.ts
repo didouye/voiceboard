@@ -44,7 +44,7 @@ import { eventMatchesShortcut } from '../../core/models';
 
       <!-- Pads grid -->
       <div class="flex-1 relative">
-        <div class="grid grid-cols-4 gap-3">
+        <div class="grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(100px, 140px));">
           @for (pad of soundboard.pads(); track pad.id; let i = $index) {
             <app-sound-pad
               [pad]="pad"
