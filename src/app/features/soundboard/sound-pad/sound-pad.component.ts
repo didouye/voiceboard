@@ -45,8 +45,9 @@ import { ShortcutService } from '../../../core/services/shortcut.service';
           </div>
         }
 
-        <!-- Action buttons -->
-        <div class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <!-- Action buttons (hidden when modal is open) -->
+        <div class="absolute top-2 right-2 flex gap-1 transition-opacity"
+             [class]="showSettingsPopup ? 'opacity-0 pointer-events-none' : 'opacity-0 group-hover:opacity-100'">
           <button
             class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] transition-colors"
             [class]="pad.volume !== 1.0 ? 'bg-status-warning text-black' : 'bg-black/50 text-white hover:bg-accent'"
@@ -226,8 +227,13 @@ export class SoundPadComponent {
       return `${base} border-dashed border-white/10 bg-white/5 hover:border-white/25 hover:bg-white/10`;
     }
 
-    let classes = `${base} border-[var(--pad-color)] hover:scale-[1.02] hover:glow-subtle`;
+    let classes = `${base} border-[var(--pad-color)]`;
     classes += ` bg-gradient-to-br from-[var(--pad-color)] to-[color-mix(in_srgb,var(--pad-color)_70%,black)]`;
+
+    // Disable hover effects when modal is open
+    if (!this.showSettingsPopup) {
+      classes += ' hover:scale-[1.02] hover:glow-subtle';
+    }
 
     if (this.pad.isPlaying) {
       classes += ' animate-glow-pulse border-white';
