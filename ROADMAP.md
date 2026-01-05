@@ -144,6 +144,11 @@
   - Image cropping/positioning within pad
   - Fallback to icon/color when no image set
 
+- [ ] **Sound Renaming**
+  - Custom name per sound (editable in pad settings)
+  - Original filename displayed smaller below custom name
+  - Fallback to filename if no custom name set
+
 - [ ] **Sound Organization**
   - Folders/categories to organize sounds
   - Drag & drop sounds into folders
@@ -380,6 +385,24 @@
   - Research open-source alternatives (RNNoise, Speex, etc.)
   - Real-time processing in audio pipeline
   - Configurable sensitivity/aggressiveness
+
+### Local AI Features
+- [ ] **Auto Sound Naming (Speech-to-Text)**
+  - Integrate local speech-to-text model (Whisper, etc.)
+  - Automatically extract/suggest name from audio content
+  - Run analysis on import or on-demand
+
+- [ ] **AI Sound Generation**
+  - Generate custom sounds using open-source AI models
+  - Text-to-speech for voice clips
+  - Sound effect generation from text descriptions
+  - Local processing (no cloud required)
+
+- [ ] **AI Image Generation for Pads**
+  - Generate pad images using local image generation models
+  - Text-to-image from sound name or custom prompt
+  - Alternative to internet image search
+  - Supports Stable Diffusion, SDXL, or similar
 
 ---
 
