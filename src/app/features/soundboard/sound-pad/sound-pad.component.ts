@@ -132,7 +132,6 @@ import { ShortcutService } from '../../../core/services/shortcut.service';
                     ? 'bg-accent border-accent text-white animate-pulse'
                     : 'bg-surface-hover border-border text-text-primary hover:border-text-muted'"
                   (click)="startRecording($event)"
-                  (keydown)="onRecordKeydown($event)"
                 >
                   {{ isRecording ? 'Press keys...' : (pad.hotkey || 'Click to set') }}
                 </button>
@@ -227,7 +226,36 @@ export class SoundPadComponent {
   onDocumentClick(): void {
     if (this.showSettingsPopup) {
       this.showSettingsPopup = false;
+      this.isRecording = false;
     }
+  }
+
+  @HostListener('window:keydown', ['$event'])
+  onWindowKeydown(event: KeyboardEvent): void {
+    if (!this.isRecording) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const shortcut = this.shortcutService.formatEventAsShortcut(event);
+    if (!shortcut) return; // Ignore modifier-only presses
+
+    this.isRecording = false;
+
+    // Check for conflicts
+    const conflictPadId = this.shortcutService.checkConflict(shortcut, this.pad.id);
+    if (conflictPadId) {
+      const pads = this.soundboardService.pads();
+      const conflictPad = pads.find(p => p.id === conflictPadId);
+      const conflictName = conflictPad?.sound?.name || conflictPadId;
+
+      if (!confirm(`"${shortcut}" is already assigned to "${conflictName}". Replace?`)) {
+        return;
+      }
+      // User confirmed replacement - the old pad will lose its shortcut
+    }
+
+    this.shortcutChange.emit(shortcut);
   }
 
   onClick(event: MouseEvent): void {
@@ -273,33 +301,6 @@ export class SoundPadComponent {
   startRecording(event: MouseEvent): void {
     event.stopPropagation();
     this.isRecording = true;
-  }
-
-  onRecordKeydown(event: KeyboardEvent): void {
-    if (!this.isRecording) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-
-    const shortcut = this.shortcutService.formatEventAsShortcut(event);
-    if (!shortcut) return; // Ignore modifier-only presses
-
-    this.isRecording = false;
-
-    // Check for conflicts
-    const conflictPadId = this.shortcutService.checkConflict(shortcut, this.pad.id);
-    if (conflictPadId) {
-      const pads = this.soundboardService.pads();
-      const conflictPad = pads.find(p => p.id === conflictPadId);
-      const conflictName = conflictPad?.sound?.name || conflictPadId;
-
-      if (!confirm(`"${shortcut}" is already assigned to "${conflictName}". Replace?`)) {
-        return;
-      }
-      // User confirmed replacement - the old pad will lose its shortcut
-    }
-
-    this.shortcutChange.emit(shortcut);
   }
 
   clearShortcut(event: MouseEvent): void {
