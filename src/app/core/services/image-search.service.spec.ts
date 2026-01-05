@@ -36,28 +36,19 @@ describe('ImageSearchService', () => {
     });
   });
 
-  describe('API key management', () => {
-    it('should start with no API key', () => {
-      expect(service.hasApiKey()).toBeFalse();
-    });
-
-    it('should save API key to localStorage', () => {
-      service.setApiKey('test-key');
-      expect(localStorage.getItem('pexels_api_key')).toBe('test-key');
+  describe('hasApiKey', () => {
+    it('should always return true (DuckDuckGo needs no key)', () => {
       expect(service.hasApiKey()).toBeTrue();
     });
+  });
 
-    it('should remove API key when set to null', () => {
-      service.setApiKey('test-key');
-      service.setApiKey(null);
-      expect(localStorage.getItem('pexels_api_key')).toBeNull();
-      expect(service.hasApiKey()).toBeFalse();
+  describe('initial state', () => {
+    it('should not be loading initially', () => {
+      expect(service.loading()).toBeFalse();
     });
 
-    it('should load API key from localStorage on construction', () => {
-      localStorage.setItem('pexels_api_key', 'stored-key');
-      const newService = new ImageSearchService();
-      expect(newService.apiKey()).toBe('stored-key');
+    it('should have no error initially', () => {
+      expect(service.error()).toBeNull();
     });
   });
 });
