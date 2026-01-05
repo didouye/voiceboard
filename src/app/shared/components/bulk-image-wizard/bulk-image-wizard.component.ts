@@ -67,10 +67,10 @@ interface PadImageSelection {
 
         <!-- Results Grid -->
         @if (searchResults().length > 0) {
-          <div class="grid grid-cols-4 gap-2 mb-4 max-h-64 overflow-y-auto p-1">
+          <div class="flex flex-wrap justify-center gap-2 mb-4 max-h-64 overflow-y-auto p-1">
             @for (result of searchResults(); track result.id) {
               <button
-                class="aspect-square rounded-lg overflow-hidden border-2 transition-all hover:scale-105 flex-shrink-0"
+                class="w-16 h-16 rounded-lg overflow-hidden border-2 transition-all hover:scale-105 flex-shrink-0"
                 [class]="selectedImage()?.id === result.id ? 'border-accent ring-2 ring-accent/50' : 'border-transparent hover:border-border'"
                 (click)="selectedImage.set(result)"
               >
