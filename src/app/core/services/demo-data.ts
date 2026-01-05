@@ -42,19 +42,32 @@ export const DEMO_MIXER_CONFIG: MixerConfig = {
   bufferSize: 1024,
 };
 
+const PAD_COLORS = [
+  '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71',
+  '#1abc9c', '#3498db', '#9b59b6', '#e91e63',
+  '#00bcd4', '#8bc34a', '#ff5722', '#795548'
+];
+
+function createDemoSound(id: string, name: string, path: string, duration: number): SoundFile {
+  return { id, name, path, duration, sampleRate: 48000, channels: 2 };
+}
+
+/**
+ * Demo soundboard pads with sounds - matches SavedPad interface
+ */
 export const DEMO_SOUNDBOARD_PADS = [
-  { id: 'pad-1', name: 'Air Horn', path: '/sounds/airhorn.mp3', shortcut: '1', volume: 1.0, speed: 1.0 },
-  { id: 'pad-2', name: 'Sad Trombone', path: '/sounds/sad-trombone.mp3', shortcut: '2', volume: 0.8, speed: 1.0 },
-  { id: 'pad-3', name: 'Applause', path: '/sounds/applause.mp3', shortcut: '3', volume: 1.0, speed: 1.0 },
-  { id: 'pad-4', name: 'Drum Roll', path: '/sounds/drumroll.mp3', shortcut: '4', volume: 0.9, speed: 1.0 },
-  { id: 'pad-5', name: 'MLG Horn', path: '/sounds/mlg.mp3', shortcut: '5', volume: 1.0, speed: 1.0 },
-  { id: 'pad-6', name: 'Bruh', path: '/sounds/bruh.mp3', shortcut: '6', volume: 0.7, speed: 1.0 },
-  { id: 'pad-7', name: 'Ba Dum Tss', path: '/sounds/badumtss.mp3', shortcut: '7', volume: 1.0, speed: 1.0 },
-  { id: 'pad-8', name: 'Victory', path: '/sounds/victory.mp3', shortcut: '8', volume: 1.0, speed: 1.0 },
-  { id: 'pad-9', name: 'Fail', path: '/sounds/fail.mp3', shortcut: '9', volume: 0.8, speed: 1.0 },
-  { id: 'pad-10', name: 'Laugh Track', path: '/sounds/laugh.mp3', shortcut: '0', volume: 1.0, speed: 1.0 },
-  { id: 'pad-11', name: 'Suspense', path: '/sounds/suspense.mp3', shortcut: '-', volume: 0.9, speed: 1.0 },
-  { id: 'pad-12', name: 'Ding', path: '/sounds/ding.mp3', shortcut: '=', volume: 1.0, speed: 1.0 },
+  { id: 'pad-0', sound: createDemoSound('s1', 'Air Horn', '/sounds/airhorn.mp3', 1.5), color: PAD_COLORS[0], hotkey: '1', volume: 1.0, speed: 1.0 },
+  { id: 'pad-1', sound: createDemoSound('s2', 'Sad Trombone', '/sounds/sad-trombone.mp3', 3.2), color: PAD_COLORS[1], hotkey: '2', volume: 0.8, speed: 1.0 },
+  { id: 'pad-2', sound: createDemoSound('s3', 'Applause', '/sounds/applause.mp3', 5.0), color: PAD_COLORS[2], hotkey: '3', volume: 1.0, speed: 1.0 },
+  { id: 'pad-3', sound: createDemoSound('s4', 'Drum Roll', '/sounds/drumroll.mp3', 4.0), color: PAD_COLORS[3], hotkey: '4', volume: 0.9, speed: 1.0 },
+  { id: 'pad-4', sound: createDemoSound('s5', 'MLG Horn', '/sounds/mlg.mp3', 2.0), color: PAD_COLORS[4], hotkey: '5', volume: 1.0, speed: 1.0 },
+  { id: 'pad-5', sound: createDemoSound('s6', 'Bruh', '/sounds/bruh.mp3', 0.8), color: PAD_COLORS[5], hotkey: '6', volume: 0.7, speed: 1.0 },
+  { id: 'pad-6', sound: createDemoSound('s7', 'Ba Dum Tss', '/sounds/badumtss.mp3', 1.2), color: PAD_COLORS[6], hotkey: '7', volume: 1.0, speed: 1.0 },
+  { id: 'pad-7', sound: createDemoSound('s8', 'Victory', '/sounds/victory.mp3', 3.5), color: PAD_COLORS[7], hotkey: '8', volume: 1.0, speed: 1.0 },
+  { id: 'pad-8', sound: createDemoSound('s9', 'Fail', '/sounds/fail.mp3', 2.5), color: PAD_COLORS[8], hotkey: '9', volume: 0.8, speed: 1.0 },
+  { id: 'pad-9', sound: createDemoSound('s10', 'Laugh Track', '/sounds/laugh.mp3', 4.5), color: PAD_COLORS[9], hotkey: '0', volume: 1.0, speed: 1.0 },
+  { id: 'pad-10', sound: createDemoSound('s11', 'Suspense', '/sounds/suspense.mp3', 6.0), color: PAD_COLORS[10], hotkey: '-', volume: 0.9, speed: 1.0 },
+  { id: 'pad-11', sound: createDemoSound('s12', 'Ding', '/sounds/ding.mp3', 0.5), color: PAD_COLORS[11], hotkey: '=', volume: 1.0, speed: 1.0 },
 ];
 
 export function createDemoSoundFile(path: string): SoundFile {
