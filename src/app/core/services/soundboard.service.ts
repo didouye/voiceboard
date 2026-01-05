@@ -1,6 +1,6 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { TauriService } from './tauri.service';
-import { SoundFile, SoundPad, Folder } from '../models';
+import { SoundFile, SoundPad, Folder, PadImage } from '../models';
 import { open } from '@tauri-apps/plugin-dialog';
 import { listen } from '@tauri-apps/api/event';
 
@@ -19,6 +19,7 @@ interface SavedPad {
   volume?: number; // Optional for backwards compatibility
   speed?: number;  // Optional for backwards compatibility
   customName?: string; // Optional for backwards compatibility
+  image?: PadImage; // Optional for backwards compatibility
 }
 
 @Injectable({
@@ -100,7 +101,8 @@ export class SoundboardService {
       color: PAD_COLORS[i % PAD_COLORS.length],
       isPlaying: false,
       volume: 1.0,
-      speed: 1.0
+      speed: 1.0,
+      image: undefined
     }));
   }
 
@@ -117,7 +119,8 @@ export class SoundboardService {
           isPlaying: false,
           volume: p.volume ?? 1.0,
           speed: p.speed ?? 1.0,
-          customName: p.customName
+          customName: p.customName,
+          image: p.image
         }));
         this._pads.set(restoredPads);
         console.log(`Loaded ${saved.filter(p => p.sound).length} sounds from storage`);
@@ -145,7 +148,8 @@ export class SoundboardService {
         hotkey: p.hotkey,
         volume: p.volume,
         speed: p.speed,
-        customName: p.customName
+        customName: p.customName,
+        image: p.image
       }));
       await this.tauri.saveSoundboardState(padsToSave);
     } catch (err) {
@@ -502,6 +506,16 @@ export class SoundboardService {
   }
 
   /**
+   * Set image for a pad
+   */
+  setPadImage(padId: string, image: PadImage | null): void {
+    this._pads.update(pads => pads.map(p =>
+      p.id === padId ? { ...p, image: image || undefined } : p
+    ));
+    this.saveState();
+  }
+
+  /**
    * Set hotkey for a pad
    */
   setPadHotkey(padId: string, hotkey: string | null): void {
@@ -582,7 +596,7 @@ export class SoundboardService {
   removeSound(padId: string): void {
     this._pads.update(pads => pads.map(pad =>
       pad.id === padId
-        ? { ...pad, sound: null, isPlaying: false }
+        ? { ...pad, sound: null, isPlaying: false, image: undefined }
         : pad
     ));
     // Reorganize to compact pads (no gaps) and maintain alphabetical order
