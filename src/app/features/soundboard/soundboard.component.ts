@@ -4,7 +4,7 @@ import { SoundboardService } from '../../core/services/soundboard.service';
 import { ShortcutService } from '../../core/services/shortcut.service';
 import { SoundPadComponent } from './sound-pad/sound-pad.component';
 import { listen, TauriEvent } from '@tauri-apps/api/event';
-import { eventMatchesShortcut } from '../../core/models';
+import { eventMatchesShortcut, PadImage } from '../../core/models';
 
 @Component({
   selector: 'app-soundboard',
@@ -59,6 +59,7 @@ import { eventMatchesShortcut } from '../../core/models';
               (speedChange)="soundboard.setPadSpeed(pad.id, $event)"
               (shortcutChange)="onShortcutChange(pad.id, $event)"
               (customNameChange)="soundboard.setPadCustomName(pad.id, $event)"
+              (imageChange)="onImageChange(pad.id, $event)"
             />
           }
         </div>
@@ -225,6 +226,10 @@ export class SoundboardComponent implements OnInit, OnDestroy {
         await this.shortcutService.unregister(oldShortcut);
       }
     }
+  }
+
+  onImageChange(padId: string, image: PadImage | null): void {
+    this.soundboard.setPadImage(padId, image);
   }
 
 }
