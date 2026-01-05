@@ -57,7 +57,7 @@ import { ImageSearchService, ImageSearchResult } from '../../core/services/image
               [isPreviewing]="soundboard.previewingPadId() === pad.id"
               (play)="soundboard.playSound(pad.id)"
               (preview)="soundboard.previewSound(pad.id)"
-              (import)="soundboard.importSound(pad.id)"
+              (import)="onImportSound(pad.id)"
               (remove)="soundboard.removeSound(pad.id)"
               (volumeChange)="soundboard.setPadVolume(pad.id, $event)"
               (speedChange)="soundboard.setPadSpeed(pad.id, $event)"
@@ -283,6 +283,32 @@ export class SoundboardComponent implements OnInit, OnDestroy {
       return pads[padIndex].hotkey;
     }
     return undefined;
+  }
+
+  /**
+   * Handle import from clicking an empty pad (with image suggestion)
+   */
+  async onImportSound(padId: string): Promise<void> {
+    // Take snapshot of existing sound paths before import
+    const existingPaths = new Set(
+      this.soundboard.pads()
+        .filter(p => p.sound)
+        .map(p => p.sound!.path)
+    );
+
+    // Do the import
+    await this.soundboard.importSound(padId);
+
+    // Find newly imported pad (if any)
+    const padsAfter = this.soundboard.pads();
+    const newPads = padsAfter.filter(pad =>
+      pad.sound && !existingPaths.has(pad.sound.path)
+    );
+
+    // Trigger suggestion if a new sound was imported
+    if (newPads.length === 1) {
+      this.triggerSingleImportSuggestion(newPads[0]);
+    }
   }
 
   async importMultiple(): Promise<void> {

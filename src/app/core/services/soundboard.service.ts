@@ -221,23 +221,54 @@ export class SoundboardService {
   /**
    * Reorganize pads: sort sounds alphabetically and compact them (no gaps).
    * All sounds are moved to the beginning, empty pads are at the end.
+   * Images, volume, speed, customName, and hotkey follow their sounds.
    */
   private reorganizePads(): void {
     const pads = this._pads();
 
-    // Collect all sounds and sort them alphabetically by name
-    const sounds = pads
+    // Collect all filled pads with their associated data, sorted by sound name
+    const filledPadData = pads
       .filter(p => p.sound !== null)
-      .map(p => p.sound!)
-      .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+      .map(p => ({
+        sound: p.sound!,
+        image: p.image,
+        volume: p.volume,
+        speed: p.speed,
+        customName: p.customName,
+        hotkey: p.hotkey
+      }))
+      .sort((a, b) => a.sound.name.toLowerCase().localeCompare(b.sound.name.toLowerCase()));
 
-    // Reassign sounds to pads in order
+    // Reassign sounds and their associated data to pads in order
     this._pads.update(currentPads => {
-      return currentPads.map((pad, index) => ({
-        ...pad,
-        sound: index < sounds.length ? sounds[index] : null,
-        isPlaying: false // Reset playing state when reorganizing
-      }));
+      return currentPads.map((pad, index) => {
+        if (index < filledPadData.length) {
+          // This pad gets a sound with its associated data
+          const data = filledPadData[index];
+          return {
+            ...pad,
+            sound: data.sound,
+            image: data.image,
+            volume: data.volume,
+            speed: data.speed,
+            customName: data.customName,
+            hotkey: data.hotkey,
+            isPlaying: false
+          };
+        } else {
+          // This pad becomes empty - clear all associated data
+          return {
+            ...pad,
+            sound: null,
+            image: undefined,
+            volume: 1.0,
+            speed: 1.0,
+            customName: undefined,
+            hotkey: undefined,
+            isPlaying: false
+          };
+        }
+      });
     });
   }
 
