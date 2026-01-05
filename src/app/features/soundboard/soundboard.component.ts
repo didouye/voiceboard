@@ -224,8 +224,8 @@ export class SoundboardComponent implements OnInit, OnDestroy {
 
         const result = await this.soundboard.importSoundsFromPaths(audioPaths);
 
-        if (result.errors.length > 0) {
-          console.warn(`Imported ${result.imported} files. Failed: ${result.errors.join(', ')}`);
+        if (result.errors.length > 0 || result.skippedDuplicates > 0) {
+          console.warn(`Imported ${result.imported} files. Skipped ${result.skippedDuplicates} duplicates. Failed: ${result.errors.join(', ')}`);
         }
 
         // If successful imports, find pads with newly imported sounds
@@ -322,8 +322,8 @@ export class SoundboardComponent implements OnInit, OnDestroy {
 
     const result = await this.soundboard.importMultipleSounds();
 
-    if (result.errors.length > 0) {
-      console.warn(`Imported ${result.imported} files.\nFailed (${result.errors.length}):\n${result.errors.join('\n')}`);
+    if (result.errors.length > 0 || result.skippedDuplicates > 0) {
+      console.warn(`Imported ${result.imported} files. Skipped ${result.skippedDuplicates} duplicates.\nFailed (${result.errors.length}):\n${result.errors.join('\n')}`);
     }
 
     // If successful imports, find pads with newly imported sounds

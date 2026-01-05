@@ -114,7 +114,7 @@ export class SoundboardService {
       const saved = await this.tauri.loadSoundboardState();
       if (saved && saved.length > 0) {
         // Restore pads, ensuring isPlaying is false and defaults for backwards compatibility
-        const restoredPads: SoundPad[] = saved.map(p => ({
+        let restoredPads: SoundPad[] = saved.map(p => ({
           ...p,
           isPlaying: false,
           volume: p.volume ?? 1.0,
@@ -122,8 +122,44 @@ export class SoundboardService {
           customName: p.customName,
           image: p.image
         }));
+
+        // Remove duplicates (keep first occurrence of each sound path)
+        const seenPaths = new Set<string>();
+        let duplicatesRemoved = 0;
+        restoredPads = restoredPads.map(pad => {
+          if (pad.sound) {
+            if (seenPaths.has(pad.sound.path)) {
+              // Duplicate - clear this pad
+              duplicatesRemoved++;
+              return {
+                ...pad,
+                sound: null,
+                image: undefined,
+                volume: 1.0,
+                speed: 1.0,
+                customName: undefined,
+                hotkey: undefined
+              };
+            }
+            seenPaths.add(pad.sound.path);
+          }
+          return pad;
+        });
+
+        if (duplicatesRemoved > 0) {
+          console.log(`Removed ${duplicatesRemoved} duplicate sound(s)`);
+        }
+
         this._pads.set(restoredPads);
-        console.log(`Loaded ${saved.filter(p => p.sound).length} sounds from storage`);
+        console.log(`Loaded ${restoredPads.filter(p => p.sound).length} sounds from storage`);
+
+        // Reorganize to compact after removing duplicates
+        if (duplicatesRemoved > 0) {
+          this.reorganizePads();
+          this.cleanupEmptyRows();
+          // Save the cleaned state
+          await this.saveState();
+        }
       }
     } catch (err) {
       console.error('Failed to load soundboard state:', err);
@@ -273,6 +309,13 @@ export class SoundboardService {
   }
 
   /**
+   * Check if a sound with the given path already exists
+   */
+  private isDuplicate(path: string): boolean {
+    return this._pads().some(p => p.sound?.path === path);
+  }
+
+  /**
    * Import a sound file to a specific pad
    */
   async importSound(padId: string): Promise<void> {
@@ -300,6 +343,13 @@ export class SoundboardService {
 
       const path = selected as string;
       console.log('[Soundboard] Selected file path:', path);
+
+      // Check for duplicate
+      if (this.isDuplicate(path)) {
+        console.log('[Soundboard] Sound already exists, skipping:', path);
+        this._error.set('Ce son existe déjà dans le soundboard');
+        return;
+      }
 
       // Load and decode the file
       console.log('[Soundboard] Calling tauri.loadSoundFile...');
@@ -337,7 +387,7 @@ export class SoundboardService {
    * Import multiple sound files at once
    * Opens a multi-file dialog and assigns sounds to empty pads
    */
-  async importMultipleSounds(): Promise<{ imported: number; errors: string[] }> {
+  async importMultipleSounds(): Promise<{ imported: number; errors: string[]; skippedDuplicates: number }> {
     try {
       this._loading.set(true);
       this._error.set(null);
@@ -353,14 +403,14 @@ export class SoundboardService {
 
       if (!selected || (Array.isArray(selected) && selected.length === 0)) {
         this._loading.set(false);
-        return { imported: 0, errors: [] };
+        return { imported: 0, errors: [], skippedDuplicates: 0 };
       }
 
       const paths = Array.isArray(selected) ? selected : [selected];
       return await this.importSoundsFromPaths(paths);
     } catch (err) {
       this._error.set(err instanceof Error ? err.message : String(err));
-      return { imported: 0, errors: [String(err)] };
+      return { imported: 0, errors: [String(err)], skippedDuplicates: 0 };
     } finally {
       this._loading.set(false);
     }
@@ -370,13 +420,26 @@ export class SoundboardService {
    * Import sounds from an array of file paths
    * Used by both button import and drag & drop
    */
-  async importSoundsFromPaths(paths: string[]): Promise<{ imported: number; errors: string[] }> {
+  async importSoundsFromPaths(paths: string[]): Promise<{ imported: number; errors: string[]; skippedDuplicates: number }> {
     if (paths.length === 0) {
-      return { imported: 0, errors: [] };
+      return { imported: 0, errors: [], skippedDuplicates: 0 };
+    }
+
+    // Filter out duplicates before loading
+    const existingPaths = new Set(this._pads().filter(p => p.sound).map(p => p.sound!.path));
+    const newPaths = paths.filter(path => !existingPaths.has(path));
+    const skippedDuplicates = paths.length - newPaths.length;
+
+    if (skippedDuplicates > 0) {
+      console.log(`[Soundboard] Skipped ${skippedDuplicates} duplicate(s)`);
+    }
+
+    if (newPaths.length === 0) {
+      return { imported: 0, errors: [], skippedDuplicates };
     }
 
     // Load all files in parallel
-    const results = await this.tauri.loadMultipleSoundFiles(paths);
+    const results = await this.tauri.loadMultipleSoundFiles(newPaths);
 
     // Separate successes and errors
     const successfulSounds: SoundFile[] = [];
@@ -386,13 +449,13 @@ export class SoundboardService {
       if ('ok' in result) {
         successfulSounds.push(result.ok);
       } else {
-        const fileName = paths[index].split('/').pop() || paths[index];
+        const fileName = newPaths[index].split('/').pop() || newPaths[index];
         errors.push(`${fileName}: ${result.err}`);
       }
     });
 
     if (successfulSounds.length === 0) {
-      return { imported: 0, errors };
+      return { imported: 0, errors, skippedDuplicates };
     }
 
     // Ensure we have enough empty pads
@@ -427,7 +490,7 @@ export class SoundboardService {
 
     await this.saveState();
 
-    return { imported: successfulSounds.length, errors };
+    return { imported: successfulSounds.length, errors, skippedDuplicates };
   }
 
   /**
