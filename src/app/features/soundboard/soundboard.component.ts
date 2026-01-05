@@ -17,7 +17,7 @@ const DEFAULT_HOTKEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', 
       <!-- Header -->
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-lg font-semibold text-text-primary">
-          {{ soundboard.activeFolder()?.name || 'Soundboard' }}
+          {{ soundboard.activeFolder().name || 'Soundboard' }}
         </h2>
         <div class="flex items-center gap-2">
           @if (soundboard.playingCount() > 0) {
