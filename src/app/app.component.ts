@@ -8,6 +8,7 @@ import { SetupWizardComponent } from './core/components/setup-wizard/setup-wizar
 import { ToastService } from './core/services/toast.service';
 import { DebugConsoleService } from './core/services/debug-console.service';
 import { SetupWizardService } from './core/services/setup-wizard.service';
+import { TauriService } from './core/services/tauri.service';
 
 interface UpdateInfo {
   available: boolean;
@@ -41,12 +42,16 @@ export class AppComponent implements OnInit {
   private toastService = inject(ToastService);
   private debugConsole = inject(DebugConsoleService);
   private setupWizard = inject(SetupWizardService);
+  private tauri = inject(TauriService);
 
   showSetupWizard = signal(false);
 
   async ngOnInit() {
     // Log startup info
     await this.logStartupInfo();
+
+    // Cleanup orphaned images
+    await this.cleanupOrphanedImages();
 
     // Check VB-Cable first (Windows only)
     const isWin = await this.isWindows();
@@ -135,6 +140,17 @@ export class AppComponent implements OnInit {
         message: `Update failed: ${errorMessage}`,
         duration: 10000
       });
+    }
+  }
+
+  private async cleanupOrphanedImages(): Promise<void> {
+    try {
+      const count = await this.tauri.cleanupOrphanedImages();
+      if (count > 0) {
+        console.log(`Cleaned up ${count} orphaned images`);
+      }
+    } catch (err) {
+      console.error('Failed to cleanup orphaned images:', err);
     }
   }
 }
