@@ -52,11 +52,11 @@ interface PadImageSelection {
 
         <!-- Results Grid -->
         @if (searchResults().length > 0) {
-          <div class="grid grid-cols-4 gap-2 mb-4 max-h-48 overflow-y-auto">
+          <div class="grid grid-cols-3 gap-3 mb-4 max-h-80 overflow-y-auto p-1">
             @for (result of searchResults(); track result.id) {
               <button
-                class="aspect-square rounded overflow-hidden border-2 transition-all hover:scale-105"
-                [class]="selectedImage()?.id === result.id ? 'border-accent' : 'border-transparent'"
+                class="aspect-square rounded-lg overflow-hidden border-2 transition-all hover:scale-105 flex-shrink-0"
+                [class]="selectedImage()?.id === result.id ? 'border-accent ring-2 ring-accent/50' : 'border-transparent hover:border-border'"
                 (click)="selectedImage.set(result)"
               >
                 <img [src]="result.thumbnailUrl" alt="" class="w-full h-full object-cover">
@@ -65,7 +65,7 @@ interface PadImageSelection {
           </div>
         } @else {
           <div class="h-48 flex items-center justify-center text-text-muted">
-            Search for images
+            Recherchez des images
           </div>
         }
 
