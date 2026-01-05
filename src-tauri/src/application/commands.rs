@@ -851,6 +851,10 @@ pub async fn play_sound(
     use std::fs::File;
     use std::io::BufReader;
 
+    // Capture the stop generation BEFORE we start loading/decoding
+    // If this changes while we're decoding, a StopAllSounds was called and we should abort
+    let start_generation = state.get_stop_generation();
+
     // Get the ACTUAL sample rate from the audio engine state
     // This is set when the engine starts and reflects the negotiated rate
     // between input and output devices (may differ from device default config)
@@ -950,6 +954,19 @@ pub async fn play_sound(
         ),
     );
 
+    // Check if a StopAllSounds was called while we were decoding
+    // If so, don't play - the user already requested to stop all sounds
+    let current_generation = state.get_stop_generation();
+    if current_generation != start_generation {
+        tracing::info!(
+            "Sound '{}' discarded: StopAllSounds called during decode (gen {} -> {})",
+            id,
+            start_generation,
+            current_generation
+        );
+        return Ok(());
+    }
+
     // Send to audio engine
     let engine = state.audio_engine.lock().await;
     engine
@@ -1021,10 +1038,30 @@ pub async fn get_preview_state(state: State<'_, AppState>) -> Result<Option<Stri
 /// Stop a playing sound
 #[tauri::command]
 pub async fn stop_sound(state: State<'_, AppState>, id: String) -> Result<(), String> {
+    // Increment generation to abort any in-flight play_sound for this specific sound
+    // This uses the same mechanism as stop_all_sounds
+    state.increment_stop_generation();
+
     let engine = state.audio_engine.lock().await;
     engine
         .send_command(AudioEngineCommand::StopSound { id })
         .map_err(|e| format!("Failed to stop sound: {}", e))?;
+
+    Ok(())
+}
+
+/// Stop all playing sounds
+#[tauri::command]
+pub async fn stop_all_sounds(state: State<'_, AppState>) -> Result<(), String> {
+    // Increment generation FIRST to signal any in-flight play_sound calls to abort
+    // This prevents sounds that started loading before this call from being added
+    let new_gen = state.increment_stop_generation();
+    tracing::debug!("StopAllSounds: generation incremented to {}", new_gen);
+
+    let engine = state.audio_engine.lock().await;
+    engine
+        .send_command(AudioEngineCommand::StopAllSounds)
+        .map_err(|e| format!("Failed to stop all sounds: {}", e))?;
 
     Ok(())
 }

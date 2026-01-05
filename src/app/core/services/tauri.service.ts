@@ -414,6 +414,14 @@ export class TauriService {
   }
 
   /**
+   * Stop all playing sounds
+   */
+  async stopAllSounds(): Promise<void> {
+    if (this.demoService.isDemoMode) return;
+    await invoke('stop_all_sounds');
+  }
+
+  /**
    * Preview a sound on a specific output device
    */
   async previewSound(path: string, deviceName: string, padId: string): Promise<void> {

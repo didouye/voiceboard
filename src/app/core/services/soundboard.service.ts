@@ -563,8 +563,14 @@ export class SoundboardService {
    * Stop all playing sounds
    */
   async stopAll(): Promise<void> {
-    const playingPads = this._pads().filter(p => p.isPlaying);
-    await Promise.all(playingPads.map(p => this.stopSound(p.id)));
+    try {
+      // Stop all sounds in the backend (authoritative)
+      await this.tauri.stopAllSounds();
+      // Reset all pads' isPlaying state to false
+      this._pads.update(pads => pads.map(p => ({ ...p, isPlaying: false })));
+    } catch (err) {
+      this._error.set(err instanceof Error ? err.message : 'Failed to stop all sounds');
+    }
   }
 
   /**

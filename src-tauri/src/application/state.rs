@@ -3,7 +3,7 @@
 use crate::application::audio_engine::AudioEngine;
 use crate::application::preview_engine::PreviewEngine;
 use crate::domain::{AppSettings, MixerConfig};
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 
@@ -17,6 +17,9 @@ pub struct AppState {
     /// Actual sample rate used by the audio engine (set after engine starts)
     /// This may differ from settings.audio.sample_rate due to device negotiation
     pub engine_sample_rate: Arc<AtomicU32>,
+    /// Generation counter incremented on every StopAllSounds call.
+    /// Used to reject sounds that started loading before a StopAll was requested.
+    pub stop_generation: Arc<AtomicU64>,
 }
 
 impl AppState {
@@ -28,6 +31,7 @@ impl AppState {
             audio_engine: Arc::new(Mutex::new(AudioEngine::new())),
             preview_engine: Arc::new(Mutex::new(None)),
             engine_sample_rate: Arc::new(AtomicU32::new(48000)), // Default, updated when engine starts
+            stop_generation: Arc::new(AtomicU64::new(0)),
         }
     }
 
@@ -45,6 +49,7 @@ impl AppState {
             audio_engine: Arc::new(Mutex::new(AudioEngine::new())),
             preview_engine: Arc::new(Mutex::new(None)),
             engine_sample_rate: Arc::new(AtomicU32::new(settings.audio.sample_rate)),
+            stop_generation: Arc::new(AtomicU64::new(0)),
         }
     }
 
@@ -56,6 +61,16 @@ impl AppState {
     /// Set the actual sample rate used by the audio engine
     pub fn set_engine_sample_rate(&self, rate: u32) {
         self.engine_sample_rate.store(rate, Ordering::Relaxed);
+    }
+
+    /// Get the current stop generation counter
+    pub fn get_stop_generation(&self) -> u64 {
+        self.stop_generation.load(Ordering::SeqCst)
+    }
+
+    /// Increment the stop generation counter (called on StopAllSounds)
+    pub fn increment_stop_generation(&self) -> u64 {
+        self.stop_generation.fetch_add(1, Ordering::SeqCst) + 1
     }
 }
 

@@ -42,6 +42,8 @@ pub enum AudioEngineCommand {
     },
     /// Stop a playing sound
     StopSound { id: String },
+    /// Stop all playing sounds
+    StopAllSounds,
     /// Set microphone volume (0.0 - 2.0)
     SetMicVolume(f32),
     /// Set master volume (0.0 - 2.0)
@@ -1085,6 +1087,14 @@ fn run_engine_thread(
                     AudioEngineCommand::StopSound { id } => {
                         if let Ok(mut state) = audio_state.lock() {
                             state.playing_sounds.remove(&id);
+                        }
+                    }
+
+                    AudioEngineCommand::StopAllSounds => {
+                        if let Ok(mut state) = audio_state.lock() {
+                            let count = state.playing_sounds.len();
+                            state.playing_sounds.clear();
+                            tracing::info!("[AudioEngine] Stopped all sounds ({} cleared)", count);
                         }
                     }
 

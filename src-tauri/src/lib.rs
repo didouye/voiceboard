@@ -78,6 +78,7 @@ use application::{
         stop_mixing,
         stop_preview,
         stop_sound,
+        stop_all_sounds,
         toggle_channel_mute,
     },
     shortcut_commands::{
@@ -274,6 +275,7 @@ pub fn run() {
             load_multiple_sound_files,
             play_sound,
             stop_sound,
+            stop_all_sounds,
             preview_sound,
             stop_preview,
             get_preview_state,
