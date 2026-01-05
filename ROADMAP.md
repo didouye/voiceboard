@@ -137,7 +137,7 @@
   - Fallback to filename if no custom name set
 
 - [x] **Pad Images** *(see docs/plans/archive/2026-01-05-pad-images-design.md)*
-  - Upload, URL, and Pexels search
+  - Upload, URL, and DuckDuckGo search
   - Local image storage
   - Auto-suggestion on import
 
