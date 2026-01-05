@@ -1,9 +1,11 @@
-import { Component, Input, Output, EventEmitter, HostListener, HostBinding } from '@angular/core';
+import { Component, Input, Output, EventEmitter, HostListener, HostBinding, inject, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { SoundPad } from '../../../core/models';
 import { SoundboardService } from '../../../core/services/soundboard.service';
 import { ShortcutService } from '../../../core/services/shortcut.service';
+import { TauriService } from '../../../core/services/tauri.service';
+import { convertFileSrc } from '@tauri-apps/api/core';
 
 @Component({
   selector: 'app-sound-pad',
@@ -11,32 +13,43 @@ import { ShortcutService } from '../../../core/services/shortcut.service';
   imports: [CommonModule, FormsModule],
   template: `
     <div
-      class="aspect-square max-w-[140px] rounded-xl cursor-pointer relative overflow-visible transition-all duration-150 flex items-center justify-center group"
+      class="aspect-square max-w-[140px] rounded-xl cursor-pointer relative overflow-hidden transition-all duration-150 flex items-end justify-center group"
       [class]="padClasses"
       [style.--pad-color]="pad.color"
       [title]="pad.sound?.name || ''"
       (click)="onClick($event)"
       (contextmenu)="onRightClick($event)"
     >
+      <!-- Image background -->
+      @if (imageUrl()) {
+        <img
+          [src]="imageUrl()"
+          alt=""
+          class="absolute inset-0 w-full h-full object-cover"
+        >
+        <!-- Gradient overlay for text readability -->
+        <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+      }
+
       <!-- Hotkey badge -->
       @if (hotkey) {
-        <span class="absolute top-2 left-2 px-1.5 py-0.5 bg-black/50 text-white/80 text-[10px] font-semibold rounded font-mono uppercase">
+        <span class="absolute top-2 left-2 px-1.5 py-0.5 bg-black/50 text-white/80 text-[10px] font-semibold rounded font-mono uppercase z-10">
           {{ hotkey }}
         </span>
       }
 
       @if (pad.sound) {
-        <!-- Sound content -->
-        <div class="text-center px-2 w-full">
-          <span class="block text-xs font-semibold text-white truncate mb-0.5 drop-shadow-md">
+        <!-- Sound content (positioned at bottom with z-index) -->
+        <div class="text-center px-2 w-full pb-2 relative z-10">
+          <span class="block text-xs font-semibold text-white truncate mb-0.5 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
             {{ pad.customName || pad.sound.name }}
           </span>
           @if (pad.customName) {
-            <span class="block text-[9px] text-white/50 truncate">
+            <span class="block text-[9px] text-white/70 truncate drop-shadow-md">
               {{ pad.sound.name }}
             </span>
           }
-          <span class="block text-[10px] text-white/70 mt-0.5">
+          <span class="block text-[10px] text-white/70 mt-0.5 drop-shadow-md">
             {{ formatDuration(pad.sound.duration) }}
           </span>
         </div>
@@ -214,7 +227,7 @@ import { ShortcutService } from '../../../core/services/shortcut.service';
     }
   `]
 })
-export class SoundPadComponent {
+export class SoundPadComponent implements OnInit {
   @Input({ required: true }) pad!: SoundPad;
   @Input() hotkey?: string;
   @Input() loading = false;
@@ -232,6 +245,17 @@ export class SoundPadComponent {
   @HostBinding('class') hostClass = 'relative';
   @HostBinding('class.z-50') get isPopupOpen() { return this.showSettingsPopup; }
 
+  private tauri = inject(TauriService);
+  private _imagesDir = signal<string>('');
+
+  readonly imageUrl = computed(() => {
+    const pad = this.pad;
+    if (!pad.image?.localPath) return null;
+    const dir = this._imagesDir();
+    if (!dir) return null;
+    return convertFileSrc(`${dir}/${pad.image.localPath}`);
+  });
+
   showSettingsPopup = false;
   modalVisible = false;
   isRecording = false;
@@ -243,15 +267,28 @@ export class SoundPadComponent {
     private shortcutService: ShortcutService
   ) {}
 
+  async ngOnInit(): Promise<void> {
+    try {
+      const dir = await this.tauri.getImagesDir();
+      this._imagesDir.set(dir);
+    } catch (e) {
+      console.error('Failed to get images dir:', e);
+    }
+  }
+
   get padClasses(): string {
     const base = 'border-2';
 
     if (!this.pad.sound) {
-      return `${base} border-dashed border-white/10 bg-white/5 hover:border-white/25 hover:bg-white/10`;
+      return `${base} border-dashed border-white/10 bg-white/5 hover:border-white/25 hover:bg-white/10 items-center`;
     }
 
     let classes = `${base} border-[var(--pad-color)]`;
-    classes += ` bg-gradient-to-br from-[var(--pad-color)] to-[color-mix(in_srgb,var(--pad-color)_70%,black)]`;
+
+    // Only add gradient background if no image
+    if (!this.pad.image) {
+      classes += ` bg-gradient-to-br from-[var(--pad-color)] to-[color-mix(in_srgb,var(--pad-color)_70%,black)]`;
+    }
 
     // Disable hover effects when modal is open
     if (!this.showSettingsPopup) {
