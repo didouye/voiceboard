@@ -502,7 +502,7 @@ export class SoundPadComponent implements OnInit, OnChanges {
     this.preview.emit();
   }
 
-  onRemove(event: MouseEvent): void {
+  async onRemove(event: MouseEvent): Promise<void> {
     event.stopPropagation();
     event.preventDefault();
 
@@ -510,13 +510,12 @@ export class SoundPadComponent implements OnInit, OnChanges {
     const padId = this.pad.id;
     const soundName = this.pad.customName || this.pad.sound?.name || 'this sound';
 
-    // Use setTimeout to ensure click event fully completes before dialog
-    setTimeout(() => {
-      if (window.confirm(`Supprimer "${soundName}" ?`)) {
-        // Call service directly instead of emitting event
-        this.soundboardService.removeSound(padId);
-      }
-    }, 0);
+    // Tauri's window.confirm returns a Promise, not a boolean
+    const confirmed = await window.confirm(`Supprimer "${soundName}" ?`);
+
+    if (confirmed) {
+      this.soundboardService.removeSound(padId);
+    }
   }
 
   toggleSettingsPopup(event: MouseEvent): void {
