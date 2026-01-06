@@ -58,7 +58,6 @@ import { ImageSearchService, ImageSearchResult } from '../../core/services/image
               (play)="soundboard.playSound(pad.id)"
               (preview)="soundboard.previewSound(pad.id)"
               (import)="onImportSound(pad.id)"
-              (remove)="soundboard.removeSound(pad.id)"
               (volumeChange)="soundboard.setPadVolume(pad.id, $event)"
               (speedChange)="soundboard.setPadSpeed(pad.id, $event)"
               (shortcutChange)="onShortcutChange(pad.id, $event)"

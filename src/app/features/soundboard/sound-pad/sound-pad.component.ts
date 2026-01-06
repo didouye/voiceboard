@@ -360,7 +360,6 @@ export class SoundPadComponent implements OnInit, OnChanges {
   @Output() play = new EventEmitter<void>();
   @Output() preview = new EventEmitter<void>();
   @Output() import = new EventEmitter<void>();
-  @Output() remove = new EventEmitter<void>();
   @Output() volumeChange = new EventEmitter<number>();
   @Output() speedChange = new EventEmitter<number>();
   @Output() shortcutChange = new EventEmitter<string | null>();
@@ -505,10 +504,19 @@ export class SoundPadComponent implements OnInit, OnChanges {
 
   onRemove(event: MouseEvent): void {
     event.stopPropagation();
+    event.preventDefault();
+
+    // Store pad info before any async operation
+    const padId = this.pad.id;
     const soundName = this.pad.customName || this.pad.sound?.name || 'this sound';
-    if (confirm(`Supprimer "${soundName}" ?`)) {
-      this.remove.emit();
-    }
+
+    // Use setTimeout to ensure click event fully completes before dialog
+    setTimeout(() => {
+      if (window.confirm(`Supprimer "${soundName}" ?`)) {
+        // Call service directly instead of emitting event
+        this.soundboardService.removeSound(padId);
+      }
+    }, 0);
   }
 
   toggleSettingsPopup(event: MouseEvent): void {
