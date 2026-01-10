@@ -49,21 +49,20 @@ import { ImageSearchService, ImageSearchResult } from '../../core/services/image
       <!-- Pads grid -->
       <div class="flex-1 relative">
         <div class="grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(100px, 140px));">
-          @for (pad of soundboard.filteredPads(); track pad.id; let i = $index) {
+          @for (pad of soundboard.pads(); track pad.sound?.id ?? pad.index; let i = $index) {
             <app-sound-pad
               [pad]="pad"
-              [hotkey]="getHotkey(i)"
               [loading]="soundboard.loading()"
-              [isPreviewing]="soundboard.previewingPadId() === pad.id"
-              (play)="soundboard.playSound(pad.id)"
-              (preview)="soundboard.previewSound(pad.id)"
-              (import)="onImportSound(pad.id)"
-              (volumeChange)="soundboard.setPadVolume(pad.id, $event)"
-              (speedChange)="soundboard.setPadSpeed(pad.id, $event)"
-              (shortcutChange)="onShortcutChange(pad.id, $event)"
-              (customNameChange)="soundboard.setPadCustomName(pad.id, $event)"
-              (imageChange)="onImageChange(pad.id, $event)"
-              (folderToggle)="soundboard.togglePadFolder(pad.id, $event)"
+              [isPreviewing]="soundboard.previewingSoundId() === pad.sound?.id"
+              (play)="soundboard.playSound(pad.sound!.id)"
+              (preview)="soundboard.previewSound(pad.sound!.id)"
+              (import)="onImportSound()"
+              (volumeChange)="soundboard.setSoundVolume(pad.sound!.id, $event)"
+              (speedChange)="soundboard.setSoundSpeed(pad.sound!.id, $event)"
+              (shortcutChange)="onShortcutChange(pad.sound!.id, $event)"
+              (customNameChange)="soundboard.setSoundCustomName(pad.sound!.id, $event)"
+              (imageChange)="onImageChange(pad.sound!.id, $event)"
+              (folderToggle)="soundboard.toggleSoundFolder(pad.sound!.id, $event)"
             />
           }
         </div>
@@ -152,7 +151,7 @@ export class SoundboardComponent implements OnInit, OnDestroy {
   showImageSuggestion = signal(false);
   suggestionSoundName = '';
   suggestionFilename = '';
-  suggestionPadId = '';
+  suggestionSoundId = '';
 
   showBulkWizard = signal(false);
   bulkWizardPads = signal<SoundPad[]>([]);
@@ -261,34 +260,20 @@ export class SoundboardComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Check custom shortcuts (with modifiers)
-    const pads = this.soundboard.pads();
-    for (const pad of pads) {
-      if (pad.hotkey && pad.sound) {
-        if (eventMatchesShortcut(event, pad.hotkey)) {
-          event.preventDefault();
-          this.soundboard.playSound(pad.id);
-          return;
-        }
+    // Check all sounds for matching hotkey
+    for (const sound of this.soundboard.sounds().values()) {
+      if (sound.hotkey && eventMatchesShortcut(event, sound.hotkey)) {
+        event.preventDefault();
+        this.soundboard.playSound(sound.id);
+        return;
       }
     }
   }
 
   /**
-   * Get the display hotkey for a pad (only custom hotkeys, no defaults)
-   */
-  getHotkey(padIndex: number): string | undefined {
-    const pads = this.soundboard.pads();
-    if (padIndex < pads.length) {
-      return pads[padIndex].hotkey;
-    }
-    return undefined;
-  }
-
-  /**
    * Handle import from clicking an empty pad (with image suggestion)
    */
-  async onImportSound(padId: string): Promise<void> {
+  async onImportSound(): Promise<void> {
     // Take snapshot of existing sound paths before import
     const existingPaths = new Set(
       this.soundboard.pads()
@@ -297,7 +282,7 @@ export class SoundboardComponent implements OnInit, OnDestroy {
     );
 
     // Do the import
-    await this.soundboard.importSound(padId);
+    await this.soundboard.importSound();
 
     // Find newly imported pad (if any)
     const padsAfter = this.soundboard.pads();
@@ -344,27 +329,29 @@ export class SoundboardComponent implements OnInit, OnDestroy {
     }
   }
 
-  async onShortcutChange(padId: string, shortcut: string | null): Promise<void> {
-    // Update pad
-    this.soundboard.setPadHotkey(padId, shortcut);
+  async onShortcutChange(soundId: string, shortcut: string | null): Promise<void> {
+    // Update sound
+    this.soundboard.setSoundHotkey(soundId, shortcut);
 
     // Update shortcut registry
     if (shortcut) {
       try {
-        await this.shortcutService.register(padId, shortcut);
+        await this.shortcutService.register(soundId, shortcut);
       } catch (err) {
         console.error('Failed to register shortcut:', err);
       }
     } else {
-      const oldShortcut = this.shortcutService.getShortcutForPad(padId);
+      // Note: getShortcutForPad is used for backwards compatibility
+      // until ShortcutService is updated (Task 14)
+      const oldShortcut = this.shortcutService.getShortcutForPad(soundId);
       if (oldShortcut) {
         await this.shortcutService.unregister(oldShortcut);
       }
     }
   }
 
-  onImageChange(padId: string, image: PadImage | null): void {
-    this.soundboard.setPadImage(padId, image);
+  onImageChange(soundId: string, image: PadImage | null): void {
+    this.soundboard.setSoundImage(soundId, image);
   }
 
   /**
@@ -373,14 +360,14 @@ export class SoundboardComponent implements OnInit, OnDestroy {
   async onAcceptSuggestion(result: ImageSearchResult): Promise<void> {
     try {
       const { data, extension } = await this.imageSearch.downloadImage(result.fullUrl);
-      const localPath = await this.tauri.savePadImage(this.suggestionPadId, data, extension);
+      const localPath = await this.tauri.savePadImage(this.suggestionSoundId, data, extension);
 
       const image: PadImage = {
         localPath,
         originalUrl: result.fullUrl,
         attribution: result.title
       };
-      this.soundboard.setPadImage(this.suggestionPadId, image);
+      this.soundboard.setSoundImage(this.suggestionSoundId, image);
     } catch (err) {
       console.error('Failed to save suggested image:', err);
     } finally {
@@ -415,17 +402,17 @@ export class SoundboardComponent implements OnInit, OnDestroy {
   /**
    * Handle selecting an image in the bulk wizard
    */
-  async onBulkSelectImage(event: { padId: string; image: ImageSearchResult }): Promise<void> {
+  async onBulkSelectImage(event: { soundId: string; image: ImageSearchResult }): Promise<void> {
     try {
       const { data, extension } = await this.imageSearch.downloadImage(event.image.fullUrl);
-      const localPath = await this.tauri.savePadImage(event.padId, data, extension);
+      const localPath = await this.tauri.savePadImage(event.soundId, data, extension);
 
       const image: PadImage = {
         localPath,
         originalUrl: event.image.fullUrl,
         attribution: event.image.title
       };
-      this.soundboard.setPadImage(event.padId, image);
+      this.soundboard.setSoundImage(event.soundId, image);
     } catch (err) {
       console.error('Failed to save image:', err);
     }
@@ -446,7 +433,7 @@ export class SoundboardComponent implements OnInit, OnDestroy {
   private triggerSingleImportSuggestion(pad: SoundPad): void {
     if (!this.imageSearch.hasApiKey() || !pad.sound) return;
 
-    this.suggestionPadId = pad.id;
+    this.suggestionSoundId = pad.sound.id;
     this.suggestionSoundName = pad.sound.name;
     this.suggestionFilename = pad.sound.path.split('/').pop() || pad.sound.name;
     this.showImageSuggestion.set(true);

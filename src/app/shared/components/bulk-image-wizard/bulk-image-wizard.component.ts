@@ -126,7 +126,7 @@ interface PadImageSelection {
 export class BulkImageWizardComponent implements OnInit {
   @Input({ required: true }) pads!: SoundPad[];
   @Output() close = new EventEmitter<void>();
-  @Output() selectImage = new EventEmitter<{ padId: string; image: ImageSearchResult }>();
+  @Output() selectImage = new EventEmitter<{ soundId: string; image: ImageSearchResult }>();
 
   private imageSearch = inject(ImageSearchService);
 
@@ -148,7 +148,7 @@ export class BulkImageWizardComponent implements OnInit {
     if (!pad?.sound) return;
 
     // Check if we already have a selection for this pad
-    const existingSelection = this.selections.get(pad.id);
+    const existingSelection = this.selections.get(pad.sound.id);
     if (existingSelection) {
       this.selectedImage.set(existingSelection);
     } else {
@@ -181,16 +181,16 @@ export class BulkImageWizardComponent implements OnInit {
 
   skip(): void {
     this.selectedImage.set(null);
-    this.selections.delete(this.currentPad()?.id || '');
+    this.selections.delete(this.currentPad()?.sound?.id || '');
     this.nextOrFinish();
   }
 
   selectAndNext(): void {
     const image = this.selectedImage();
     const pad = this.currentPad();
-    if (image && pad) {
-      this.selections.set(pad.id, image);
-      this.selectImage.emit({ padId: pad.id, image });
+    if (image && pad?.sound) {
+      this.selections.set(pad.sound.id, image);
+      this.selectImage.emit({ soundId: pad.sound.id, image });
     }
     this.nextOrFinish();
   }
