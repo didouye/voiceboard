@@ -61,6 +61,51 @@ export class SoundboardService {
   readonly activePads = computed(() => this._pads().filter(p => p.sound !== null));
   readonly playingCount = computed(() => this._pads().filter(p => p.isPlaying).length);
 
+  /**
+   * Pads filtered by active folder.
+   * Returns all pads for "All" folder, or only pads containing the active folder.
+   */
+  readonly filteredPads = computed(() => {
+    const activeFolderId = this._activeFolderId();
+    const allPads = this._pads();
+
+    if (activeFolderId === 'all') {
+      return allPads;
+    }
+
+    // Get pads that belong to this folder
+    const folderPads = allPads.filter(pad =>
+      pad.sound !== null && pad.folderIds.includes(activeFolderId)
+    );
+
+    // Create a virtual pad grid with filtered sounds sorted alphabetically
+    const sortedPads = [...folderPads].sort((a, b) =>
+      (a.sound?.name || '').toLowerCase().localeCompare((b.sound?.name || '').toLowerCase())
+    );
+
+    // Map to new pad positions for display
+    const minPads = Math.max(12, Math.ceil(sortedPads.length / 4) * 4 + 4);
+    const result: SoundPad[] = [];
+
+    for (let i = 0; i < minPads; i++) {
+      if (i < sortedPads.length) {
+        result.push({ ...sortedPads[i], id: `pad-${i}` });
+      } else {
+        result.push({
+          id: `pad-${i}`,
+          sound: null,
+          color: PAD_COLORS[i % PAD_COLORS.length],
+          isPlaying: false,
+          volume: 1.0,
+          speed: 1.0,
+          folderIds: []
+        });
+      }
+    }
+
+    return result;
+  });
+
   constructor(private tauri: TauriService) {
     // Load saved state on construction
     this.loadState();

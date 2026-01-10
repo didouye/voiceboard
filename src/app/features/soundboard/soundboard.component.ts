@@ -49,7 +49,7 @@ import { ImageSearchService, ImageSearchResult } from '../../core/services/image
       <!-- Pads grid -->
       <div class="flex-1 relative">
         <div class="grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(100px, 140px));">
-          @for (pad of soundboard.pads(); track pad.id; let i = $index) {
+          @for (pad of soundboard.filteredPads(); track pad.id; let i = $index) {
             <app-sound-pad
               [pad]="pad"
               [hotkey]="getHotkey(i)"
