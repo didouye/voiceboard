@@ -21,6 +21,16 @@ import {
 } from './demo-data';
 
 /**
+ * Imported sound with hash
+ */
+export interface ImportedSound {
+  hash: string;
+  name: string;
+  path: string;
+  duration: number;
+}
+
+/**
  * Service for communicating with the Tauri/Rust backend
  * In demo mode, returns mock data instead of calling Tauri APIs
  */
@@ -498,6 +508,53 @@ export class TauriService {
       return DEMO_SOUNDBOARD_PADS;
     }
     return invoke<any[] | null>('load_soundboard');
+  }
+
+  // =========================================================================
+  // Hash-based Sound Import
+  // =========================================================================
+
+  /**
+   * Import a sound file and get its hash
+   */
+  async importSoundWithHash(path: string): Promise<ImportedSound> {
+    if (this.demoService.isDemoMode) {
+      return {
+        hash: 'demo_' + Math.random().toString(36).substring(7),
+        name: path.split('/').pop()?.replace(/\.[^.]+$/, '') || 'demo',
+        path,
+        duration: 5.0
+      };
+    }
+    return invoke<ImportedSound>('import_sound_with_hash', { path });
+  }
+
+  /**
+   * Import multiple sound files with hashes
+   */
+  async importMultipleSoundsWithHash(paths: string[]): Promise<Array<{ ok: ImportedSound } | { err: string }>> {
+    if (this.demoService.isDemoMode) {
+      return paths.map(path => ({
+        ok: {
+          hash: 'demo_' + Math.random().toString(36).substring(7),
+          name: path.split('/').pop()?.replace(/\.[^.]+$/, '') || 'demo',
+          path,
+          duration: 5.0
+        }
+      }));
+    }
+    const results = await invoke<Array<{ Ok: ImportedSound } | { Err: string }>>('import_multiple_sounds_with_hash', { paths });
+    return results.map(r => 'Ok' in r ? { ok: r.Ok } : { err: r.Err });
+  }
+
+  /**
+   * Calculate SHA-256 hash of a file
+   */
+  async hashFile(path: string): Promise<string> {
+    if (this.demoService.isDemoMode) {
+      return 'demo_' + Math.random().toString(36).substring(7);
+    }
+    return invoke<string>('hash_file', { path });
   }
 
   /**
