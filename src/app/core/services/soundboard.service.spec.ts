@@ -1,16 +1,32 @@
 import { TestBed } from '@angular/core/testing';
 import { SoundboardService } from './soundboard.service';
 import { TauriService } from './tauri.service';
-import { PadImage } from '../models';
+import { PadImage, Sound } from '../models';
+import { signal } from '@angular/core';
 
 describe('SoundboardService', () => {
   let service: SoundboardService;
   let tauriServiceSpy: jasmine.SpyObj<TauriService>;
 
+  const createMockSound = (overrides: Partial<Sound> = {}): Sound => ({
+    id: 'hash_abc123',
+    name: 'test-sound',
+    path: '/path/to/test-sound.mp3',
+    duration: 5.0,
+    volume: 1.0,
+    speed: 1.0,
+    folderIds: [],
+    isPlaying: false,
+    addedAt: Date.now(),
+    ...overrides
+  });
+
   beforeEach(() => {
     const spy = jasmine.createSpyObj('TauriService', [
       'loadSoundboardState',
       'saveSoundboardState',
+      'loadFolders',
+      'saveFolders',
       'loadSettings',
       'loadSoundFile',
       'playSound',
@@ -19,12 +35,17 @@ describe('SoundboardService', () => {
       'stopPreview',
       'setPreviewDevice',
       'listenPreviewStarted',
-      'listenPreviewStopped'
+      'listenPreviewStopped',
+      'importSoundWithHash',
+      'importMultipleSoundsWithHash',
+      'hashFile'
     ]);
 
     // Default mock implementations
-    spy.loadSoundboardState.and.returnValue(Promise.resolve([]));
+    spy.loadSoundboardState.and.returnValue(Promise.resolve(null));
     spy.saveSoundboardState.and.returnValue(Promise.resolve());
+    spy.loadFolders.and.returnValue(Promise.resolve([]));
+    spy.saveFolders.and.returnValue(Promise.resolve());
     spy.loadSettings.and.returnValue(Promise.resolve({
       audio: { previewDeviceId: null }
     }));
@@ -52,133 +73,131 @@ describe('SoundboardService', () => {
       expect(service.pads().every(p => p.sound === null)).toBeTrue();
     });
 
-    it('should initialize pads with default values', () => {
+    it('should initialize pads with index and color', () => {
       const pad = service.pads()[0];
-      expect(pad.volume).toBe(1.0);
-      expect(pad.speed).toBe(1.0);
-      expect(pad.isPlaying).toBeFalse();
-      expect(pad.customName).toBeUndefined();
+      expect(pad.index).toBe(0);
+      expect(pad.color).toBeDefined();
+      expect(pad.sound).toBeNull();
     });
   });
 
-  describe('setPadCustomName', () => {
-    it('should set custom name on a pad', () => {
-      const padId = service.pads()[0].id;
+  describe('setSoundCustomName', () => {
+    beforeEach(() => {
+      // Add a sound to work with
+      const sound = createMockSound({ id: 'sound-1' });
+      (service as any)._sounds.set(new Map([['sound-1', sound]]));
+    });
 
-      service.setPadCustomName(padId, 'My Custom Name');
+    it('should set custom name on a sound', () => {
+      service.setSoundCustomName('sound-1', 'My Custom Name');
 
-      const updatedPad = service.pads().find(p => p.id === padId);
-      expect(updatedPad?.customName).toBe('My Custom Name');
+      const sound = service.getSound('sound-1');
+      expect(sound?.customName).toBe('My Custom Name');
     });
 
     it('should clear custom name when passed null', () => {
-      const padId = service.pads()[0].id;
+      service.setSoundCustomName('sound-1', 'My Custom Name');
+      service.setSoundCustomName('sound-1', null);
 
-      service.setPadCustomName(padId, 'My Custom Name');
-      service.setPadCustomName(padId, null);
-
-      const updatedPad = service.pads().find(p => p.id === padId);
-      expect(updatedPad?.customName).toBeUndefined();
+      const sound = service.getSound('sound-1');
+      expect(sound?.customName).toBeUndefined();
     });
 
     it('should clear custom name when passed empty string', () => {
-      const padId = service.pads()[0].id;
+      service.setSoundCustomName('sound-1', 'My Custom Name');
+      service.setSoundCustomName('sound-1', '');
 
-      service.setPadCustomName(padId, 'My Custom Name');
-      service.setPadCustomName(padId, '');
-
-      const updatedPad = service.pads().find(p => p.id === padId);
-      expect(updatedPad?.customName).toBeUndefined();
+      const sound = service.getSound('sound-1');
+      expect(sound?.customName).toBeUndefined();
     });
 
-    // Note: Testing that saveState is called requires complex async mocking
-    // due to the service's initialization flow. The behavior (state persistence)
-    // is verified through integration tests. Unit tests focus on state changes.
+    it('should not affect other sounds when setting custom name', () => {
+      const sound2 = createMockSound({ id: 'sound-2', name: 'sound-2' });
+      (service as any)._sounds.update((sounds: Map<string, Sound>) => {
+        const updated = new Map(sounds);
+        updated.set('sound-2', sound2);
+        return updated;
+      });
 
-    it('should not affect other pads when setting custom name', () => {
-      const pad0Id = service.pads()[0].id;
-      const pad1Id = service.pads()[1].id;
+      service.setSoundCustomName('sound-1', 'Name for Sound 1');
 
-      service.setPadCustomName(pad0Id, 'Name for Pad 0');
-
-      const pad1 = service.pads().find(p => p.id === pad1Id);
-      expect(pad1?.customName).toBeUndefined();
+      const otherSound = service.getSound('sound-2');
+      expect(otherSound?.customName).toBeUndefined();
     });
   });
 
-  describe('setPadVolume', () => {
-    it('should set volume on a pad', () => {
-      const padId = service.pads()[0].id;
+  describe('setSoundVolume', () => {
+    beforeEach(() => {
+      const sound = createMockSound({ id: 'sound-1' });
+      (service as any)._sounds.set(new Map([['sound-1', sound]]));
+    });
 
-      service.setPadVolume(padId, 1.5);
+    it('should set volume on a sound', () => {
+      service.setSoundVolume('sound-1', 1.5);
 
-      const updatedPad = service.pads().find(p => p.id === padId);
-      expect(updatedPad?.volume).toBe(1.5);
+      const sound = service.getSound('sound-1');
+      expect(sound?.volume).toBe(1.5);
     });
 
     it('should clamp volume to max 2.0', () => {
-      const padId = service.pads()[0].id;
+      service.setSoundVolume('sound-1', 3.0);
 
-      service.setPadVolume(padId, 3.0);
-
-      const updatedPad = service.pads().find(p => p.id === padId);
-      expect(updatedPad?.volume).toBe(2.0);
+      const sound = service.getSound('sound-1');
+      expect(sound?.volume).toBe(2.0);
     });
 
     it('should clamp volume to min 0', () => {
-      const padId = service.pads()[0].id;
+      service.setSoundVolume('sound-1', -0.5);
 
-      service.setPadVolume(padId, -0.5);
-
-      const updatedPad = service.pads().find(p => p.id === padId);
-      expect(updatedPad?.volume).toBe(0);
+      const sound = service.getSound('sound-1');
+      expect(sound?.volume).toBe(0);
     });
   });
 
-  describe('setPadSpeed', () => {
-    it('should set speed on a pad', () => {
-      const padId = service.pads()[0].id;
+  describe('setSoundSpeed', () => {
+    beforeEach(() => {
+      const sound = createMockSound({ id: 'sound-1' });
+      (service as any)._sounds.set(new Map([['sound-1', sound]]));
+    });
 
-      service.setPadSpeed(padId, 1.5);
+    it('should set speed on a sound', () => {
+      service.setSoundSpeed('sound-1', 1.5);
 
-      const updatedPad = service.pads().find(p => p.id === padId);
-      expect(updatedPad?.speed).toBe(1.5);
+      const sound = service.getSound('sound-1');
+      expect(sound?.speed).toBe(1.5);
     });
 
     it('should clamp speed to max 2.0', () => {
-      const padId = service.pads()[0].id;
+      service.setSoundSpeed('sound-1', 3.0);
 
-      service.setPadSpeed(padId, 3.0);
-
-      const updatedPad = service.pads().find(p => p.id === padId);
-      expect(updatedPad?.speed).toBe(2.0);
+      const sound = service.getSound('sound-1');
+      expect(sound?.speed).toBe(2.0);
     });
 
     it('should clamp speed to min 0.5', () => {
-      const padId = service.pads()[0].id;
+      service.setSoundSpeed('sound-1', 0.1);
 
-      service.setPadSpeed(padId, 0.1);
-
-      const updatedPad = service.pads().find(p => p.id === padId);
-      expect(updatedPad?.speed).toBe(0.5);
+      const sound = service.getSound('sound-1');
+      expect(sound?.speed).toBe(0.5);
     });
   });
 
-  describe('addPads', () => {
-    it('should add 4 pads by default', () => {
-      const initialCount = service.pads().length;
+  describe('virtual pads', () => {
+    it('should generate pads with sounds in them', () => {
+      const sound = createMockSound({ id: 'sound-1', name: 'Test Sound' });
+      (service as any)._sounds.set(new Map([['sound-1', sound]]));
 
-      service.addPads();
-
-      expect(service.pads().length).toBe(initialCount + 4);
+      const pads = service.pads();
+      expect(pads.length).toBeGreaterThanOrEqual(12);
+      expect(pads[0].sound?.id).toBe('sound-1');
     });
 
-    it('should add specified number of pads', () => {
-      const initialCount = service.pads().length;
+    it('should leave remaining pads empty', () => {
+      const sound = createMockSound({ id: 'sound-1' });
+      (service as any)._sounds.set(new Map([['sound-1', sound]]));
 
-      service.addPads(8);
-
-      expect(service.pads().length).toBe(initialCount + 8);
+      const pads = service.pads();
+      expect(pads[1].sound).toBeNull();
     });
   });
 
@@ -192,18 +211,35 @@ describe('SoundboardService', () => {
     });
   });
 
-  describe('setPadImage', () => {
-    it('should set image on pad', () => {
-      const image: PadImage = { localPath: 'pad-0-abc123.jpg' };
-      service.setPadImage('pad-0', image);
-      expect(service.pads()[0].image).toEqual(image);
+  describe('setSoundImage', () => {
+    beforeEach(() => {
+      const sound = createMockSound({ id: 'sound-1' });
+      (service as any)._sounds.set(new Map([['sound-1', sound]]));
+    });
+
+    it('should set image on sound', () => {
+      const image: PadImage = { localPath: 'sound-1-abc123.jpg' };
+      service.setSoundImage('sound-1', image);
+      expect(service.getSound('sound-1')?.image).toEqual(image);
     });
 
     it('should clear image when set to null', () => {
-      const image: PadImage = { localPath: 'pad-0-abc123.jpg' };
-      service.setPadImage('pad-0', image);
-      service.setPadImage('pad-0', null);
-      expect(service.pads()[0].image).toBeUndefined();
+      const image: PadImage = { localPath: 'sound-1-abc123.jpg' };
+      service.setSoundImage('sound-1', image);
+      service.setSoundImage('sound-1', null);
+      expect(service.getSound('sound-1')?.image).toBeUndefined();
+    });
+  });
+
+  describe('removeSound', () => {
+    beforeEach(() => {
+      const sound = createMockSound({ id: 'sound-1' });
+      (service as any)._sounds.set(new Map([['sound-1', sound]]));
+    });
+
+    it('should remove sound from store', () => {
+      service.removeSound('sound-1');
+      expect(service.getSound('sound-1')).toBeUndefined();
     });
   });
 });

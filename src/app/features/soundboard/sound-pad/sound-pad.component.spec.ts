@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { SoundPadComponent } from './sound-pad.component';
 import { SoundboardService } from '../../../core/services/soundboard.service';
 import { ShortcutService } from '../../../core/services/shortcut.service';
-import { SoundPad, SoundFile } from '../../../core/models';
+import { SoundPad, Sound } from '../../../core/models';
 
 describe('SoundPadComponent', () => {
   let component: SoundPadComponent;
@@ -10,23 +10,23 @@ describe('SoundPadComponent', () => {
   let soundboardServiceSpy: jasmine.SpyObj<SoundboardService>;
   let shortcutServiceSpy: jasmine.SpyObj<ShortcutService>;
 
-  const mockSoundFile: SoundFile = {
-    id: 'sound-1',
+  const createMockSound = (overrides: Partial<Sound> = {}): Sound => ({
+    id: 'hash_abc123',
     name: 'test-sound.mp3',
     path: '/path/to/test-sound.mp3',
     duration: 5.5,
-    sampleRate: 44100,
-    channels: 2
-  };
-
-  const createMockPad = (overrides: Partial<SoundPad> = {}): SoundPad => ({
-    id: 'pad-0',
-    sound: null,
-    color: '#e74c3c',
-    isPlaying: false,
     volume: 1.0,
     speed: 1.0,
     folderIds: [],
+    isPlaying: false,
+    addedAt: Date.now(),
+    ...overrides
+  });
+
+  const createMockPad = (overrides: Partial<SoundPad> = {}): SoundPad => ({
+    index: 0,
+    sound: null,
+    color: '#e74c3c',
     ...overrides
   });
 
@@ -63,7 +63,7 @@ describe('SoundPadComponent', () => {
 
   describe('display', () => {
     it('should display filename when no custom name', () => {
-      component.pad = createMockPad({ sound: mockSoundFile });
+      component.pad = createMockPad({ sound: createMockSound() });
       fixture.detectChanges();
 
       const compiled = fixture.nativeElement as HTMLElement;
@@ -74,8 +74,7 @@ describe('SoundPadComponent', () => {
 
     it('should display custom name when set', () => {
       component.pad = createMockPad({
-        sound: mockSoundFile,
-        customName: 'My Custom Sound'
+        sound: createMockSound({ customName: 'My Custom Sound' })
       });
       fixture.detectChanges();
 
@@ -87,8 +86,7 @@ describe('SoundPadComponent', () => {
 
     it('should display original filename below custom name', () => {
       component.pad = createMockPad({
-        sound: mockSoundFile,
-        customName: 'My Custom Sound'
+        sound: createMockSound({ customName: 'My Custom Sound' })
       });
       fixture.detectChanges();
 
@@ -99,7 +97,7 @@ describe('SoundPadComponent', () => {
     });
 
     it('should not display filename below when no custom name', () => {
-      component.pad = createMockPad({ sound: mockSoundFile });
+      component.pad = createMockPad({ sound: createMockSound() });
       fixture.detectChanges();
 
       const compiled = fixture.nativeElement as HTMLElement;
@@ -109,7 +107,7 @@ describe('SoundPadComponent', () => {
     });
 
     it('should display duration', () => {
-      component.pad = createMockPad({ sound: mockSoundFile });
+      component.pad = createMockPad({ sound: createMockSound() });
       fixture.detectChanges();
 
       const compiled = fixture.nativeElement as HTMLElement;
@@ -129,7 +127,7 @@ describe('SoundPadComponent', () => {
 
   describe('events', () => {
     it('should emit customNameChange when name changes', () => {
-      component.pad = createMockPad({ sound: mockSoundFile });
+      component.pad = createMockPad({ sound: createMockSound() });
       fixture.detectChanges();
 
       spyOn(component.customNameChange, 'emit');
@@ -140,7 +138,7 @@ describe('SoundPadComponent', () => {
     });
 
     it('should emit null when name is empty', () => {
-      component.pad = createMockPad({ sound: mockSoundFile });
+      component.pad = createMockPad({ sound: createMockSound() });
       fixture.detectChanges();
 
       spyOn(component.customNameChange, 'emit');
@@ -151,7 +149,7 @@ describe('SoundPadComponent', () => {
     });
 
     it('should emit null when name is whitespace only', () => {
-      component.pad = createMockPad({ sound: mockSoundFile });
+      component.pad = createMockPad({ sound: createMockSound() });
       fixture.detectChanges();
 
       spyOn(component.customNameChange, 'emit');
@@ -162,7 +160,7 @@ describe('SoundPadComponent', () => {
     });
 
     it('should emit trimmed name', () => {
-      component.pad = createMockPad({ sound: mockSoundFile });
+      component.pad = createMockPad({ sound: createMockSound() });
       fixture.detectChanges();
 
       spyOn(component.customNameChange, 'emit');
@@ -173,7 +171,7 @@ describe('SoundPadComponent', () => {
     });
 
     it('should emit play when clicked with sound', () => {
-      component.pad = createMockPad({ sound: mockSoundFile });
+      component.pad = createMockPad({ sound: createMockSound() });
       fixture.detectChanges();
 
       spyOn(component.play, 'emit');
@@ -195,7 +193,7 @@ describe('SoundPadComponent', () => {
     });
 
     it('should emit volumeChange when volume changes', () => {
-      component.pad = createMockPad({ sound: mockSoundFile });
+      component.pad = createMockPad({ sound: createMockSound() });
       fixture.detectChanges();
 
       spyOn(component.volumeChange, 'emit');
@@ -206,7 +204,7 @@ describe('SoundPadComponent', () => {
     });
 
     it('should emit speedChange when speed changes', () => {
-      component.pad = createMockPad({ sound: mockSoundFile });
+      component.pad = createMockPad({ sound: createMockSound() });
       fixture.detectChanges();
 
       spyOn(component.speedChange, 'emit');
@@ -220,10 +218,11 @@ describe('SoundPadComponent', () => {
   describe('resetAll', () => {
     it('should emit reset values for volume, speed and customName', () => {
       component.pad = createMockPad({
-        sound: mockSoundFile,
-        customName: 'Custom',
-        volume: 1.5,
-        speed: 2.0
+        sound: createMockSound({
+          customName: 'Custom',
+          volume: 1.5,
+          speed: 2.0
+        })
       });
       fixture.detectChanges();
 
