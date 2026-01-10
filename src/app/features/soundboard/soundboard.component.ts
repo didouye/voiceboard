@@ -63,6 +63,7 @@ import { ImageSearchService, ImageSearchResult } from '../../core/services/image
               (shortcutChange)="onShortcutChange(pad.id, $event)"
               (customNameChange)="soundboard.setPadCustomName(pad.id, $event)"
               (imageChange)="onImageChange(pad.id, $event)"
+              (folderToggle)="soundboard.togglePadFolder(pad.id, $event)"
             />
           }
         </div>

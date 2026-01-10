@@ -19,8 +19,11 @@ import { open } from '@tauri-apps/plugin-dialog';
       [class]="padClasses"
       [style.--pad-color]="pad.color"
       [title]="pad.sound?.name || ''"
+      [draggable]="pad.sound !== null"
       (click)="onClick($event)"
       (contextmenu)="onRightClick($event)"
+      (dragstart)="onDragStart($event)"
+      (dragend)="onDragEnd($event)"
     >
       <!-- Image background -->
       @if (imageUrl()) {
@@ -333,6 +336,30 @@ import { open } from '@tauri-apps/plugin-dialog';
             <p class="text-[10px] text-text-muted mt-1">Use Ctrl, Alt, Shift or Cmd + key</p>
           </div>
 
+          <!-- Folders -->
+          @if (folders().length > 1) {
+            <div class="mb-4 pt-4 border-t border-border">
+              <div class="flex justify-between items-center mb-2 text-xs">
+                <span class="text-text-secondary">Folders</span>
+              </div>
+              <div class="space-y-1">
+                @for (folder of folders(); track folder.id) {
+                  @if (folder.id !== 'all') {
+                    <label class="flex items-center gap-2 py-1 cursor-pointer hover:bg-surface-hover rounded px-2 -mx-2">
+                      <input
+                        type="checkbox"
+                        [checked]="pad.folderIds.includes(folder.id)"
+                        (change)="onFolderToggle(folder.id)"
+                        class="w-4 h-4 rounded border-border bg-surface-hover text-accent focus:ring-accent focus:ring-offset-0"
+                      >
+                      <span class="text-sm text-text-primary">{{ folder.name }}</span>
+                    </label>
+                  }
+                }
+              </div>
+            </div>
+          }
+
           <!-- Reset button -->
           <button
             class="w-full py-2 text-xs text-text-secondary hover:text-text-primary bg-surface-hover hover:bg-border rounded transition-colors"
@@ -365,12 +392,14 @@ export class SoundPadComponent implements OnInit, OnChanges {
   @Output() shortcutChange = new EventEmitter<string | null>();
   @Output() customNameChange = new EventEmitter<string | null>();
   @Output() imageChange = new EventEmitter<PadImage | null>();
+  @Output() folderToggle = new EventEmitter<string>();
 
   @HostBinding('class') hostClass = 'relative';
   @HostBinding('class.z-50') get isPopupOpen() { return this.showSettingsPopup; }
 
   private tauri = inject(TauriService);
   imageSearchService = inject(ImageSearchService);
+  folders = inject(SoundboardService).folders;
 
   // Track pad image changes with a signal
   private _padImage = signal<PadImage | undefined>(undefined);
@@ -694,5 +723,19 @@ export class SoundPadComponent implements OnInit, OnChanges {
 
   formatDuration(seconds: number): string {
     return this.soundboardService.formatDuration(seconds);
+  }
+
+  onFolderToggle(folderId: string): void {
+    this.folderToggle.emit(folderId);
+  }
+
+  onDragStart(event: DragEvent): void {
+    if (!this.pad.sound) return;
+    event.dataTransfer?.setData('text/plain', this.pad.id);
+    event.dataTransfer!.effectAllowed = 'copy';
+  }
+
+  onDragEnd(event: DragEvent): void {
+    // Cleanup if needed
   }
 }

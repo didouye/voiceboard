@@ -29,11 +29,12 @@ import { Folder } from '../../core/models';
             @for (folder of soundboard.folders(); track folder.id) {
               <button
                 class="w-full px-4 py-2.5 text-left text-sm transition-colors flex items-center gap-2"
-                [class]="folder.id === soundboard.activeFolderId()
-                  ? 'bg-surface-hover text-text-primary border-l-2 border-accent'
-                  : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary border-l-2 border-transparent'"
+                [class]="getFolderClasses(folder)"
                 (click)="soundboard.setActiveFolder(folder.id)"
                 (contextmenu)="onFolderContextMenu($event, folder)"
+                (dragover)="onFolderDragOver($event, folder)"
+                (dragleave)="onFolderDragLeave($event)"
+                (drop)="onFolderDrop($event, folder)"
               >
                 <span>{{ folder.id === soundboard.activeFolderId() ? '&#9654;' : '&#128193;' }}</span>
                 {{ folder.name }}
@@ -203,6 +204,9 @@ export class MixerComponent implements OnInit {
   editingFolderId = signal<string | null>(null);
   editingFolderName = signal('');
 
+  // Drag & drop state
+  dragOverFolderId = signal<string | null>(null);
+
   constructor(
     public mixer: MixerService,
     public soundboard: SoundboardService
@@ -251,6 +255,44 @@ export class MixerComponent implements OnInit {
     if (folderId && newName) {
       this.soundboard.renameFolder(folderId, newName);
       this.editingFolderId.set(null);
+    }
+  }
+
+  getFolderClasses(folder: Folder): string {
+    const isActive = folder.id === this.soundboard.activeFolderId();
+    const isDragOver = folder.id === this.dragOverFolderId() && folder.id !== 'all';
+
+    let classes = '';
+    if (isActive) {
+      classes = 'bg-surface-hover text-text-primary border-l-2 border-accent';
+    } else if (isDragOver) {
+      classes = 'bg-accent/20 text-text-primary border-l-2 border-accent';
+    } else {
+      classes = 'text-text-secondary hover:bg-surface-hover hover:text-text-primary border-l-2 border-transparent';
+    }
+    return classes;
+  }
+
+  onFolderDragOver(event: DragEvent, folder: Folder): void {
+    if (folder.id === 'all') return;
+    event.preventDefault();
+    event.dataTransfer!.dropEffect = 'copy';
+    this.dragOverFolderId.set(folder.id);
+  }
+
+  onFolderDragLeave(event: DragEvent): void {
+    this.dragOverFolderId.set(null);
+  }
+
+  onFolderDrop(event: DragEvent, folder: Folder): void {
+    event.preventDefault();
+    this.dragOverFolderId.set(null);
+
+    if (folder.id === 'all') return;
+
+    const padId = event.dataTransfer?.getData('text/plain');
+    if (padId) {
+      this.soundboard.addPadToFolder(padId, folder.id);
     }
   }
 }
