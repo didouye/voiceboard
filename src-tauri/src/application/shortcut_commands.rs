@@ -6,7 +6,7 @@ use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, State};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
-/// State to track registered shortcuts (shortcut string -> pad_id)
+/// State to track registered shortcuts (shortcut string -> sound_id)
 pub struct ShortcutRegistry {
     pub shortcuts: Mutex<HashMap<String, String>>,
     pub enabled: Mutex<bool>,
@@ -21,12 +21,12 @@ impl Default for ShortcutRegistry {
     }
 }
 
-/// Register a global shortcut for a pad
+/// Register a global shortcut for a sound
 #[tauri::command]
 pub fn register_global_shortcut(
     app: AppHandle,
     registry: State<ShortcutRegistry>,
-    pad_id: String,
+    sound_id: String,
     shortcut: String,
 ) -> Result<(), String> {
     // Check if enabled
@@ -34,7 +34,7 @@ pub fn register_global_shortcut(
     if !*enabled {
         // Still store in registry but don't activate
         let mut shortcuts = registry.shortcuts.lock().map_err(|e| e.to_string())?;
-        shortcuts.insert(shortcut, pad_id);
+        shortcuts.insert(shortcut, sound_id);
         return Ok(());
     }
     drop(enabled);
@@ -45,7 +45,7 @@ pub fn register_global_shortcut(
         .map_err(|e| format!("Invalid shortcut '{}': {}", shortcut, e))?;
 
     let shortcut_clone = shortcut.clone();
-    let pad_id_clone = pad_id.clone();
+    let sound_id_clone = sound_id.clone();
     let app_clone = app.clone();
 
     app.global_shortcut()
@@ -54,12 +54,12 @@ pub fn register_global_shortcut(
                 tracing::info!(
                     "[Shortcuts] Global shortcut triggered: {} -> {}",
                     shortcut_clone,
-                    pad_id_clone
+                    sound_id_clone
                 );
                 let _ = app_clone.emit(
                     "global-shortcut-triggered",
                     json!({
-                        "padId": pad_id_clone,
+                        "soundId": sound_id_clone,
                         "shortcut": shortcut_clone
                     }),
                 );
@@ -69,7 +69,7 @@ pub fn register_global_shortcut(
 
     // Store in registry
     let mut shortcuts = registry.shortcuts.lock().map_err(|e| e.to_string())?;
-    shortcuts.insert(shortcut, pad_id);
+    shortcuts.insert(shortcut, sound_id);
 
     Ok(())
 }
@@ -125,10 +125,10 @@ pub fn set_global_hotkeys_enabled(
     if enabled && !was_enabled {
         // Re-register all shortcuts from registry
         let shortcuts = registry.shortcuts.lock().map_err(|e| e.to_string())?;
-        for (shortcut, pad_id) in shortcuts.iter() {
+        for (shortcut, sound_id) in shortcuts.iter() {
             if let Ok(parsed) = shortcut.parse::<Shortcut>() {
                 let shortcut_clone = shortcut.clone();
-                let pad_id_clone = pad_id.clone();
+                let sound_id_clone = sound_id.clone();
                 let app_clone = app.clone();
 
                 let _ = app
@@ -138,7 +138,7 @@ pub fn set_global_hotkeys_enabled(
                             let _ = app_clone.emit(
                                 "global-shortcut-triggered",
                                 json!({
-                                    "padId": pad_id_clone,
+                                    "soundId": sound_id_clone,
                                     "shortcut": shortcut_clone
                                 }),
                             );

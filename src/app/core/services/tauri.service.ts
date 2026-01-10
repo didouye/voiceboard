@@ -682,11 +682,11 @@ export class TauriService {
   // =========================================================================
 
   /**
-   * Register a global shortcut for a pad
+   * Register a global shortcut for a sound
    */
-  async registerGlobalShortcut(padId: string, shortcut: string): Promise<void> {
+  async registerGlobalShortcut(soundId: string, shortcut: string): Promise<void> {
     if (this.demoService.isDemoMode) return;
-    await invoke('register_global_shortcut', { padId, shortcut });
+    await invoke('register_global_shortcut', { soundId, shortcut });
   }
 
   /**
@@ -724,12 +724,12 @@ export class TauriService {
   /**
    * Listen for global shortcut triggered events
    */
-  async listenGlobalShortcut(callback: (data: { padId: string; shortcut: string }) => void): Promise<() => void> {
+  async listenGlobalShortcut(callback: (data: { soundId: string; shortcut: string }) => void): Promise<() => void> {
     if (this.demoService.isDemoMode) {
       return () => {}; // No-op unlisten
     }
     const { listen } = await import('@tauri-apps/api/event');
-    const unlisten = await listen<{ padId: string; shortcut: string }>('global-shortcut-triggered', (event) => {
+    const unlisten = await listen<{ soundId: string; shortcut: string }>('global-shortcut-triggered', (event) => {
       callback(event.payload);
     });
     return unlisten;

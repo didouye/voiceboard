@@ -7,7 +7,7 @@ import { formatShortcut, shortcutFromEvent, isModifierKey } from '../models';
   providedIn: 'root'
 })
 export class ShortcutService implements OnDestroy {
-  // Map shortcut string -> pad id
+  // Map shortcut string -> sound id
   private registry = new Map<string, string>();
 
   // Enabled state
@@ -24,13 +24,13 @@ export class ShortcutService implements OnDestroy {
   ) {
     this.init();
 
-    // Watch for pad changes and resync shortcuts when hotkey associations change
+    // Watch for sound changes and resync shortcuts when hotkey associations change
     effect(() => {
-      const pads = this.soundboard.pads();
-      // Create a snapshot of hotkey -> padId associations
-      const snapshot = pads
-        .filter(p => p.hotkey)
-        .map(p => `${p.hotkey}:${p.id}`)
+      const sounds = Array.from(this.soundboard.sounds().values());
+      // Create a snapshot of hotkey -> soundId associations
+      const snapshot = sounds
+        .filter(s => s.hotkey)
+        .map(s => `${s.hotkey}:${s.id}`)
         .sort()
         .join('|');
 
@@ -54,7 +54,7 @@ export class ShortcutService implements OnDestroy {
     // Listen for global shortcut events from backend
     this.unlistenGlobalShortcut = await this.tauri.listenGlobalShortcut((data) => {
       console.log('[ShortcutService] Global shortcut triggered:', data);
-      this.soundboard.playSound(data.padId);
+      this.soundboard.playSound(data.soundId);
     });
 
     // Register all existing shortcuts from soundboard
@@ -66,10 +66,10 @@ export class ShortcutService implements OnDestroy {
   }
 
   private updateHotkeySnapshot(): void {
-    const pads = this.soundboard.pads();
-    this.lastHotkeySnapshot = pads
-      .filter(p => p.hotkey)
-      .map(p => `${p.hotkey}:${p.id}`)
+    const sounds = Array.from(this.soundboard.sounds().values());
+    this.lastHotkeySnapshot = sounds
+      .filter(s => s.hotkey)
+      .map(s => `${s.hotkey}:${s.id}`)
       .sort()
       .join('|');
   }
@@ -79,54 +79,54 @@ export class ShortcutService implements OnDestroy {
   }
 
   /**
-   * Sync shortcuts from soundboard pads to backend
+   * Sync shortcuts from soundboard sounds to backend
    */
   async syncFromSoundboard(): Promise<void> {
-    const pads = this.soundboard.pads();
+    const sounds = Array.from(this.soundboard.sounds().values());
 
     // Clear existing
     await this.tauri.unregisterAllShortcuts();
     this.registry.clear();
 
-    // Register all pad shortcuts
-    for (const pad of pads) {
-      if (pad.hotkey) {
+    // Register all sound shortcuts
+    for (const sound of sounds) {
+      if (sound.hotkey) {
         try {
-          await this.tauri.registerGlobalShortcut(pad.id, pad.hotkey);
-          this.registry.set(pad.hotkey, pad.id);
+          await this.tauri.registerGlobalShortcut(sound.id, sound.hotkey);
+          this.registry.set(sound.hotkey, sound.id);
         } catch (err) {
-          console.error(`Failed to register shortcut ${pad.hotkey} for ${pad.id}:`, err);
+          console.error(`Failed to register shortcut ${sound.hotkey} for ${sound.id}:`, err);
         }
       }
     }
   }
 
   /**
-   * Check if a shortcut is already used by another pad
-   * Returns the pad ID if conflict exists, null otherwise
+   * Check if a shortcut is already used by another sound
+   * Returns the sound ID if conflict exists, null otherwise
    */
-  checkConflict(shortcut: string, excludePadId?: string): string | null {
-    const existingPadId = this.registry.get(shortcut);
-    if (existingPadId && existingPadId !== excludePadId) {
-      return existingPadId;
+  checkConflict(shortcut: string, excludeSoundId?: string): string | null {
+    const existingSoundId = this.registry.get(shortcut);
+    if (existingSoundId && existingSoundId !== excludeSoundId) {
+      return existingSoundId;
     }
     return null;
   }
 
   /**
-   * Register a shortcut for a pad
+   * Register a shortcut for a sound
    */
-  async register(padId: string, shortcut: string): Promise<void> {
-    // Unregister old shortcut for this pad if exists
-    const oldShortcut = this.getShortcutForPad(padId);
+  async register(soundId: string, shortcut: string): Promise<void> {
+    // Unregister old shortcut for this sound if exists
+    const oldShortcut = this.getShortcutForSound(soundId);
     if (oldShortcut) {
       await this.unregister(oldShortcut);
     }
 
     // Register new shortcut
     try {
-      await this.tauri.registerGlobalShortcut(padId, shortcut);
-      this.registry.set(shortcut, padId);
+      await this.tauri.registerGlobalShortcut(soundId, shortcut);
+      this.registry.set(shortcut, soundId);
     } catch (err) {
       console.error(`Failed to register shortcut ${shortcut}:`, err);
       throw err;
@@ -146,11 +146,11 @@ export class ShortcutService implements OnDestroy {
   }
 
   /**
-   * Get shortcut assigned to a pad
+   * Get shortcut assigned to a sound
    */
-  getShortcutForPad(padId: string): string | null {
+  getShortcutForSound(soundId: string): string | null {
     for (const [shortcut, id] of this.registry.entries()) {
-      if (id === padId) return shortcut;
+      if (id === soundId) return shortcut;
     }
     return null;
   }

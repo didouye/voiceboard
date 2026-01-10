@@ -899,10 +899,7 @@ pub async fn import_multiple_sounds_with_hash(
 ) -> Vec<Result<ImportedSoundDto, String>> {
     use futures::future::join_all;
 
-    let futures: Vec<_> = paths
-        .into_iter()
-        .map(import_sound_with_hash)
-        .collect();
+    let futures: Vec<_> = paths.into_iter().map(import_sound_with_hash).collect();
 
     join_all(futures).await
 }

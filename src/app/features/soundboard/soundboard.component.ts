@@ -341,9 +341,7 @@ export class SoundboardComponent implements OnInit, OnDestroy {
         console.error('Failed to register shortcut:', err);
       }
     } else {
-      // Note: getShortcutForPad is used for backwards compatibility
-      // until ShortcutService is updated (Task 14)
-      const oldShortcut = this.shortcutService.getShortcutForPad(soundId);
+      const oldShortcut = this.shortcutService.getShortcutForSound(soundId);
       if (oldShortcut) {
         await this.shortcutService.unregister(oldShortcut);
       }
