@@ -42,8 +42,8 @@ export class SoundboardService {
   private unlistenPreviewStopped?: () => void;
 
   // Folder state
-  private _folders = signal<Folder[]>([{ id: 'default', name: 'Default', createdAt: Date.now() }]);
-  private _activeFolderId = signal<string>('default');
+  private _folders = signal<Folder[]>([{ id: 'all', name: 'Tous', createdAt: Date.now() }]);
+  private _activeFolderId = signal<string>('all');
 
   // Public readonly signals for folders
   readonly folders = this._folders.asReadonly();
@@ -102,7 +102,8 @@ export class SoundboardService {
       isPlaying: false,
       volume: 1.0,
       speed: 1.0,
-      image: undefined
+      image: undefined,
+      folderIds: []
     }));
   }
 
@@ -120,7 +121,8 @@ export class SoundboardService {
           volume: p.volume ?? 1.0,
           speed: p.speed ?? 1.0,
           customName: p.customName,
-          image: p.image
+          image: p.image,
+          folderIds: p.folderIds ?? []  // Migration: add empty array if missing
         }));
 
         // Remove duplicates (keep first occurrence of each sound path)
@@ -199,13 +201,14 @@ export class SoundboardService {
   addPads(count: number = 4): void {
     const current = this._pads();
     const startIndex = current.length;
-    const newPads = Array.from({ length: count }, (_, i) => ({
+    const newPads: SoundPad[] = Array.from({ length: count }, (_, i) => ({
       id: `pad-${startIndex + i}`,
       sound: null,
       color: PAD_COLORS[(startIndex + i) % PAD_COLORS.length],
       isPlaying: false,
       volume: 1.0,
-      speed: 1.0
+      speed: 1.0,
+      folderIds: []
     }));
     this._pads.set([...current, ...newPads]);
     this.saveState();
@@ -271,7 +274,8 @@ export class SoundboardService {
         volume: p.volume,
         speed: p.speed,
         customName: p.customName,
-        hotkey: p.hotkey
+        hotkey: p.hotkey,
+        folderIds: p.folderIds
       }))
       .sort((a, b) => a.sound.name.toLowerCase().localeCompare(b.sound.name.toLowerCase()));
 
@@ -289,6 +293,7 @@ export class SoundboardService {
             speed: data.speed,
             customName: data.customName,
             hotkey: data.hotkey,
+            folderIds: data.folderIds,
             isPlaying: false
           };
         } else {
@@ -301,6 +306,7 @@ export class SoundboardService {
             speed: 1.0,
             customName: undefined,
             hotkey: undefined,
+            folderIds: [],
             isPlaying: false
           };
         }

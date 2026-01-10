@@ -26,6 +26,7 @@ describe('SoundPadComponent', () => {
     isPlaying: false,
     volume: 1.0,
     speed: 1.0,
+    folderIds: [],
     ...overrides
   });
 

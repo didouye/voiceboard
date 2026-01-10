@@ -90,6 +90,8 @@ export interface SoundPad {
   customName?: string;
   /** Custom image for the pad */
   image?: PadImage;
+  /** Folder IDs this sound belongs to (empty = only in "All") */
+  folderIds: string[];
 }
 
 /**
