@@ -96,7 +96,7 @@
 
 ---
 
-## Phase 3 - UI/UX Redesign - 70% Complete
+## Phase 3 - UI/UX Redesign - 85% Complete
 
 ### Stack
 - **Tailwind CSS** (Tailwind Plus account available)
@@ -147,7 +147,7 @@
   - Customizable themes (dark/light/custom)
   - Drag & drop to reorganize pads
 
-- [ ] **Sound Organization**
+- [x] **Sound Organization** *(see docs/plans/2026-01-10-folder-management-design.md)*
   - Folders/categories to organize sounds
   - Drag & drop sounds into folders
   - Folder navigation in UI
