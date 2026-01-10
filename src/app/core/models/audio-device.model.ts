@@ -74,24 +74,52 @@ export interface PadImage {
 }
 
 /**
- * Sound pad configuration (position + sound)
+ * Sound entity identified by SHA-256 hash
+ * Contains all properties previously on SoundPad
  */
-export interface SoundPad {
+export interface Sound {
+  /** SHA-256 hash of file content (64 chars hex) */
   id: string;
-  sound: SoundFile | null;
-  color: string;
-  hotkey?: string;
-  isPlaying: boolean;
+  /** Filename without extension */
+  name: string;
+  /** Absolute path to audio file */
+  path: string;
+  /** Duration in seconds */
+  duration: number;
+
+  // User properties
   /** Volume level (0.0-2.0, default 1.0 = 100%) */
   volume: number;
   /** Playback speed (0.5-2.0, default 1.0 = normal) */
   speed: number;
-  /** User-defined custom name (optional, fallback to sound.name) */
+  /** Keyboard shortcut */
+  hotkey?: string;
+  /** User-defined custom name */
   customName?: string;
-  /** Custom image for the pad */
+  /** Custom image */
   image?: PadImage;
-  /** Folder IDs this sound belongs to (empty = only in "All") */
+  /** Folder IDs this sound belongs to */
   folderIds: string[];
+
+  // Runtime state (not persisted)
+  /** Whether sound is currently playing */
+  isPlaying: boolean;
+
+  // Metadata
+  /** Timestamp when sound was added */
+  addedAt: number;
+}
+
+/**
+ * Virtual pad for display (generated from sounds)
+ */
+export interface SoundPad {
+  /** Position in grid (0, 1, 2, ...) */
+  index: number;
+  /** Reference to sound or null if empty */
+  sound: Sound | null;
+  /** Color generated from index */
+  color: string;
 }
 
 /**
