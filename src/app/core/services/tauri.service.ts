@@ -495,9 +495,9 @@ export class TauriService {
   /**
    * Save soundboard state to persistent storage
    */
-  async saveSoundboardState(pads: any[]): Promise<void> {
+  async saveSoundboardState(data: { sounds: Record<string, any> }): Promise<void> {
     if (this.demoService.isDemoMode) return;
-    await invoke('save_soundboard', { pads });
+    await invoke('save_soundboard', { pads: data });
   }
 
   /**
