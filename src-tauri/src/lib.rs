@@ -49,6 +49,9 @@ use application::{
         get_settings,
         get_virtual_output_devices,
         get_virtual_outputs_by_priority,
+        hash_file,
+        import_multiple_sounds_with_hash,
+        import_sound_with_hash,
         install_update,
         is_mixing,
         load_folders,
@@ -274,6 +277,10 @@ pub fn run() {
             // Sound playback
             load_sound_file,
             load_multiple_sound_files,
+            // Sound hashing
+            hash_file,
+            import_sound_with_hash,
+            import_multiple_sounds_with_hash,
             play_sound,
             stop_sound,
             stop_all_sounds,

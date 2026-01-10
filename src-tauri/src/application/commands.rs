@@ -834,6 +834,79 @@ async fn load_sound_file_internal(path: &str) -> Result<SoundFileDto, String> {
     })
 }
 
+/// Calculate SHA-256 hash of a file
+#[tauri::command]
+pub async fn hash_file(path: String) -> Result<String, String> {
+    use sha2::{Digest, Sha256};
+
+    let data = std::fs::read(&path).map_err(|e| format!("Failed to read file: {}", e))?;
+    let hash = format!("{:x}", Sha256::digest(&data));
+    Ok(hash)
+}
+
+/// DTO for imported sound with hash
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportedSoundDto {
+    pub hash: String,
+    pub name: String,
+    pub path: String,
+    pub duration: f64,
+}
+
+/// Import a sound file and return its hash and metadata
+#[tauri::command]
+pub async fn import_sound_with_hash(path: String) -> Result<ImportedSoundDto, String> {
+    use rodio::Source;
+    use sha2::{Digest, Sha256};
+    use std::fs::File;
+    use std::io::BufReader;
+    use std::path::Path;
+
+    // Read file and calculate hash
+    let data = std::fs::read(&path).map_err(|e| format!("Failed to read file: {}", e))?;
+    let hash = format!("{:x}", Sha256::digest(&data));
+
+    // Decode audio to get duration
+    let file = File::open(&path).map_err(|e| format!("Failed to open file: {}", e))?;
+    let reader = BufReader::new(file);
+    let decoder =
+        rodio::Decoder::new(reader).map_err(|e| format!("Failed to decode audio: {}", e))?;
+
+    let duration = decoder
+        .total_duration()
+        .map(|d| d.as_secs_f64())
+        .unwrap_or(0.0);
+
+    // Extract filename
+    let name = Path::new(&path)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("unknown")
+        .to_string();
+
+    Ok(ImportedSoundDto {
+        hash,
+        name,
+        path,
+        duration,
+    })
+}
+
+/// Import multiple sound files with hashes in parallel
+#[tauri::command]
+pub async fn import_multiple_sounds_with_hash(
+    paths: Vec<String>,
+) -> Vec<Result<ImportedSoundDto, String>> {
+    use futures::future::join_all;
+
+    let futures: Vec<_> = paths
+        .into_iter()
+        .map(import_sound_with_hash)
+        .collect();
+
+    join_all(futures).await
+}
+
 /// Play a sound file (mix with microphone) with optional volume (0.0-2.0, default 1.0)
 /// and optional speed (0.5-2.0, default 1.0)
 #[tauri::command]
