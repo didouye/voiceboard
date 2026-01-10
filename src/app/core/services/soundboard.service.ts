@@ -1,6 +1,6 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { TauriService } from './tauri.service';
-import { SoundFile, SoundPad, Folder, PadImage } from '../models';
+import { Sound, SoundPad, Folder, PadImage } from '../models';
 import { open } from '@tauri-apps/plugin-dialog';
 import { listen } from '@tauri-apps/api/event';
 
@@ -10,615 +10,168 @@ const PAD_COLORS = [
   '#00bcd4', '#8bc34a', '#ff5722', '#795548'
 ];
 
-/** Serializable pad data for persistence */
-interface SavedPad {
-  id: string;
-  sound: SoundFile | null;
-  color: string;
-  hotkey?: string;
-  volume?: number; // Optional for backwards compatibility
-  speed?: number;  // Optional for backwards compatibility
-  customName?: string; // Optional for backwards compatibility
-  image?: PadImage; // Optional for backwards compatibility
-}
-
 @Injectable({
   providedIn: 'root'
 })
 export class SoundboardService {
-  // State signals
-  private _pads = signal<SoundPad[]>(this.createInitialPads(12));
+  // Source of truth
+  private _sounds = signal<Map<string, Sound>>(new Map());
+  private _folders = signal<Folder[]>([{ id: 'all', name: 'Tous', createdAt: Date.now() }]);
+  private _activeFolderId = signal<string>('all');
   private _loading = signal(false);
   private _error = signal<string | null>(null);
   private _initialized = false;
 
   // Preview state
-  private _previewingPadId = signal<string | null>(null);
+  private _previewingSoundId = signal<string | null>(null);
   private _previewDeviceId = signal<string | null>(null);
-  readonly previewingPadId = this._previewingPadId.asReadonly();
+  readonly previewingSoundId = this._previewingSoundId.asReadonly();
   readonly previewDeviceId = this._previewDeviceId.asReadonly();
 
   private unlistenPreviewStarted?: () => void;
   private unlistenPreviewStopped?: () => void;
 
-  // Folder state
-  private _folders = signal<Folder[]>([{ id: 'all', name: 'Tous', createdAt: Date.now() }]);
-  private _activeFolderId = signal<string>('all');
-
-  // Public readonly signals for folders
+  // Public readonly signals
+  readonly sounds = this._sounds.asReadonly();
   readonly folders = this._folders.asReadonly();
   readonly activeFolderId = this._activeFolderId.asReadonly();
+  readonly loading = this._loading.asReadonly();
+  readonly error = this._error.asReadonly();
+
   readonly activeFolder = computed(() =>
     this._folders().find(f => f.id === this._activeFolderId()) || this._folders()[0]
   );
 
-  // Public readonly signals
-  readonly pads = this._pads.asReadonly();
-  readonly loading = this._loading.asReadonly();
-  readonly error = this._error.asReadonly();
+  readonly activeSounds = computed(() =>
+    Array.from(this._sounds().values())
+  );
 
-  // Computed
-  readonly activePads = computed(() => this._pads().filter(p => p.sound !== null));
-  readonly playingCount = computed(() => this._pads().filter(p => p.isPlaying).length);
+  readonly playingCount = computed(() =>
+    Array.from(this._sounds().values()).filter(s => s.isPlaying).length
+  );
 
   /**
-   * Pads filtered by active folder.
-   * Returns all pads for "All" folder, or only pads containing the active folder.
+   * Virtual pad grid computed from sounds and active folder
    */
-  readonly filteredPads = computed(() => {
+  readonly pads = computed(() => {
+    const sounds = this._sounds();
     const activeFolderId = this._activeFolderId();
-    const allPads = this._pads();
 
-    if (activeFolderId === 'all') {
-      return allPads;
+    // Filter sounds by folder
+    let filteredSounds = Array.from(sounds.values());
+    if (activeFolderId !== 'all') {
+      filteredSounds = filteredSounds.filter(s => s.folderIds.includes(activeFolderId));
     }
 
-    // Get pads that belong to this folder
-    const folderPads = allPads.filter(pad =>
-      pad.sound !== null && pad.folderIds.includes(activeFolderId)
+    // Sort alphabetically by display name
+    filteredSounds.sort((a, b) =>
+      (a.customName || a.name).toLowerCase()
+        .localeCompare((b.customName || b.name).toLowerCase())
     );
 
-    // Create a virtual pad grid with filtered sounds sorted alphabetically
-    const sortedPads = [...folderPads].sort((a, b) =>
-      (a.sound?.name || '').toLowerCase().localeCompare((b.sound?.name || '').toLowerCase())
-    );
-
-    // Map to new pad positions for display
-    const minPads = Math.max(12, Math.ceil(sortedPads.length / 4) * 4 + 4);
-    const result: SoundPad[] = [];
+    // Generate virtual grid
+    const minPads = Math.max(12, Math.ceil(filteredSounds.length / 4) * 4 + 4);
+    const pads: SoundPad[] = [];
 
     for (let i = 0; i < minPads; i++) {
-      if (i < sortedPads.length) {
-        result.push({ ...sortedPads[i], id: `pad-${i}` });
-      } else {
-        result.push({
-          id: `pad-${i}`,
-          sound: null,
-          color: PAD_COLORS[i % PAD_COLORS.length],
-          isPlaying: false,
-          volume: 1.0,
-          speed: 1.0,
-          folderIds: []
-        });
-      }
+      pads.push({
+        index: i,
+        sound: filteredSounds[i] || null,
+        color: PAD_COLORS[i % PAD_COLORS.length]
+      });
     }
 
-    return result;
+    return pads;
   });
 
   constructor(private tauri: TauriService) {
-    // Load saved state on construction
     this.loadState();
     this.initPreviewListeners();
     this.initSoundFinishedListener();
   }
 
-  private async initSoundFinishedListener(): Promise<void> {
-    try {
-      await listen<{ id: string }>('sound-finished', (event) => {
-        const soundId = event.payload.id;
-        // Find the pad that has this sound and mark it as not playing
-        this._pads.update(pads => pads.map(p =>
-          p.sound?.id === soundId ? { ...p, isPlaying: false } : p
-        ));
-      });
-    } catch (e) {
-      console.error('Failed to initialize sound-finished listener:', e);
-    }
+  // =========================================================================
+  // Sound Operations
+  // =========================================================================
+
+  /**
+   * Get a sound by ID
+   */
+  getSound(soundId: string): Sound | undefined {
+    return this._sounds().get(soundId);
   }
 
-  private async initPreviewListeners(): Promise<void> {
-    this.unlistenPreviewStarted = await this.tauri.listenPreviewStarted((padId) => {
-      this._previewingPadId.set(padId);
-    });
-
-    this.unlistenPreviewStopped = await this.tauri.listenPreviewStopped((padId) => {
-      if (this._previewingPadId() === padId) {
-        this._previewingPadId.set(null);
-      }
+  /**
+   * Add a sound to the store
+   */
+  private addSound(sound: Sound): void {
+    this._sounds.update(sounds => {
+      const updated = new Map(sounds);
+      updated.set(sound.id, sound);
+      return updated;
     });
   }
 
-  private createInitialPads(count: number): SoundPad[] {
-    return Array.from({ length: count }, (_, i) => ({
-      id: `pad-${i}`,
-      sound: null,
-      color: PAD_COLORS[i % PAD_COLORS.length],
-      isPlaying: false,
-      volume: 1.0,
-      speed: 1.0,
-      image: undefined,
-      folderIds: []
-    }));
+  /**
+   * Update a sound in the store
+   */
+  private updateSound(soundId: string, updates: Partial<Sound>): void {
+    this._sounds.update(sounds => {
+      const sound = sounds.get(soundId);
+      if (!sound) return sounds;
+
+      const updated = new Map(sounds);
+      updated.set(soundId, { ...sound, ...updates });
+      return updated;
+    });
   }
 
   /**
-   * Load soundboard state from persistent storage
+   * Remove a sound from the store
    */
-  private async loadState(): Promise<void> {
-    try {
-      // Load folders first
-      const savedFolders = await this.tauri.loadFolders();
-      if (savedFolders && savedFolders.length > 0) {
-        // Ensure "All" folder exists and is first
-        const hasAll = savedFolders.some(f => f.id === 'all');
-        if (!hasAll) {
-          savedFolders.unshift({ id: 'all', name: 'Tous', createdAt: 0 });
-        }
-        this._folders.set(savedFolders);
-      }
-
-      // Load pads (existing code)
-      const saved = await this.tauri.loadSoundboardState();
-      if (saved && saved.length > 0) {
-        // Restore pads, ensuring isPlaying is false and defaults for backwards compatibility
-        let restoredPads: SoundPad[] = saved.map(p => ({
-          ...p,
-          isPlaying: false,
-          volume: p.volume ?? 1.0,
-          speed: p.speed ?? 1.0,
-          customName: p.customName,
-          image: p.image,
-          folderIds: p.folderIds ?? []  // Migration: add empty array if missing
-        }));
-
-        // Remove duplicates (keep first occurrence of each sound path)
-        const seenPaths = new Set<string>();
-        let duplicatesRemoved = 0;
-        restoredPads = restoredPads.map(pad => {
-          if (pad.sound) {
-            if (seenPaths.has(pad.sound.path)) {
-              // Duplicate - clear this pad
-              duplicatesRemoved++;
-              return {
-                ...pad,
-                sound: null,
-                image: undefined,
-                volume: 1.0,
-                speed: 1.0,
-                customName: undefined,
-                hotkey: undefined
-              };
-            }
-            seenPaths.add(pad.sound.path);
-          }
-          return pad;
-        });
-
-        if (duplicatesRemoved > 0) {
-          console.log(`Removed ${duplicatesRemoved} duplicate sound(s)`);
-        }
-
-        this._pads.set(restoredPads);
-        console.log(`Loaded ${restoredPads.filter(p => p.sound).length} sounds from storage`);
-
-        // Reorganize to compact after removing duplicates
-        if (duplicatesRemoved > 0) {
-          this.reorganizePads();
-          this.cleanupEmptyRows();
-          // Save the cleaned state
-          await this.saveState();
-        }
-      }
-    } catch (err) {
-      console.error('Failed to load soundboard state:', err);
-    }
-    this._initialized = true;
-
-    // Also load preview device setting
-    this.loadPreviewDevice();
-  }
-
-  /**
-   * Save soundboard state to persistent storage
-   */
-  private async saveState(): Promise<void> {
-    if (!this._initialized) return;
-
-    try {
-      const padsToSave: SavedPad[] = this._pads().map(p => ({
-        id: p.id,
-        sound: p.sound,
-        color: p.color,
-        hotkey: p.hotkey,
-        volume: p.volume,
-        speed: p.speed,
-        customName: p.customName,
-        image: p.image
-      }));
-      await this.tauri.saveSoundboardState(padsToSave);
-    } catch (err) {
-      console.error('Failed to save soundboard state:', err);
-    }
-  }
-
-  /**
-   * Add more pads to the soundboard
-   */
-  addPads(count: number = 4): void {
-    const current = this._pads();
-    const startIndex = current.length;
-    const newPads: SoundPad[] = Array.from({ length: count }, (_, i) => ({
-      id: `pad-${startIndex + i}`,
-      sound: null,
-      color: PAD_COLORS[(startIndex + i) % PAD_COLORS.length],
-      isPlaying: false,
-      volume: 1.0,
-      speed: 1.0,
-      folderIds: []
-    }));
-    this._pads.set([...current, ...newPads]);
+  removeSound(soundId: string): void {
+    this._sounds.update(sounds => {
+      const updated = new Map(sounds);
+      updated.delete(soundId);
+      return updated;
+    });
     this.saveState();
   }
 
   /**
-   * Ensure there's at least one empty pad available.
-   * If the last empty pad was just filled, add a new row of 4 pads.
+   * Play a sound
    */
-  private ensureEmptyPadAvailable(): void {
-    const pads = this._pads();
-    const hasEmptyPad = pads.some(p => p.sound === null);
-
-    if (!hasEmptyPad) {
-      this.addPads(4);
-    }
-  }
-
-  /**
-   * Remove empty rows from the end, keeping:
-   * - Minimum 12 pads (3 rows)
-   * - At least 1 empty pad
-   */
-  private cleanupEmptyRows(): void {
-    const pads = this._pads();
-    const minPads = 12;
-
-    if (pads.length <= minPads) return;
-
-    // Find the last pad with a sound
-    let lastFilledIndex = -1;
-    for (let i = pads.length - 1; i >= 0; i--) {
-      if (pads[i].sound !== null) {
-        lastFilledIndex = i;
-        break;
-      }
-    }
-
-    // Calculate how many pads to keep (round up to complete row of 4, plus ensure 1 empty)
-    const padsNeeded = lastFilledIndex + 1;
-    const rowsNeeded = Math.ceil((padsNeeded + 1) / 4); // +1 to ensure at least 1 empty pad
-    const padsToKeep = Math.max(minPads, rowsNeeded * 4);
-
-    if (pads.length > padsToKeep) {
-      this._pads.set(pads.slice(0, padsToKeep));
-    }
-  }
-
-  /**
-   * Reorganize pads: sort sounds alphabetically and compact them (no gaps).
-   * All sounds are moved to the beginning, empty pads are at the end.
-   * Images, volume, speed, customName, and hotkey follow their sounds.
-   */
-  private reorganizePads(): void {
-    const pads = this._pads();
-
-    // Collect all filled pads with their associated data, sorted by sound name
-    const filledPadData = pads
-      .filter(p => p.sound !== null)
-      .map(p => ({
-        sound: p.sound!,
-        image: p.image,
-        volume: p.volume,
-        speed: p.speed,
-        customName: p.customName,
-        hotkey: p.hotkey,
-        folderIds: p.folderIds
-      }))
-      .sort((a, b) => a.sound.name.toLowerCase().localeCompare(b.sound.name.toLowerCase()));
-
-    // Reassign sounds and their associated data to pads in order
-    this._pads.update(currentPads => {
-      return currentPads.map((pad, index) => {
-        if (index < filledPadData.length) {
-          // This pad gets a sound with its associated data
-          const data = filledPadData[index];
-          return {
-            ...pad,
-            sound: data.sound,
-            image: data.image,
-            volume: data.volume,
-            speed: data.speed,
-            customName: data.customName,
-            hotkey: data.hotkey,
-            folderIds: data.folderIds,
-            isPlaying: false
-          };
-        } else {
-          // This pad becomes empty - clear all associated data
-          return {
-            ...pad,
-            sound: null,
-            image: undefined,
-            volume: 1.0,
-            speed: 1.0,
-            customName: undefined,
-            hotkey: undefined,
-            folderIds: [],
-            isPlaying: false
-          };
-        }
-      });
-    });
-  }
-
-  /**
-   * Check if a sound with the given path already exists
-   */
-  private isDuplicate(path: string): boolean {
-    return this._pads().some(p => p.sound?.path === path);
-  }
-
-  /**
-   * Import a sound file to a specific pad
-   */
-  async importSound(padId: string): Promise<void> {
-    console.log('[Soundboard] importSound called for pad:', padId);
-    try {
-      this._loading.set(true);
-      this._error.set(null);
-
-      // Open file dialog
-      console.log('[Soundboard] Opening file dialog...');
-      const selected = await open({
-        multiple: false,
-        filters: [{
-          name: 'Audio Files',
-          extensions: ['mp3', 'ogg', 'wav', 'flac']
-        }]
-      });
-      console.log('[Soundboard] File dialog result:', selected);
-
-      if (!selected) {
-        console.log('[Soundboard] User cancelled file selection');
-        this._loading.set(false);
-        return; // User cancelled
-      }
-
-      const path = selected as string;
-      console.log('[Soundboard] Selected file path:', path);
-
-      // Check for duplicate
-      if (this.isDuplicate(path)) {
-        console.log('[Soundboard] Sound already exists, skipping:', path);
-        this._error.set('Ce son existe déjà dans le soundboard');
-        return;
-      }
-
-      // Load and decode the file
-      console.log('[Soundboard] Calling tauri.loadSoundFile...');
-      const soundFile = await this.tauri.loadSoundFile(path);
-      console.log('[Soundboard] Sound file loaded:', soundFile);
-
-      // Add the sound to the pad temporarily
-      this._pads.update(pads => pads.map(pad =>
-        pad.id === padId
-          ? { ...pad, sound: soundFile }
-          : pad
-      ));
-
-      // Reorganize: sort alphabetically and compact (no gaps)
-      this.reorganizePads();
-      console.log('[Soundboard] Pads reorganized');
-
-      // Ensure there's always an empty pad available
-      this.ensureEmptyPadAvailable();
-
-      // Persist the change
-      await this.saveState();
-      console.log('[Soundboard] State saved');
-    } catch (err) {
-      console.error('[Soundboard] Import sound error:', err);
-      console.error('[Soundboard] Error type:', typeof err);
-      console.error('[Soundboard] Error details:', JSON.stringify(err, null, 2));
-      this._error.set(err instanceof Error ? err.message : String(err));
-    } finally {
-      this._loading.set(false);
-    }
-  }
-
-  /**
-   * Import multiple sound files at once
-   * Opens a multi-file dialog and assigns sounds to empty pads
-   */
-  async importMultipleSounds(): Promise<{ imported: number; errors: string[]; skippedDuplicates: number }> {
-    try {
-      this._loading.set(true);
-      this._error.set(null);
-
-      // Open file dialog with multiple selection
-      const selected = await open({
-        multiple: true,
-        filters: [{
-          name: 'Audio Files',
-          extensions: ['mp3', 'ogg', 'wav', 'flac']
-        }]
-      });
-
-      if (!selected || (Array.isArray(selected) && selected.length === 0)) {
-        this._loading.set(false);
-        return { imported: 0, errors: [], skippedDuplicates: 0 };
-      }
-
-      const paths = Array.isArray(selected) ? selected : [selected];
-      return await this.importSoundsFromPaths(paths);
-    } catch (err) {
-      this._error.set(err instanceof Error ? err.message : String(err));
-      return { imported: 0, errors: [String(err)], skippedDuplicates: 0 };
-    } finally {
-      this._loading.set(false);
-    }
-  }
-
-  /**
-   * Import sounds from an array of file paths
-   * Used by both button import and drag & drop
-   */
-  async importSoundsFromPaths(paths: string[]): Promise<{ imported: number; errors: string[]; skippedDuplicates: number }> {
-    if (paths.length === 0) {
-      return { imported: 0, errors: [], skippedDuplicates: 0 };
-    }
-
-    // Filter out duplicates before loading
-    const existingPaths = new Set(this._pads().filter(p => p.sound).map(p => p.sound!.path));
-    const newPaths = paths.filter(path => !existingPaths.has(path));
-    const skippedDuplicates = paths.length - newPaths.length;
-
-    if (skippedDuplicates > 0) {
-      console.log(`[Soundboard] Skipped ${skippedDuplicates} duplicate(s)`);
-    }
-
-    if (newPaths.length === 0) {
-      return { imported: 0, errors: [], skippedDuplicates };
-    }
-
-    // Load all files in parallel
-    const results = await this.tauri.loadMultipleSoundFiles(newPaths);
-
-    // Separate successes and errors
-    const successfulSounds: SoundFile[] = [];
-    const errors: string[] = [];
-
-    results.forEach((result, index) => {
-      if ('ok' in result) {
-        successfulSounds.push(result.ok);
-      } else {
-        const fileName = newPaths[index].split('/').pop() || newPaths[index];
-        errors.push(`${fileName}: ${result.err}`);
-      }
-    });
-
-    if (successfulSounds.length === 0) {
-      return { imported: 0, errors, skippedDuplicates };
-    }
-
-    // Ensure we have enough empty pads
-    this.ensurePadsForImport(successfulSounds.length);
-
-    // Assign sounds to empty pads temporarily
-    const pads = this._pads();
-    const emptyPadIds: string[] = [];
-    for (const pad of pads) {
-      if (pad.sound === null && emptyPadIds.length < successfulSounds.length) {
-        emptyPadIds.push(pad.id);
-      }
-    }
-
-    this._pads.update(currentPads => {
-      const updatedPads = [...currentPads];
-      successfulSounds.forEach((sound, index) => {
-        const padId = emptyPadIds[index];
-        const padIndex = updatedPads.findIndex(p => p.id === padId);
-        if (padIndex !== -1) {
-          updatedPads[padIndex] = { ...updatedPads[padIndex], sound };
-        }
-      });
-      return updatedPads;
-    });
-
-    // Reorganize: sort all sounds alphabetically and compact (no gaps)
-    this.reorganizePads();
-
-    // Ensure there's still an empty pad available after import
-    this.ensureEmptyPadAvailable();
-
-    await this.saveState();
-
-    return { imported: successfulSounds.length, errors, skippedDuplicates };
-  }
-
-  /**
-   * Ensure there are enough pads for the import
-   * Adds rows as needed to accommodate all files plus 1 empty pad
-   */
-  private ensurePadsForImport(fileCount: number): void {
-    const pads = this._pads();
-    const emptyPads = pads.filter(p => p.sound === null).length;
-
-    // Need fileCount empty pads + 1 extra for the "always have 1 empty" rule
-    const padsNeeded = fileCount + 1;
-
-    if (emptyPads < padsNeeded) {
-      const additionalPadsNeeded = padsNeeded - emptyPads;
-      const rowsToAdd = Math.ceil(additionalPadsNeeded / 4);
-      this.addPads(rowsToAdd * 4);
-    }
-  }
-
-  /**
-   * Play a sound from a pad
-   */
-  async playSound(padId: string): Promise<void> {
-    const pad = this._pads().find(p => p.id === padId);
-    if (!pad?.sound) return;
+  async playSound(soundId: string): Promise<void> {
+    const sound = this._sounds().get(soundId);
+    if (!sound) return;
 
     try {
       // If already playing, stop it first
-      if (pad.isPlaying) {
-        await this.stopSound(padId);
+      if (sound.isPlaying) {
+        await this.stopSound(soundId);
         return;
       }
 
-      // Mark as playing
-      this._pads.update(pads => pads.map(p =>
-        p.id === padId ? { ...p, isPlaying: true } : p
-      ));
-
-      // Play the sound with pad volume and speed
-      // The backend will emit 'sound-finished' when playback completes
-      await this.tauri.playSound(pad.sound.id, pad.sound.path, pad.volume, pad.speed);
-
+      await this.tauri.playSound(soundId, sound.path, sound.volume, sound.speed);
+      this.updateSound(soundId, { isPlaying: true });
     } catch (err) {
-      this._error.set(err instanceof Error ? err.message : 'Failed to play sound');
-      this._pads.update(pads => pads.map(p =>
-        p.id === padId ? { ...p, isPlaying: false } : p
-      ));
+      console.error('Failed to play sound:', err);
+      this._error.set('Failed to play sound');
     }
   }
 
   /**
-   * Stop a playing sound
+   * Stop a specific sound
    */
-  async stopSound(padId: string): Promise<void> {
-    const pad = this._pads().find(p => p.id === padId);
-    if (!pad?.sound) return;
+  async stopSound(soundId: string): Promise<void> {
+    const sound = this._sounds().get(soundId);
+    if (!sound) return;
 
     try {
-      await this.tauri.stopSound(pad.sound.id);
-      this._pads.update(pads => pads.map(p =>
-        p.id === padId ? { ...p, isPlaying: false } : p
-      ));
+      await this.tauri.stopSound(soundId);
+      this.updateSound(soundId, { isPlaying: false });
     } catch (err) {
-      this._error.set(err instanceof Error ? err.message : 'Failed to stop sound');
+      console.error('Failed to stop sound:', err);
     }
   }
 
@@ -627,94 +180,39 @@ export class SoundboardService {
    */
   async stopAll(): Promise<void> {
     try {
-      // Stop all sounds in the backend (authoritative)
       await this.tauri.stopAllSounds();
-      // Reset all pads' isPlaying state to false
-      this._pads.update(pads => pads.map(p => ({ ...p, isPlaying: false })));
+      this._sounds.update(sounds => {
+        const updated = new Map(sounds);
+        for (const [id, sound] of updated) {
+          if (sound.isPlaying) {
+            updated.set(id, { ...sound, isPlaying: false });
+          }
+        }
+        return updated;
+      });
     } catch (err) {
-      this._error.set(err instanceof Error ? err.message : 'Failed to stop all sounds');
+      console.error('Failed to stop all sounds:', err);
     }
   }
 
   /**
-   * Set volume for a pad (0.0-2.0, where 1.0 = 100%)
+   * Preview a sound on the preview output device
    */
-  setPadVolume(padId: string, volume: number): void {
-    const clampedVolume = Math.max(0, Math.min(2, volume));
-    this._pads.update(pads => pads.map(p =>
-      p.id === padId ? { ...p, volume: clampedVolume } : p
-    ));
-    this.saveState();
-  }
-
-  /**
-   * Set playback speed for a pad (0.5-2.0, where 1.0 = normal)
-   */
-  setPadSpeed(padId: string, speed: number): void {
-    const clampedSpeed = Math.max(0.5, Math.min(2, speed));
-    this._pads.update(pads => pads.map(p =>
-      p.id === padId ? { ...p, speed: clampedSpeed } : p
-    ));
-    this.saveState();
-  }
-
-  /**
-   * Set custom name for a pad (null to clear)
-   */
-  setPadCustomName(padId: string, name: string | null): void {
-    this._pads.update(pads => pads.map(p =>
-      p.id === padId ? { ...p, customName: name || undefined } : p
-    ));
-    this.saveState();
-  }
-
-  /**
-   * Set image for a pad
-   */
-  setPadImage(padId: string, image: PadImage | null): void {
-    this._pads.update(pads => pads.map(p =>
-      p.id === padId ? { ...p, image: image || undefined } : p
-    ));
-    this.saveState();
-  }
-
-  /**
-   * Set hotkey for a pad
-   */
-  setPadHotkey(padId: string, hotkey: string | null): void {
-    // If setting a new hotkey, clear it from any other pad first
-    if (hotkey) {
-      this._pads.update(pads => pads.map(p =>
-        p.hotkey === hotkey && p.id !== padId
-          ? { ...p, hotkey: undefined }
-          : p
-      ));
-    }
-
-    this._pads.update(pads => pads.map(p =>
-      p.id === padId ? { ...p, hotkey: hotkey || undefined } : p
-    ));
-    this.saveState();
-  }
-
-  /**
-   * Preview a sound on the selected preview output device
-   */
-  async previewSound(padId: string): Promise<void> {
-    const pad = this._pads().find(p => p.id === padId);
-    if (!pad?.sound) return;
+  async previewSound(soundId: string): Promise<void> {
+    const sound = this._sounds().get(soundId);
+    if (!sound) return;
 
     try {
-      // If same pad is previewing, stop it
-      if (this._previewingPadId() === padId) {
-        await this.stopPreview();
-        return;
+      if (this._previewingSoundId() === soundId) {
+        await this.tauri.stopPreview();
+        this._previewingSoundId.set(null);
+      } else {
+        const previewDeviceId = this._previewDeviceId() || 'default';
+        await this.tauri.previewSound(sound.path, previewDeviceId, soundId);
+        this._previewingSoundId.set(soundId);
       }
-
-      const previewDeviceId = this._previewDeviceId() || 'default';
-      await this.tauri.previewSound(pad.sound.path, previewDeviceId, padId);
     } catch (err) {
-      this._error.set(err instanceof Error ? err.message : 'Failed to preview sound');
+      console.error('Failed to preview sound:', err);
     }
   }
 
@@ -724,10 +222,428 @@ export class SoundboardService {
   async stopPreview(): Promise<void> {
     try {
       await this.tauri.stopPreview();
+      this._previewingSoundId.set(null);
     } catch (err) {
       this._error.set(err instanceof Error ? err.message : 'Failed to stop preview');
     }
   }
+
+  // =========================================================================
+  // Sound Property Setters
+  // =========================================================================
+
+  setSoundVolume(soundId: string, volume: number): void {
+    const clampedVolume = Math.max(0, Math.min(2, volume));
+    this.updateSound(soundId, { volume: clampedVolume });
+    this.saveState();
+  }
+
+  setSoundSpeed(soundId: string, speed: number): void {
+    const clampedSpeed = Math.max(0.5, Math.min(2, speed));
+    this.updateSound(soundId, { speed: clampedSpeed });
+    this.saveState();
+  }
+
+  setSoundHotkey(soundId: string, hotkey: string | null): void {
+    // If setting a new hotkey, clear it from any other sound first
+    if (hotkey) {
+      this._sounds.update(sounds => {
+        const updated = new Map(sounds);
+        for (const [id, sound] of updated) {
+          if (sound.hotkey === hotkey && id !== soundId) {
+            updated.set(id, { ...sound, hotkey: undefined });
+          }
+        }
+        return updated;
+      });
+    }
+    this.updateSound(soundId, { hotkey: hotkey || undefined });
+    this.saveState();
+  }
+
+  setSoundCustomName(soundId: string, customName: string | null): void {
+    this.updateSound(soundId, { customName: customName || undefined });
+    this.saveState();
+  }
+
+  setSoundImage(soundId: string, image: PadImage | null): void {
+    this.updateSound(soundId, { image: image || undefined });
+    this.saveState();
+  }
+
+  // =========================================================================
+  // Import Operations
+  // =========================================================================
+
+  /**
+   * Import a single sound file
+   */
+  async importSound(): Promise<void> {
+    try {
+      this._loading.set(true);
+      this._error.set(null);
+
+      const selected = await open({
+        multiple: false,
+        filters: [{ name: 'Audio', extensions: ['mp3', 'ogg', 'wav', 'flac'] }]
+      });
+
+      if (!selected) return;
+
+      const path = selected as string;
+      const imported = await this.tauri.importSoundWithHash(path);
+
+      // Check for duplicate
+      if (this._sounds().has(imported.hash)) {
+        this._error.set('This sound already exists in your library');
+        return;
+      }
+
+      const sound: Sound = {
+        id: imported.hash,
+        name: imported.name,
+        path: imported.path,
+        duration: imported.duration,
+        volume: 1.0,
+        speed: 1.0,
+        folderIds: [],
+        isPlaying: false,
+        addedAt: Date.now()
+      };
+
+      this.addSound(sound);
+      await this.saveState();
+    } catch (err) {
+      console.error('Failed to import sound:', err);
+      this._error.set('Failed to import sound');
+    } finally {
+      this._loading.set(false);
+    }
+  }
+
+  /**
+   * Import multiple sound files
+   */
+  async importMultipleSounds(): Promise<{ imported: number; skippedDuplicates: number; errors: string[] }> {
+    const result = { imported: 0, skippedDuplicates: 0, errors: [] as string[] };
+
+    try {
+      this._loading.set(true);
+      this._error.set(null);
+
+      const selected = await open({
+        multiple: true,
+        filters: [{ name: 'Audio', extensions: ['mp3', 'ogg', 'wav', 'flac'] }]
+      });
+
+      if (!selected || (Array.isArray(selected) && selected.length === 0)) {
+        return result;
+      }
+
+      const paths = Array.isArray(selected) ? selected : [selected];
+      const importResults = await this.tauri.importMultipleSoundsWithHash(paths);
+
+      for (const res of importResults) {
+        if ('err' in res) {
+          result.errors.push(res.err);
+          continue;
+        }
+
+        const imported = res.ok;
+
+        // Check for duplicate
+        if (this._sounds().has(imported.hash)) {
+          result.skippedDuplicates++;
+          continue;
+        }
+
+        const sound: Sound = {
+          id: imported.hash,
+          name: imported.name,
+          path: imported.path,
+          duration: imported.duration,
+          volume: 1.0,
+          speed: 1.0,
+          folderIds: [],
+          isPlaying: false,
+          addedAt: Date.now()
+        };
+
+        this.addSound(sound);
+        result.imported++;
+      }
+
+      if (result.imported > 0) {
+        await this.saveState();
+      }
+    } catch (err) {
+      console.error('Failed to import sounds:', err);
+      result.errors.push(String(err));
+    } finally {
+      this._loading.set(false);
+    }
+
+    return result;
+  }
+
+  /**
+   * Import sounds from file paths (for drag & drop)
+   */
+  async importSoundsFromPaths(paths: string[]): Promise<{ imported: number; skippedDuplicates: number; errors: string[] }> {
+    const result = { imported: 0, skippedDuplicates: 0, errors: [] as string[] };
+
+    try {
+      this._loading.set(true);
+      const importResults = await this.tauri.importMultipleSoundsWithHash(paths);
+
+      for (const res of importResults) {
+        if ('err' in res) {
+          result.errors.push(res.err);
+          continue;
+        }
+
+        const imported = res.ok;
+
+        if (this._sounds().has(imported.hash)) {
+          result.skippedDuplicates++;
+          continue;
+        }
+
+        const sound: Sound = {
+          id: imported.hash,
+          name: imported.name,
+          path: imported.path,
+          duration: imported.duration,
+          volume: 1.0,
+          speed: 1.0,
+          folderIds: [],
+          isPlaying: false,
+          addedAt: Date.now()
+        };
+
+        this.addSound(sound);
+        result.imported++;
+      }
+
+      if (result.imported > 0) {
+        await this.saveState();
+      }
+    } catch (err) {
+      result.errors.push(String(err));
+    } finally {
+      this._loading.set(false);
+    }
+
+    return result;
+  }
+
+  // =========================================================================
+  // Folder Operations
+  // =========================================================================
+
+  setActiveFolder(folderId: string): void {
+    if (this._folders().some(f => f.id === folderId)) {
+      this._activeFolderId.set(folderId);
+    }
+  }
+
+  createFolder(name: string): void {
+    const trimmedName = name.trim();
+    if (!trimmedName) return;
+
+    if (this._folders().some(f => f.name.toLowerCase() === trimmedName.toLowerCase())) {
+      return;
+    }
+
+    const id = `folder-${Date.now()}`;
+    const newFolder: Folder = { id, name: trimmedName, createdAt: Date.now() };
+    this._folders.update(folders => [...folders, newFolder]);
+    this.saveFolders();
+  }
+
+  renameFolder(folderId: string, newName: string): void {
+    if (folderId === 'all') return;
+
+    const trimmedName = newName.trim();
+    if (!trimmedName) return;
+
+    if (this._folders().some(f => f.id !== folderId && f.name.toLowerCase() === trimmedName.toLowerCase())) {
+      return;
+    }
+
+    this._folders.update(folders =>
+      folders.map(f => f.id === folderId ? { ...f, name: trimmedName } : f)
+    );
+    this.saveFolders();
+  }
+
+  deleteFolder(folderId: string): void {
+    if (folderId === 'all') return;
+
+    // Remove folder from all sounds
+    this._sounds.update(sounds => {
+      const updated = new Map(sounds);
+      for (const [id, sound] of updated) {
+        if (sound.folderIds.includes(folderId)) {
+          updated.set(id, {
+            ...sound,
+            folderIds: sound.folderIds.filter(f => f !== folderId)
+          });
+        }
+      }
+      return updated;
+    });
+
+    this._folders.update(folders => folders.filter(f => f.id !== folderId));
+
+    if (this._activeFolderId() === folderId) {
+      this._activeFolderId.set('all');
+    }
+
+    this.saveFolders();
+    this.saveState();
+  }
+
+  toggleSoundFolder(soundId: string, folderId: string): void {
+    if (folderId === 'all') return;
+
+    const sound = this._sounds().get(soundId);
+    if (!sound) return;
+
+    const hasFolder = sound.folderIds.includes(folderId);
+    this.updateSound(soundId, {
+      folderIds: hasFolder
+        ? sound.folderIds.filter(f => f !== folderId)
+        : [...sound.folderIds, folderId]
+    });
+    this.saveState();
+  }
+
+  addSoundToFolder(soundId: string, folderId: string): void {
+    if (folderId === 'all') return;
+
+    const sound = this._sounds().get(soundId);
+    if (!sound || sound.folderIds.includes(folderId)) return;
+
+    this.updateSound(soundId, {
+      folderIds: [...sound.folderIds, folderId]
+    });
+    this.saveState();
+  }
+
+  // =========================================================================
+  // Persistence
+  // =========================================================================
+
+  private async loadState(): Promise<void> {
+    try {
+      // Load folders
+      const savedFolders = await this.tauri.loadFolders();
+      if (savedFolders && savedFolders.length > 0) {
+        const hasAll = savedFolders.some(f => f.id === 'all');
+        if (!hasAll) {
+          savedFolders.unshift({ id: 'all', name: 'Tous', createdAt: 0 });
+        }
+        this._folders.set(savedFolders);
+      }
+
+      // Load sounds (new format)
+      const data = await this.tauri.loadSoundboardState();
+
+      if (data && typeof data === 'object' && !Array.isArray(data) && (data as any).sounds) {
+        // New format: sounds as object
+        const soundsObj = (data as any).sounds as Record<string, any>;
+        const soundsMap = new Map<string, Sound>();
+        for (const [id, soundData] of Object.entries(soundsObj)) {
+          soundsMap.set(id, {
+            ...soundData,
+            isPlaying: false // Reset runtime state
+          } as Sound);
+        }
+        this._sounds.set(soundsMap);
+      } else if (data && Array.isArray(data)) {
+        // Old format: pads array - migrate
+        await this.migrateFromOldFormat(data);
+      }
+
+      this._initialized = true;
+    } catch (err) {
+      console.error('Failed to load state:', err);
+      this._initialized = true;
+    }
+
+    // Also load preview device setting
+    this.loadPreviewDevice();
+  }
+
+  private async migrateFromOldFormat(pads: any[]): Promise<void> {
+    console.log('Migrating from old pad format to new sound format...');
+    const sounds = new Map<string, Sound>();
+
+    for (const pad of pads) {
+      if (!pad.sound) continue;
+
+      try {
+        // Calculate hash for existing file
+        const hash = await this.tauri.hashFile(pad.sound.path);
+
+        // Skip if already migrated (duplicate)
+        if (sounds.has(hash)) continue;
+
+        const sound: Sound = {
+          id: hash,
+          name: pad.sound.name,
+          path: pad.sound.path,
+          duration: pad.sound.duration || 0,
+          volume: pad.volume ?? 1.0,
+          speed: pad.speed ?? 1.0,
+          hotkey: pad.hotkey,
+          customName: pad.customName,
+          image: pad.image,
+          folderIds: pad.folderIds ?? [],
+          isPlaying: false,
+          addedAt: Date.now()
+        };
+
+        sounds.set(hash, sound);
+      } catch (err) {
+        console.error(`Failed to migrate sound ${pad.sound?.name}:`, err);
+      }
+    }
+
+    this._sounds.set(sounds);
+    await this.saveState();
+    console.log(`Migration complete: ${sounds.size} sounds migrated`);
+  }
+
+  private async saveState(): Promise<void> {
+    if (!this._initialized) return;
+
+    try {
+      // Convert Map to object for JSON serialization
+      const soundsObj: Record<string, Omit<Sound, 'isPlaying'>> = {};
+      for (const [id, sound] of this._sounds()) {
+        const { isPlaying, ...rest } = sound;
+        soundsObj[id] = rest;
+      }
+
+      await this.tauri.saveSoundboardState({ sounds: soundsObj } as any);
+    } catch (err) {
+      console.error('Failed to save state:', err);
+    }
+  }
+
+  private async saveFolders(): Promise<void> {
+    try {
+      await this.tauri.saveFolders(this._folders());
+    } catch (err) {
+      console.error('Failed to save folders:', err);
+    }
+  }
+
+  // =========================================================================
+  // Preview Device
+  // =========================================================================
 
   /**
    * Set the preview output device
@@ -753,159 +669,45 @@ export class SoundboardService {
     }
   }
 
-  /**
-   * Remove sound from a pad
-   */
-  removeSound(padId: string): void {
-    this._pads.update(pads => pads.map(pad =>
-      pad.id === padId
-        ? { ...pad, sound: null, isPlaying: false, image: undefined }
-        : pad
-    ));
-    // Reorganize to compact pads (no gaps) and maintain alphabetical order
-    this.reorganizePads();
-    this.cleanupEmptyRows();
-    this.saveState();
-  }
+  // =========================================================================
+  // Listeners
+  // =========================================================================
 
-  /**
-   * Change pad color
-   */
-  setPadColor(padId: string, color: string): void {
-    this._pads.update(pads => pads.map(pad =>
-      pad.id === padId ? { ...pad, color } : pad
-    ));
-    this.saveState();
-  }
-
-  /**
-   * Clear any error
-   */
-  clearError(): void {
-    this._error.set(null);
-  }
-
-  /**
-   * Switch to a different folder
-   */
-  setActiveFolder(folderId: string): void {
-    if (this._folders().some(f => f.id === folderId)) {
-      this._activeFolderId.set(folderId);
-    }
-  }
-
-  /**
-   * Create a new folder
-   */
-  createFolder(name: string): void {
-    const trimmedName = name.trim();
-    if (!trimmedName) return;
-
-    // Check for duplicate names
-    if (this._folders().some(f => f.name.toLowerCase() === trimmedName.toLowerCase())) {
-      return;
-    }
-
-    const id = `folder-${Date.now()}`;
-    const newFolder: Folder = { id, name: trimmedName, createdAt: Date.now() };
-    this._folders.update(folders => [...folders, newFolder]);
-    this.saveFolders();
-  }
-
-  /**
-   * Rename a folder
-   */
-  renameFolder(folderId: string, newName: string): void {
-    if (folderId === 'all') return; // Protected
-
-    const trimmedName = newName.trim();
-    if (!trimmedName) return;
-
-    // Check for duplicate names (excluding current folder)
-    if (this._folders().some(f => f.id !== folderId && f.name.toLowerCase() === trimmedName.toLowerCase())) {
-      return;
-    }
-
-    this._folders.update(folders =>
-      folders.map(f => f.id === folderId ? { ...f, name: trimmedName } : f)
-    );
-    this.saveFolders();
-  }
-
-  /**
-   * Delete a folder
-   */
-  deleteFolder(folderId: string): void {
-    if (folderId === 'all') return; // Protected
-
-    // Remove this folder from all pads
-    this._pads.update(pads => pads.map(pad => ({
-      ...pad,
-      folderIds: pad.folderIds.filter(id => id !== folderId)
-    })));
-
-    // Delete the folder
-    this._folders.update(folders => folders.filter(f => f.id !== folderId));
-
-    // Return to "All" if we were in this folder
-    if (this._activeFolderId() === folderId) {
-      this._activeFolderId.set('all');
-    }
-
-    this.saveFolders();
-    this.saveState();
-  }
-
-  /**
-   * Toggle a folder assignment for a pad
-   */
-  togglePadFolder(padId: string, folderId: string): void {
-    if (folderId === 'all') return; // Can't toggle "All"
-
-    this._pads.update(pads => pads.map(pad => {
-      if (pad.id !== padId) return pad;
-
-      const hasFolder = pad.folderIds.includes(folderId);
-      return {
-        ...pad,
-        folderIds: hasFolder
-          ? pad.folderIds.filter(id => id !== folderId)
-          : [...pad.folderIds, folderId]
-      };
-    }));
-    this.saveState();
-  }
-
-  /**
-   * Add a pad to a folder (for drag & drop)
-   */
-  addPadToFolder(padId: string, folderId: string): void {
-    if (folderId === 'all') return;
-
-    this._pads.update(pads => pads.map(pad => {
-      if (pad.id !== padId || pad.folderIds.includes(folderId)) return pad;
-      return { ...pad, folderIds: [...pad.folderIds, folderId] };
-    }));
-    this.saveState();
-  }
-
-  /**
-   * Save folders to persistent storage
-   */
-  private async saveFolders(): Promise<void> {
+  private async initSoundFinishedListener(): Promise<void> {
     try {
-      await this.tauri.saveFolders(this._folders());
-    } catch (err) {
-      console.error('Failed to save folders:', err);
+      await listen<{ id: string }>('sound-finished', (event) => {
+        // The backend sends soundId as the id
+        const soundId = event.payload.id;
+        if (this._sounds().has(soundId)) {
+          this.updateSound(soundId, { isPlaying: false });
+        }
+      });
+    } catch (e) {
+      console.error('Failed to initialize sound-finished listener:', e);
     }
   }
 
-  /**
-   * Format duration as mm:ss
-   */
+  private async initPreviewListeners(): Promise<void> {
+    this.unlistenPreviewStarted = await this.tauri.listenPreviewStarted((soundId) => {
+      this._previewingSoundId.set(soundId);
+    });
+
+    this.unlistenPreviewStopped = await this.tauri.listenPreviewStopped(() => {
+      this._previewingSoundId.set(null);
+    });
+  }
+
+  // =========================================================================
+  // Utilities
+  // =========================================================================
+
   formatDuration(seconds: number): string {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
+  }
+
+  clearError(): void {
+    this._error.set(null);
   }
 }
