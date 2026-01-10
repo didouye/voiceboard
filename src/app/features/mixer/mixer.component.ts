@@ -290,9 +290,9 @@ export class MixerComponent implements OnInit {
 
     if (folder.id === 'all') return;
 
-    const padId = event.dataTransfer?.getData('text/plain');
-    if (padId) {
-      this.soundboard.addPadToFolder(padId, folder.id);
+    const soundId = event.dataTransfer?.getData('text/plain');
+    if (soundId) {
+      this.soundboard.addSoundToFolder(soundId, folder.id);
     }
   }
 }
