@@ -112,6 +112,18 @@ export class SoundboardService {
    */
   private async loadState(): Promise<void> {
     try {
+      // Load folders first
+      const savedFolders = await this.tauri.loadFolders();
+      if (savedFolders && savedFolders.length > 0) {
+        // Ensure "All" folder exists and is first
+        const hasAll = savedFolders.some(f => f.id === 'all');
+        if (!hasAll) {
+          savedFolders.unshift({ id: 'all', name: 'Tous', createdAt: 0 });
+        }
+        this._folders.set(savedFolders);
+      }
+
+      // Load pads (existing code)
       const saved = await this.tauri.loadSoundboardState();
       if (saved && saved.length > 0) {
         // Restore pads, ensuring isPlaying is false and defaults for backwards compatibility
@@ -734,6 +746,112 @@ export class SoundboardService {
   setActiveFolder(folderId: string): void {
     if (this._folders().some(f => f.id === folderId)) {
       this._activeFolderId.set(folderId);
+    }
+  }
+
+  /**
+   * Create a new folder
+   */
+  createFolder(name: string): void {
+    const trimmedName = name.trim();
+    if (!trimmedName) return;
+
+    // Check for duplicate names
+    if (this._folders().some(f => f.name.toLowerCase() === trimmedName.toLowerCase())) {
+      return;
+    }
+
+    const id = `folder-${Date.now()}`;
+    const newFolder: Folder = { id, name: trimmedName, createdAt: Date.now() };
+    this._folders.update(folders => [...folders, newFolder]);
+    this.saveFolders();
+  }
+
+  /**
+   * Rename a folder
+   */
+  renameFolder(folderId: string, newName: string): void {
+    if (folderId === 'all') return; // Protected
+
+    const trimmedName = newName.trim();
+    if (!trimmedName) return;
+
+    // Check for duplicate names (excluding current folder)
+    if (this._folders().some(f => f.id !== folderId && f.name.toLowerCase() === trimmedName.toLowerCase())) {
+      return;
+    }
+
+    this._folders.update(folders =>
+      folders.map(f => f.id === folderId ? { ...f, name: trimmedName } : f)
+    );
+    this.saveFolders();
+  }
+
+  /**
+   * Delete a folder
+   */
+  deleteFolder(folderId: string): void {
+    if (folderId === 'all') return; // Protected
+
+    // Remove this folder from all pads
+    this._pads.update(pads => pads.map(pad => ({
+      ...pad,
+      folderIds: pad.folderIds.filter(id => id !== folderId)
+    })));
+
+    // Delete the folder
+    this._folders.update(folders => folders.filter(f => f.id !== folderId));
+
+    // Return to "All" if we were in this folder
+    if (this._activeFolderId() === folderId) {
+      this._activeFolderId.set('all');
+    }
+
+    this.saveFolders();
+    this.saveState();
+  }
+
+  /**
+   * Toggle a folder assignment for a pad
+   */
+  togglePadFolder(padId: string, folderId: string): void {
+    if (folderId === 'all') return; // Can't toggle "All"
+
+    this._pads.update(pads => pads.map(pad => {
+      if (pad.id !== padId) return pad;
+
+      const hasFolder = pad.folderIds.includes(folderId);
+      return {
+        ...pad,
+        folderIds: hasFolder
+          ? pad.folderIds.filter(id => id !== folderId)
+          : [...pad.folderIds, folderId]
+      };
+    }));
+    this.saveState();
+  }
+
+  /**
+   * Add a pad to a folder (for drag & drop)
+   */
+  addPadToFolder(padId: string, folderId: string): void {
+    if (folderId === 'all') return;
+
+    this._pads.update(pads => pads.map(pad => {
+      if (pad.id !== padId || pad.folderIds.includes(folderId)) return pad;
+      return { ...pad, folderIds: [...pad.folderIds, folderId] };
+    }));
+    this.saveState();
+  }
+
+  /**
+   * Save folders to persistent storage
+   */
+  private async saveFolders(): Promise<void> {
+    try {
+      await this.tauri.saveFolders(this._folders());
+    } catch (err) {
+      console.error('Failed to save folders:', err);
     }
   }
 

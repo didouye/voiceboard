@@ -51,6 +51,7 @@ use application::{
         get_virtual_outputs_by_priority,
         install_update,
         is_mixing,
+        load_folders,
         load_multiple_sound_files,
         load_settings,
         // Sound playback
@@ -58,9 +59,11 @@ use application::{
         load_soundboard,
         play_sound,
         preview_sound,
-        remove_channel,
-        save_pad_image,
         read_image_file,
+        remove_channel,
+        // Folder persistence
+        save_folders,
+        save_pad_image,
         save_settings,
         // Soundboard persistence
         save_soundboard,
@@ -75,10 +78,10 @@ use application::{
         set_preview_device,
         // Mixing control
         start_mixing,
+        stop_all_sounds,
         stop_mixing,
         stop_preview,
         stop_sound,
-        stop_all_sounds,
         toggle_channel_mute,
     },
     shortcut_commands::{
@@ -214,10 +217,8 @@ pub fn run() {
                             }
                             AudioEngineEvent::SoundFinished { id } => {
                                 tracing::debug!("[AudioEngine] Sound finished: {}", id);
-                                let _ = app_handle.emit(
-                                    "sound-finished",
-                                    serde_json::json!({ "id": id }),
-                                );
+                                let _ = app_handle
+                                    .emit("sound-finished", serde_json::json!({ "id": id }));
                             }
                         }
                     }
@@ -284,6 +285,9 @@ pub fn run() {
             // Soundboard persistence
             save_soundboard,
             load_soundboard,
+            // Folder persistence
+            save_folders,
+            load_folders,
             // Image management
             get_images_dir,
             save_pad_image,

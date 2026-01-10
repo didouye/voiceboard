@@ -1115,6 +1115,28 @@ pub async fn load_soundboard(app: tauri::AppHandle) -> Result<Option<serde_json:
     Ok(pads)
 }
 
+const FOLDERS_KEY: &str = "folders";
+
+/// Save folders to persistent storage
+#[tauri::command]
+pub async fn save_folders(app: tauri::AppHandle, folders: serde_json::Value) -> Result<(), String> {
+    let store = app.store(SOUNDBOARD_STORE).map_err(|e| e.to_string())?;
+    store.set(FOLDERS_KEY, folders);
+    store.save().map_err(|e| e.to_string())?;
+    tracing::debug!("Folders saved");
+    Ok(())
+}
+
+/// Load folders from persistent storage
+#[tauri::command]
+pub async fn load_folders(app: tauri::AppHandle) -> Result<Option<serde_json::Value>, String> {
+    let store = app.store(SOUNDBOARD_STORE).map_err(|e| e.to_string())?;
+    #[allow(clippy::map_clone)]
+    let folders = store.get(FOLDERS_KEY).map(|v| v.clone());
+    tracing::debug!("Folders loaded: {:?}", folders.is_some());
+    Ok(folders)
+}
+
 // ============================================================================
 // Image Management Commands
 // ============================================================================
@@ -1122,7 +1144,9 @@ pub async fn load_soundboard(app: tauri::AppHandle) -> Result<Option<serde_json:
 /// Get the images directory path
 #[tauri::command]
 pub async fn get_images_dir(app: tauri::AppHandle) -> Result<String, String> {
-    let app_data_dir = app.path().app_data_dir()
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
         .map_err(|e| format!("Failed to get app data dir: {}", e))?;
 
     let images_dir = app_data_dir.join("images");
@@ -1143,9 +1167,11 @@ pub async fn save_pad_image(
     image_data: Vec<u8>,
     extension: String,
 ) -> Result<String, String> {
-    use sha2::{Sha256, Digest};
+    use sha2::{Digest, Sha256};
 
-    let app_data_dir = app.path().app_data_dir()
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
         .map_err(|e| format!("Failed to get app data dir: {}", e))?;
 
     let images_dir = app_data_dir.join("images");
@@ -1176,8 +1202,7 @@ pub async fn save_pad_image(
     }
 
     // Write new image
-    std::fs::write(&file_path, &image_data)
-        .map_err(|e| format!("Failed to save image: {}", e))?;
+    std::fs::write(&file_path, &image_data).map_err(|e| format!("Failed to save image: {}", e))?;
 
     tracing::info!("Saved pad image: {}", filename);
 
@@ -1187,11 +1212,10 @@ pub async fn save_pad_image(
 
 /// Delete image for a pad
 #[tauri::command]
-pub async fn delete_pad_image(
-    app: tauri::AppHandle,
-    pad_id: String,
-) -> Result<(), String> {
-    let app_data_dir = app.path().app_data_dir()
+pub async fn delete_pad_image(app: tauri::AppHandle, pad_id: String) -> Result<(), String> {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
         .map_err(|e| format!("Failed to get app data dir: {}", e))?;
 
     let images_dir = app_data_dir.join("images");
@@ -1223,8 +1247,7 @@ pub async fn read_image_file(path: String) -> Result<Vec<u8>, String> {
     }
 
     // Read file
-    let data = std::fs::read(&path)
-        .map_err(|e| format!("Failed to read image: {}", e))?;
+    let data = std::fs::read(&path).map_err(|e| format!("Failed to read image: {}", e))?;
 
     // Validate file size (10MB max)
     if data.len() > 10 * 1024 * 1024 {
@@ -1237,10 +1260,10 @@ pub async fn read_image_file(path: String) -> Result<Vec<u8>, String> {
 /// Clean up orphaned images (not referenced by any pad)
 /// Called on app startup
 #[tauri::command]
-pub async fn cleanup_orphaned_images(
-    app: tauri::AppHandle,
-) -> Result<u32, String> {
-    let app_data_dir = app.path().app_data_dir()
+pub async fn cleanup_orphaned_images(app: tauri::AppHandle) -> Result<u32, String> {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
         .map_err(|e| format!("Failed to get app data dir: {}", e))?;
 
     let images_dir = app_data_dir.join("images");

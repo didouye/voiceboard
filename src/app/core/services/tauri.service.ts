@@ -6,7 +6,8 @@ import {
   MixerConfig,
   AppSettings,
   ApiResponse,
-  SoundFile
+  SoundFile,
+  Folder
 } from '../models';
 import { DemoService } from './demo.service';
 import {
@@ -497,6 +498,24 @@ export class TauriService {
       return DEMO_SOUNDBOARD_PADS;
     }
     return invoke<any[] | null>('load_soundboard');
+  }
+
+  /**
+   * Save folders to persistent storage
+   */
+  async saveFolders(folders: Folder[]): Promise<void> {
+    if (this.demoService.isDemoMode) return;
+    await invoke('save_folders', { folders });
+  }
+
+  /**
+   * Load folders from persistent storage
+   */
+  async loadFolders(): Promise<Folder[] | null> {
+    if (this.demoService.isDemoMode) {
+      return [{ id: 'all', name: 'Tous', createdAt: Date.now() }];
+    }
+    return invoke<Folder[] | null>('load_folders');
   }
 
   // =========================================================================
