@@ -1,4 +1,4 @@
-import { Injectable, signal, OnDestroy } from '@angular/core';
+import { Injectable, signal, OnDestroy, effect } from '@angular/core';
 import { TauriService } from './tauri.service';
 import { SoundboardService } from './soundboard.service';
 import { formatShortcut, shortcutFromEvent, isModifierKey } from '../models';
@@ -15,12 +15,31 @@ export class ShortcutService implements OnDestroy {
   readonly enabled = this._enabled.asReadonly();
 
   private unlistenGlobalShortcut?: () => void;
+  private initialized = false;
+  private lastHotkeySnapshot = '';
 
   constructor(
     private tauri: TauriService,
     private soundboard: SoundboardService
   ) {
     this.init();
+
+    // Watch for pad changes and resync shortcuts when hotkey associations change
+    effect(() => {
+      const pads = this.soundboard.pads();
+      // Create a snapshot of hotkey -> padId associations
+      const snapshot = pads
+        .filter(p => p.hotkey)
+        .map(p => `${p.hotkey}:${p.id}`)
+        .sort()
+        .join('|');
+
+      // Only sync if initialized and associations actually changed
+      if (this.initialized && snapshot !== this.lastHotkeySnapshot) {
+        this.lastHotkeySnapshot = snapshot;
+        this.syncFromSoundboard();
+      }
+    });
   }
 
   private async init(): Promise<void> {
@@ -40,6 +59,19 @@ export class ShortcutService implements OnDestroy {
 
     // Register all existing shortcuts from soundboard
     await this.syncFromSoundboard();
+
+    // Capture initial snapshot and mark as initialized
+    this.updateHotkeySnapshot();
+    this.initialized = true;
+  }
+
+  private updateHotkeySnapshot(): void {
+    const pads = this.soundboard.pads();
+    this.lastHotkeySnapshot = pads
+      .filter(p => p.hotkey)
+      .map(p => `${p.hotkey}:${p.id}`)
+      .sort()
+      .join('|');
   }
 
   ngOnDestroy(): void {
