@@ -242,4 +242,21 @@ describe('SoundboardService', () => {
       expect(service.getSound('sound-1')).toBeUndefined();
     });
   });
+
+  describe('search', () => {
+    it('should have searchQuery signal initialized to empty string', () => {
+      expect(service.searchQuery()).toBe('');
+    });
+
+    it('should update searchQuery when setSearchQuery is called', () => {
+      service.setSearchQuery('test');
+      expect(service.searchQuery()).toBe('test');
+    });
+
+    it('should clear searchQuery when setActiveFolder is called', () => {
+      service.setSearchQuery('test');
+      service.setActiveFolder('all');
+      expect(service.searchQuery()).toBe('');
+    });
+  });
 });

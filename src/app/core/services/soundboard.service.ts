@@ -20,6 +20,7 @@ export class SoundboardService {
   private _activeFolderId = signal<string>('all');
   private _loading = signal(false);
   private _error = signal<string | null>(null);
+  private _searchQuery = signal<string>('');
   private _initialized = false;
 
   // Preview state
@@ -37,6 +38,7 @@ export class SoundboardService {
   readonly activeFolderId = this._activeFolderId.asReadonly();
   readonly loading = this._loading.asReadonly();
   readonly error = this._error.asReadonly();
+  readonly searchQuery = this._searchQuery.asReadonly();
 
   readonly activeFolder = computed(() =>
     this._folders().find(f => f.id === this._activeFolderId()) || this._folders()[0]
@@ -444,7 +446,12 @@ export class SoundboardService {
   setActiveFolder(folderId: string): void {
     if (this._folders().some(f => f.id === folderId)) {
       this._activeFolderId.set(folderId);
+      this._searchQuery.set('');
     }
+  }
+
+  setSearchQuery(query: string): void {
+    this._searchQuery.set(query);
   }
 
   createFolder(name: string): void {
