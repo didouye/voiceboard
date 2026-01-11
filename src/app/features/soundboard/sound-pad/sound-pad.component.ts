@@ -37,30 +37,30 @@ import { open } from '@tauri-apps/plugin-dialog';
       }
 
       <!-- Hotkey badge -->
-      @if (pad.sound?.hotkey) {
+      @if (pad.sound?.hotkey; as hotkey) {
         <span class="absolute top-2 left-2 px-1.5 py-0.5 bg-black/50 text-white/80 text-[10px] font-semibold rounded font-mono uppercase z-10">
-          {{ pad.sound?.hotkey }}
+          {{ hotkey }}
         </span>
       }
 
-      @if (pad.sound) {
+      @if (pad.sound; as sound) {
         <!-- Sound content (positioned at bottom with z-index) -->
         <div class="text-center px-2 w-full pb-2 relative z-10">
           <span class="block text-xs font-semibold text-white truncate mb-0.5 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-            {{ pad.sound?.customName || pad.sound?.name }}
+            {{ sound.customName || sound.name }}
           </span>
-          @if (pad.sound?.customName) {
+          @if (sound.customName) {
             <span class="block text-[9px] text-white/70 truncate drop-shadow-md">
-              {{ pad.sound.name }}
+              {{ sound.name }}
             </span>
           }
           <span class="block text-[10px] text-white/70 mt-0.5 drop-shadow-md">
-            {{ formatDuration(pad.sound.duration) }}
+            {{ formatDuration(sound.duration) }}
           </span>
         </div>
 
         <!-- Playing indicator -->
-        @if (pad.sound?.isPlaying) {
+        @if (sound.isPlaying) {
           <div class="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-0.5 items-end h-4">
             <span class="w-1 bg-white rounded-sm animate-[soundbar_0.4s_ease-in-out_infinite_alternate]" style="height: 8px"></span>
             <span class="w-1 bg-white rounded-sm animate-[soundbar_0.4s_ease-in-out_infinite_alternate_0.1s]" style="height: 14px"></span>
@@ -73,7 +73,7 @@ import { open } from '@tauri-apps/plugin-dialog';
              [class]="showSettingsPopup ? 'opacity-0 pointer-events-none' : 'opacity-0 group-hover:opacity-100'">
           <button
             class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] transition-colors"
-            [class]="(pad.sound?.volume ?? 1.0) !== 1.0 ? 'bg-status-warning text-black' : 'bg-black/50 text-white hover:bg-accent'"
+            [class]="sound.volume !== 1.0 ? 'bg-status-warning text-black' : 'bg-black/50 text-white hover:bg-accent'"
             (click)="toggleSettingsPopup($event)"
             title="Settings"
           >
@@ -105,7 +105,7 @@ import { open } from '@tauri-apps/plugin-dialog';
     </div>
 
     <!-- Settings modal (covers pad grid area only, leaving sidebar and status bar visible) -->
-    @if (showSettingsPopup && pad.sound) {
+    @if (showSettingsPopup && pad.sound; as sound) {
       <div
         class="fixed top-0 right-0 bottom-14 left-48 z-50 flex items-center justify-center transition-opacity duration-150 p-6"
         [class]="modalVisible ? 'opacity-100' : 'opacity-0'"
@@ -122,7 +122,7 @@ import { open } from '@tauri-apps/plugin-dialog';
         >
           <!-- Header -->
           <div class="flex items-center justify-between mb-4">
-            <h3 class="text-sm font-semibold text-text-primary truncate">{{ pad.sound.name }}</h3>
+            <h3 class="text-sm font-semibold text-text-primary truncate">{{ sound.name }}</h3>
             <button
               class="w-6 h-6 flex items-center justify-center rounded hover:bg-surface-hover text-text-secondary hover:text-text-primary transition-colors"
               (click)="closePopup($event)"
@@ -138,9 +138,9 @@ import { open } from '@tauri-apps/plugin-dialog';
             </div>
             <input
               type="text"
-              [ngModel]="pad.sound?.customName || ''"
+              [ngModel]="sound.customName || ''"
               (ngModelChange)="onCustomNameChange($event)"
-              [placeholder]="pad.sound?.name"
+              [placeholder]="sound.name"
               class="w-full px-3 py-2 text-sm bg-surface-hover border border-border rounded text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
             >
           </div>
@@ -174,7 +174,7 @@ import { open } from '@tauri-apps/plugin-dialog';
               </button>
 
               <!-- Remove button (top-right, only when image exists) -->
-              @if (pad.sound?.image && !imageLoading()) {
+              @if (sound.image && !imageLoading()) {
                 <button
                   class="absolute top-2 right-2 w-6 h-6 bg-status-error/90 hover:bg-status-error rounded-full flex items-center justify-center text-white text-xs shadow-lg transition-colors"
                   (click)="removeImage(); $event.stopPropagation()"
@@ -271,11 +271,11 @@ import { open } from '@tauri-apps/plugin-dialog';
           <div class="mb-4">
             <div class="flex justify-between items-center mb-2 text-xs">
               <span class="text-text-secondary">Volume</span>
-              <span class="text-text-primary font-semibold">{{ Math.round((pad.sound?.volume ?? 1.0) * 100) }}%</span>
+              <span class="text-text-primary font-semibold">{{ Math.round(sound.volume * 100) }}%</span>
             </div>
             <input
               type="range"
-              [ngModel]="pad.sound?.volume ?? 1.0"
+              [ngModel]="sound.volume"
               (ngModelChange)="onVolumeChange($event)"
               min="0" max="2" step="0.05"
               class="w-full h-1.5 bg-surface-hover rounded-full appearance-none cursor-pointer
@@ -293,13 +293,13 @@ import { open } from '@tauri-apps/plugin-dialog';
           <div class="mb-4 pt-4 border-t border-border">
             <div class="flex justify-between items-center mb-2 text-xs">
               <span class="text-text-secondary">Speed</span>
-              <span class="text-text-primary font-semibold">{{ pad.sound?.speed ?? 1.0 }}x</span>
+              <span class="text-text-primary font-semibold">{{ sound.speed }}x</span>
             </div>
             <div class="flex flex-wrap gap-1">
               @for (s of speedOptions; track s) {
                 <button
                   class="flex-1 min-w-[40px] px-2 py-1.5 text-xs rounded border transition-colors"
-                  [class]="(pad.sound?.speed ?? 1.0) === s
+                  [class]="sound.speed === s
                     ? 'bg-accent border-accent text-white'
                     : 'bg-surface-hover border-border text-text-secondary hover:text-text-primary'"
                   (click)="onSpeedChange(s)"
@@ -323,9 +323,9 @@ import { open } from '@tauri-apps/plugin-dialog';
                   : 'bg-surface-hover border-border text-text-primary hover:border-text-muted'"
                 (click)="startRecording($event)"
               >
-                {{ isRecording ? 'Press keys...' : (pad.sound?.hotkey || 'Click to set') }}
+                {{ isRecording ? 'Press keys...' : (sound.hotkey || 'Click to set') }}
               </button>
-              @if (pad.sound?.hotkey) {
+              @if (sound.hotkey) {
                 <button
                   class="px-2 text-text-muted hover:text-status-error transition-colors"
                   (click)="clearShortcut($event)"
@@ -348,7 +348,7 @@ import { open } from '@tauri-apps/plugin-dialog';
                     <label class="flex items-center gap-2 py-1 cursor-pointer hover:bg-surface-hover rounded px-2 -mx-2">
                       <input
                         type="checkbox"
-                        [checked]="(pad.sound?.folderIds ?? []).includes(folder.id)"
+                        [checked]="sound.folderIds.includes(folder.id)"
                         (change)="onFolderToggle(folder.id)"
                         class="w-4 h-4 rounded border-border bg-surface-hover text-accent focus:ring-accent focus:ring-offset-0"
                       >
@@ -453,15 +453,16 @@ export class SoundPadComponent implements OnInit, OnChanges {
 
   get padClasses(): string {
     const base = 'border-2';
+    const sound = this.pad.sound;
 
-    if (!this.pad.sound) {
+    if (!sound) {
       return `${base} border-dashed border-white/10 bg-white/5 hover:border-white/25 hover:bg-white/10 items-center`;
     }
 
     let classes = `${base} border-[var(--pad-color)]`;
 
     // Only add gradient background if no image
-    if (!this.pad.sound?.image) {
+    if (!sound.image) {
       classes += ` bg-gradient-to-br from-[var(--pad-color)] to-[color-mix(in_srgb,var(--pad-color)_70%,black)]`;
     }
 
@@ -470,7 +471,7 @@ export class SoundPadComponent implements OnInit, OnChanges {
       classes += ' hover:scale-[1.02] hover:glow-subtle';
     }
 
-    if (this.pad.sound?.isPlaying) {
+    if (sound.isPlaying) {
       classes += ' animate-glow-pulse border-white';
     }
 

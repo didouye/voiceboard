@@ -1365,12 +1365,11 @@ pub async fn cleanup_orphaned_images(app: tauri::AppHandle) -> Result<u32, Strin
     if let Ok(entries) = std::fs::read_dir(&images_dir) {
         for entry in entries.flatten() {
             let filename = entry.file_name().to_string_lossy().to_string();
-            if !referenced_images.contains(&filename) {
-                if std::fs::remove_file(entry.path()).is_ok() {
+            if !referenced_images.contains(&filename)
+                && std::fs::remove_file(entry.path()).is_ok() {
                     tracing::info!("Deleted orphaned image: {}", filename);
                     deleted_count += 1;
                 }
-            }
         }
     }
 

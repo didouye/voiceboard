@@ -23,7 +23,7 @@ interface PadImageSelection {
         <!-- Header -->
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-lg font-semibold text-text-primary">
-            Image pour "{{ currentPad()?.sound?.name }}" ({{ currentIndex() + 1 }}/{{ pads.length }})
+            Image pour "{{ currentSoundName() }}" ({{ currentIndex() + 1 }}/{{ pads.length }})
           </h2>
           <button
             class="text-text-muted hover:text-text-primary"
@@ -137,6 +137,8 @@ export class BulkImageWizardComponent implements OnInit {
   selections = new Map<string, ImageSearchResult>();
 
   readonly currentPad = () => this.pads[this.currentIndex()];
+  readonly currentSoundName = () => this.currentPad()?.sound?.name || '';
+  readonly currentSoundId = () => this.currentPad()?.sound?.id || '';
   readonly isLast = () => this.currentIndex() === this.pads.length - 1;
 
   async ngOnInit(): Promise<void> {
@@ -181,7 +183,10 @@ export class BulkImageWizardComponent implements OnInit {
 
   skip(): void {
     this.selectedImage.set(null);
-    this.selections.delete(this.currentPad()?.sound?.id || '');
+    const soundId = this.currentSoundId();
+    if (soundId) {
+      this.selections.delete(soundId);
+    }
     this.nextOrFinish();
   }
 
