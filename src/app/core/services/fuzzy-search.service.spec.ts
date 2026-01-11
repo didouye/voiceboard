@@ -171,4 +171,27 @@ describe('FuzzySearchService', () => {
       expect(results2.length).toBe(0);
     });
   });
+
+  describe('accent insensitivity', () => {
+    it('should match accented characters with non-accented query', () => {
+      const sounds = [createMockSound({ id: '1', name: 'café' })];
+      const results = service.search('cafe', sounds);
+
+      expect(results.length).toBe(1);
+    });
+
+    it('should match non-accented characters with accented query', () => {
+      const sounds = [createMockSound({ id: '1', name: 'cafe' })];
+      const results = service.search('café', sounds);
+
+      expect(results.length).toBe(1);
+    });
+
+    it('should handle various accents', () => {
+      const sounds = [createMockSound({ id: '1', name: 'résumé' })];
+      const results = service.search('resume', sounds);
+
+      expect(results.length).toBe(1);
+    });
+  });
 });
