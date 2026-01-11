@@ -120,6 +120,8 @@ export interface SoundPad {
   sound: Sound | null;
   /** Color generated from index */
   color: string;
+  /** Indices of characters to highlight in search results */
+  matchedIndices: number[];
 }
 
 /**

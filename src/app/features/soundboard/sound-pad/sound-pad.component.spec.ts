@@ -27,6 +27,7 @@ describe('SoundPadComponent', () => {
     index: 0,
     sound: null,
     color: '#e74c3c',
+    matchedIndices: [],
     ...overrides
   });
 
