@@ -1327,7 +1327,7 @@ pub async fn read_image_file(path: String) -> Result<Vec<u8>, String> {
     Ok(data)
 }
 
-/// Clean up orphaned images (not referenced by any pad)
+/// Clean up orphaned images (not referenced by any sound)
 /// Called on app startup
 #[tauri::command]
 pub async fn cleanup_orphaned_images(app: tauri::AppHandle) -> Result<u32, String> {
@@ -1344,12 +1344,23 @@ pub async fn cleanup_orphaned_images(app: tauri::AppHandle) -> Result<u32, Strin
 
     // Load soundboard to get referenced images
     let store = app.store(SOUNDBOARD_STORE).map_err(|e| e.to_string())?;
-    let pads_value = store.get(SOUNDBOARD_KEY);
+    let data_value = store.get(SOUNDBOARD_KEY);
 
     let mut referenced_images: std::collections::HashSet<String> = std::collections::HashSet::new();
 
-    if let Some(pads) = pads_value {
-        if let Some(pads_array) = pads.as_array() {
+    if let Some(data) = data_value {
+        // New format: { sounds: { hash: { image: {...} } } }
+        if let Some(sounds_obj) = data.get("sounds").and_then(|v| v.as_object()) {
+            for (_id, sound) in sounds_obj {
+                if let Some(image) = sound.get("image") {
+                    if let Some(local_path) = image.get("localPath").and_then(|v| v.as_str()) {
+                        referenced_images.insert(local_path.to_string());
+                    }
+                }
+            }
+        }
+        // Old format (legacy): array of pads
+        else if let Some(pads_array) = data.as_array() {
             for pad in pads_array {
                 if let Some(image) = pad.get("image") {
                     if let Some(local_path) = image.get("localPath").and_then(|v| v.as_str()) {
