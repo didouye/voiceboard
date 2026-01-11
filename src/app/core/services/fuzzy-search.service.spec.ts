@@ -69,4 +69,44 @@ describe('FuzzySearchService', () => {
       expect(results.length).toBe(0);
     });
   });
+
+  describe('subsequence match', () => {
+    it('should find subsequence match', () => {
+      const sounds = [createMockSound({ id: '1', name: 'barbe bleue' })];
+      const results = service.search('bbe', sounds);
+
+      expect(results.length).toBe(1);
+      expect(results[0].score).toBeGreaterThan(0);
+      expect(results[0].score).toBeLessThan(100);
+    });
+
+    it('should return correct indices for subsequence', () => {
+      const sounds = [createMockSound({ id: '1', name: 'barbe bleue' })];
+      const results = service.search('bbe', sounds);
+
+      // b(0), b(3 or 6), e(4 or 10) - depending on implementation
+      expect(results[0].matchedIndices.length).toBe(3);
+    });
+
+    it('should score denser subsequences higher', () => {
+      const sounds = [
+        createMockSound({ id: '1', name: 'abc' }),      // dense: a(0)b(1)c(2)
+        createMockSound({ id: '2', name: 'a---b---c' }) // sparse
+      ];
+      const results = service.search('abc', sounds);
+
+      // First should have exact match (score 100), second subsequence
+      const denseResult = results.find(r => r.sound.id === '1');
+      const sparseResult = results.find(r => r.sound.id === '2');
+
+      expect(denseResult!.score).toBeGreaterThan(sparseResult!.score);
+    });
+
+    it('should prefer exact match over subsequence', () => {
+      const sounds = [createMockSound({ id: '1', name: 'barbe' })];
+      const results = service.search('barbe', sounds);
+
+      expect(results[0].score).toBe(100); // Exact, not subsequence
+    });
+  });
 });
