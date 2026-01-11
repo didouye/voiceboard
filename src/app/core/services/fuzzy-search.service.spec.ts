@@ -109,4 +109,66 @@ describe('FuzzySearchService', () => {
       expect(results[0].score).toBe(100); // Exact, not subsequence
     });
   });
+
+  describe('levenshtein match', () => {
+    it('should find match with typo (substitution)', () => {
+      const sounds = [createMockSound({ id: '1', name: 'barbe' })];
+      const results = service.search('babre', sounds);
+
+      expect(results.length).toBe(1);
+      expect(results[0].score).toBeGreaterThan(0);
+      expect(results[0].score).toBeLessThan(60); // Lower than subsequence
+    });
+
+    it('should find match with missing character', () => {
+      const sounds = [createMockSound({ id: '1', name: 'barbe' })];
+      const results = service.search('barb', sounds);
+
+      expect(results.length).toBe(1);
+    });
+
+    it('should find match with extra character', () => {
+      const sounds = [createMockSound({ id: '1', name: 'barbe' })];
+      const results = service.search('barbee', sounds);
+
+      expect(results.length).toBe(1);
+    });
+
+    it('should not match if too many errors', () => {
+      const sounds = [createMockSound({ id: '1', name: 'barbe' })];
+      const results = service.search('xxxxx', sounds);
+
+      expect(results.length).toBe(0);
+    });
+
+    it('should not use levenshtein for queries under 3 characters', () => {
+      const sounds = [createMockSound({ id: '1', name: 'ab' })];
+      const results = service.search('ax', sounds);
+
+      // 'ax' vs 'ab' is 1 edit, but query is too short
+      expect(results.length).toBe(0);
+    });
+
+    it('should not return matched indices for levenshtein', () => {
+      const sounds = [createMockSound({ id: '1', name: 'barbe' })];
+      const results = service.search('babre', sounds);
+
+      expect(results[0].matchedIndices).toEqual([]);
+    });
+
+    it('should skip levenshtein for names longer than 50 characters', () => {
+      const longName = 'a'.repeat(51);
+      const sounds = [createMockSound({ id: '1', name: longName })];
+      // Query that would match via levenshtein but name is too long
+      const results = service.search('aaa', sounds);
+
+      // Should not match because name > 50 chars and 'aaa' is not exact or subsequence of 51 a's
+      // Actually 'aaa' is a subsequence of 'aaa...a', so let's use a different query
+      const sounds2 = [createMockSound({ id: '1', name: longName })];
+      const results2 = service.search('baa', sounds2);
+
+      // 'baa' vs 51 a's - not exact, not subsequence (b not in string), levenshtein skipped
+      expect(results2.length).toBe(0);
+    });
+  });
 });

@@ -34,6 +34,15 @@ export class FuzzySearchService {
       const subseqMatch = this.subsequenceMatch(normalizedQuery, normalizedName);
       if (subseqMatch) {
         results.push({ sound, ...subseqMatch });
+        continue;
+      }
+
+      // Try levenshtein match (only for queries >= 3 chars)
+      if (normalizedQuery.length >= 3) {
+        const levMatch = this.levenshteinMatch(normalizedQuery, normalizedName);
+        if (levMatch) {
+          results.push({ sound, ...levMatch });
+        }
       }
     }
 
@@ -72,6 +81,47 @@ export class FuzzySearchService {
     const score = Math.round(60 + (density * 30)); // 60-90 range
 
     return { score: Math.min(score, 90), matchedIndices: indices };
+  }
+
+  private levenshteinMatch(query: string, text: string): { score: number; matchedIndices: number[] } | null {
+    // Skip very long texts for performance
+    if (text.length > 50) return null;
+
+    const distance = this.levenshteinDistance(query, text);
+
+    // Max allowed errors: roughly 1 error per 3 characters, max 3
+    const maxErrors = Math.min(3, Math.floor(query.length / 3) + 1);
+
+    if (distance > maxErrors) return null;
+
+    // Score inversely proportional to distance (10-50 range)
+    const score = Math.max(10, 50 - (distance * 15));
+
+    return { score, matchedIndices: [] }; // No highlighting for levenshtein
+  }
+
+  private levenshteinDistance(a: string, b: string): number {
+    const matrix: number[][] = [];
+
+    for (let i = 0; i <= a.length; i++) {
+      matrix[i] = [i];
+    }
+    for (let j = 0; j <= b.length; j++) {
+      matrix[0][j] = j;
+    }
+
+    for (let i = 1; i <= a.length; i++) {
+      for (let j = 1; j <= b.length; j++) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j] + 1,      // deletion
+          matrix[i][j - 1] + 1,      // insertion
+          matrix[i - 1][j - 1] + cost // substitution
+        );
+      }
+    }
+
+    return matrix[a.length][b.length];
   }
 
   private normalizeText(text: string): string {
