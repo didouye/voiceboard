@@ -47,7 +47,13 @@ import { open } from '@tauri-apps/plugin-dialog';
         <!-- Sound content (positioned at bottom with z-index) -->
         <div class="text-center px-2 w-full pb-2 relative z-10">
           <span class="block text-xs font-semibold text-white truncate mb-0.5 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-            {{ sound.customName || sound.name }}
+            @for (segment of getHighlightedName(); track $index) {
+              @if (segment.highlighted) {
+                <span class="text-accent font-bold">{{ segment.text }}</span>
+              } @else {
+                <span>{{ segment.text }}</span>
+              }
+            }
           </span>
           @if (sound.customName) {
             <span class="block text-[9px] text-white/70 truncate drop-shadow-md">
@@ -737,5 +743,40 @@ export class SoundPadComponent implements OnInit, OnChanges {
 
   onDragEnd(event: DragEvent): void {
     // Cleanup if needed
+  }
+
+  getHighlightedName(): { text: string; highlighted: boolean }[] {
+    const sound = this.pad.sound;
+    if (!sound) return [];
+
+    const displayName = sound.customName || sound.name;
+    const indices = new Set(this.pad.matchedIndices || []);
+
+    if (indices.size === 0) {
+      return [{ text: displayName, highlighted: false }];
+    }
+
+    const segments: { text: string; highlighted: boolean }[] = [];
+    let currentSegment = '';
+    let currentHighlighted = indices.has(0);
+
+    for (let i = 0; i < displayName.length; i++) {
+      const isHighlighted = indices.has(i);
+      if (isHighlighted !== currentHighlighted) {
+        if (currentSegment) {
+          segments.push({ text: currentSegment, highlighted: currentHighlighted });
+        }
+        currentSegment = displayName[i];
+        currentHighlighted = isHighlighted;
+      } else {
+        currentSegment += displayName[i];
+      }
+    }
+
+    if (currentSegment) {
+      segments.push({ text: currentSegment, highlighted: currentHighlighted });
+    }
+
+    return segments;
   }
 }
