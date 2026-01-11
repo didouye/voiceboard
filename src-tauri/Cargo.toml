@@ -23,7 +23,7 @@ tauri-plugin-updater = "2"              # Auto-update functionality
 tauri-plugin-os = "2"                   # Platform detection
 tauri-plugin-process = "2"              # Process control (relaunch)
 tauri-plugin-global-shortcut = "2"     # Global keyboard shortcuts
-tauri-plugin-http = "2"                 # HTTP client for image search
+tauri-plugin-http = { version = "2", features = ["unsafe-headers"] }  # HTTP client for image search
 
 # Serialization
 serde = { version = "1", features = ["derive"] }
