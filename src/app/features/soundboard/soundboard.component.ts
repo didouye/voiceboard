@@ -1,4 +1,4 @@
-import { Component, HostListener, signal, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, HostListener, signal, OnInit, OnDestroy, inject, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { SoundboardService } from '../../core/services/soundboard.service';
 import { ShortcutService } from '../../core/services/shortcut.service';
@@ -9,11 +9,12 @@ import { eventMatchesShortcut, PadImage, SoundPad } from '../../core/models';
 import { ImageSuggestionToastComponent } from '../../shared/components/image-suggestion-toast/image-suggestion-toast.component';
 import { BulkImageWizardComponent } from '../../shared/components/bulk-image-wizard/bulk-image-wizard.component';
 import { ImageSearchService, ImageSearchResult } from '../../core/services/image-search.service';
+import { SearchBarComponent } from './search-bar/search-bar.component';
 
 @Component({
   selector: 'app-soundboard',
   standalone: true,
-  imports: [CommonModule, SoundPadComponent, ImageSuggestionToastComponent, BulkImageWizardComponent],
+  imports: [CommonModule, SoundPadComponent, ImageSuggestionToastComponent, BulkImageWizardComponent, SearchBarComponent],
   template: `
     <div class="h-full flex flex-col">
       <!-- Header -->
@@ -31,6 +32,11 @@ import { ImageSearchService, ImageSearchResult } from '../../core/services/image
             </button>
           }
         </div>
+      </div>
+
+      <!-- Search bar -->
+      <div class="mb-4">
+        <app-search-bar />
       </div>
 
       <!-- Error message -->
@@ -139,6 +145,8 @@ import { ImageSearchService, ImageSearchResult } from '../../core/services/image
   styles: []
 })
 export class SoundboardComponent implements OnInit, OnDestroy {
+  @ViewChild(SearchBarComponent) searchBar!: SearchBarComponent;
+
   public soundboard = inject(SoundboardService);
   private shortcutService = inject(ShortcutService);
   private tauri = inject(TauriService);
@@ -249,6 +257,13 @@ export class SoundboardComponent implements OnInit, OnDestroy {
 
   @HostListener('window:keydown', ['$event'])
   handleKeydown(event: KeyboardEvent): void {
+    // Ctrl+F: Focus search bar
+    if (event.ctrlKey && event.key === 'f') {
+      event.preventDefault();
+      this.searchBar?.focus();
+      return;
+    }
+
     // Ignore if user is typing in an input field
     if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
       return;
