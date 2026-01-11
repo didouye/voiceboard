@@ -1,13 +1,11 @@
-// src/app/features/soundboard/search-bar/search-bar.component.ts
-import { Component, ElementRef, ViewChild, inject, Output, EventEmitter } from '@angular/core';
+import { Component, ElementRef, ViewChild, inject, Output, EventEmitter, signal, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
 import { SoundboardService } from '../../../core/services/soundboard.service';
 
 @Component({
   selector: 'app-search-bar',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule],
   template: `
     <div class="relative">
       <div class="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none">
@@ -16,8 +14,8 @@ import { SoundboardService } from '../../../core/services/soundboard.service';
       <input
         #searchInput
         type="text"
-        [ngModel]="soundboard.searchQuery()"
-        (ngModelChange)="onQueryChange($event)"
+        [value]="inputValue()"
+        (input)="onInput($event)"
         (keydown.escape)="onEscape($event)"
         placeholder="Search sounds..."
         class="w-full pl-10 pr-10 py-2 text-sm bg-surface-hover border border-border rounded-lg
@@ -25,7 +23,7 @@ import { SoundboardService } from '../../../core/services/soundboard.service';
                focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/50
                transition-colors"
       />
-      @if (soundboard.searchQuery()) {
+      @if (inputValue()) {
         <button
           class="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center
                  text-text-muted hover:text-text-primary rounded-full hover:bg-surface-hover
@@ -43,16 +41,33 @@ export class SearchBarComponent {
   @ViewChild('searchInput') searchInput!: ElementRef<HTMLInputElement>;
   @Output() cleared = new EventEmitter<void>();
 
-  soundboard = inject(SoundboardService);
+  private soundboard = inject(SoundboardService);
+
+  // Local signal for immediate UI updates
+  inputValue = signal('');
 
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  constructor() {
+    // Sync from service to local (for external clears like folder change)
+    effect(() => {
+      const serviceValue = this.soundboard.searchQuery();
+      if (serviceValue !== this.inputValue()) {
+        this.inputValue.set(serviceValue);
+      }
+    });
+  }
 
   focus(): void {
     this.searchInput?.nativeElement.focus();
   }
 
-  onQueryChange(value: string): void {
-    // Debounce input
+  onInput(event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    // Update local signal immediately for responsive UI
+    this.inputValue.set(value);
+
+    // Debounce the service update
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
     }
@@ -68,6 +83,7 @@ export class SearchBarComponent {
   }
 
   clear(): void {
+    this.inputValue.set('');
     this.soundboard.setSearchQuery('');
     this.cleared.emit();
   }
