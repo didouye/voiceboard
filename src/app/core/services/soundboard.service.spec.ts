@@ -1,12 +1,14 @@
 import { TestBed } from '@angular/core/testing';
 import { SoundboardService } from './soundboard.service';
 import { TauriService } from './tauri.service';
+import { FuzzySearchService, SearchResult } from './fuzzy-search.service';
 import { PadImage, Sound } from '../models';
 import { signal } from '@angular/core';
 
 describe('SoundboardService', () => {
   let service: SoundboardService;
   let tauriServiceSpy: jasmine.SpyObj<TauriService>;
+  let fuzzySearchServiceSpy: jasmine.SpyObj<FuzzySearchService>;
 
   const createMockSound = (overrides: Partial<Sound> = {}): Sound => ({
     id: 'hash_abc123',
@@ -22,7 +24,7 @@ describe('SoundboardService', () => {
   });
 
   beforeEach(() => {
-    const spy = jasmine.createSpyObj('TauriService', [
+    const tauriSpy = jasmine.createSpyObj('TauriService', [
       'loadSoundboardState',
       'saveSoundboardState',
       'loadFolders',
@@ -42,25 +44,41 @@ describe('SoundboardService', () => {
     ]);
 
     // Default mock implementations
-    spy.loadSoundboardState.and.returnValue(Promise.resolve(null));
-    spy.saveSoundboardState.and.returnValue(Promise.resolve());
-    spy.loadFolders.and.returnValue(Promise.resolve([]));
-    spy.saveFolders.and.returnValue(Promise.resolve());
-    spy.loadSettings.and.returnValue(Promise.resolve({
+    tauriSpy.loadSoundboardState.and.returnValue(Promise.resolve(null));
+    tauriSpy.saveSoundboardState.and.returnValue(Promise.resolve());
+    tauriSpy.loadFolders.and.returnValue(Promise.resolve([]));
+    tauriSpy.saveFolders.and.returnValue(Promise.resolve());
+    tauriSpy.loadSettings.and.returnValue(Promise.resolve({
       audio: { previewDeviceId: null }
     }));
-    spy.listenPreviewStarted.and.returnValue(Promise.resolve(() => {}));
-    spy.listenPreviewStopped.and.returnValue(Promise.resolve(() => {}));
+    tauriSpy.listenPreviewStarted.and.returnValue(Promise.resolve(() => {}));
+    tauriSpy.listenPreviewStopped.and.returnValue(Promise.resolve(() => {}));
+
+    const fuzzySearchSpy = jasmine.createSpyObj('FuzzySearchService', ['search']);
+    // Default: return results matching query in name
+    fuzzySearchSpy.search.and.callFake((query: string, sounds: Sound[]): SearchResult[] => {
+      const normalizedQuery = query.toLowerCase();
+      return sounds
+        .filter(s => (s.customName || s.name).toLowerCase().includes(normalizedQuery))
+        .map(s => {
+          const name = (s.customName || s.name).toLowerCase();
+          const index = name.indexOf(normalizedQuery);
+          const matchedIndices = Array.from({ length: normalizedQuery.length }, (_, i) => index + i);
+          return { sound: s, score: 100, matchedIndices };
+        });
+    });
 
     TestBed.configureTestingModule({
       providers: [
         SoundboardService,
-        { provide: TauriService, useValue: spy }
+        { provide: TauriService, useValue: tauriSpy },
+        { provide: FuzzySearchService, useValue: fuzzySearchSpy }
       ]
     });
 
     service = TestBed.inject(SoundboardService);
     tauriServiceSpy = TestBed.inject(TauriService) as jasmine.SpyObj<TauriService>;
+    fuzzySearchServiceSpy = TestBed.inject(FuzzySearchService) as jasmine.SpyObj<FuzzySearchService>;
   });
 
   describe('initialization', () => {
@@ -257,6 +275,57 @@ describe('SoundboardService', () => {
       service.setSearchQuery('test');
       service.setActiveFolder('all');
       expect(service.searchQuery()).toBe('');
+    });
+  });
+
+  describe('pads with search', () => {
+    beforeEach(() => {
+      const sounds = [
+        createMockSound({ id: '1', name: 'barbe bleue' }),
+        createMockSound({ id: '2', name: 'chat noir' }),
+        createMockSound({ id: '3', name: 'barbare' })
+      ];
+      const soundsMap = new Map(sounds.map(s => [s.id, s]));
+      (service as any)._sounds.set(soundsMap);
+    });
+
+    it('should filter pads when searchQuery is set', () => {
+      service.setSearchQuery('barb');
+
+      const padsWithSounds = service.pads().filter(p => p.sound !== null);
+      expect(padsWithSounds.length).toBe(2); // barbe bleue, barbare
+    });
+
+    it('should sort pads by search score', () => {
+      service.setSearchQuery('barb');
+
+      const padsWithSounds = service.pads().filter(p => p.sound !== null);
+      // Both should match, order depends on score
+      expect(padsWithSounds.every(p => p.sound!.name.includes('barb'))).toBeTrue();
+    });
+
+    it('should show all pads when searchQuery is empty', () => {
+      service.setSearchQuery('');
+
+      const padsWithSounds = service.pads().filter(p => p.sound !== null);
+      expect(padsWithSounds.length).toBe(3);
+    });
+
+    it('should include matchedIndices in each pad', () => {
+      service.setSearchQuery('barb');
+
+      const padsWithSounds = service.pads().filter(p => p.sound !== null);
+      // Should have matchedIndices property on all pads
+      expect(padsWithSounds.every(p => Array.isArray(p.matchedIndices))).toBeTrue();
+      // At least one should have non-empty matchedIndices (exact matches)
+      expect(padsWithSounds.some(p => p.matchedIndices.length > 0)).toBeTrue();
+    });
+
+    it('should have empty matchedIndices when no search query', () => {
+      service.setSearchQuery('');
+
+      const pads = service.pads();
+      expect(pads.every(p => p.matchedIndices.length === 0)).toBeTrue();
     });
   });
 });

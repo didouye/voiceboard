@@ -1,5 +1,6 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { TauriService } from './tauri.service';
+import { FuzzySearchService } from './fuzzy-search.service';
 import { Sound, SoundPad, Folder, PadImage } from '../models';
 import { open } from '@tauri-apps/plugin-dialog';
 import { listen } from '@tauri-apps/api/event';
@@ -58,6 +59,7 @@ export class SoundboardService {
   readonly pads = computed(() => {
     const sounds = this._sounds();
     const activeFolderId = this._activeFolderId();
+    const searchQuery = this._searchQuery();
 
     // Filter sounds by folder
     let filteredSounds = Array.from(sounds.values());
@@ -65,28 +67,45 @@ export class SoundboardService {
       filteredSounds = filteredSounds.filter(s => s.folderIds.includes(activeFolderId));
     }
 
-    // Sort alphabetically by display name
-    filteredSounds.sort((a, b) =>
-      (a.customName || a.name).toLowerCase()
-        .localeCompare((b.customName || b.name).toLowerCase())
-    );
+    // Apply search filter
+    let sortedSounds: Array<{ sound: Sound; matchedIndices: number[] }>;
+
+    if (searchQuery.trim()) {
+      const searchResults = this.fuzzySearch.search(searchQuery, filteredSounds);
+      sortedSounds = searchResults.map(r => ({
+        sound: r.sound,
+        matchedIndices: r.matchedIndices
+      }));
+    } else {
+      // No search: sort alphabetically
+      filteredSounds.sort((a, b) =>
+        (a.customName || a.name).toLowerCase()
+          .localeCompare((b.customName || b.name).toLowerCase())
+      );
+      sortedSounds = filteredSounds.map(s => ({ sound: s, matchedIndices: [] }));
+    }
 
     // Generate virtual grid
-    const minPads = Math.max(12, Math.ceil(filteredSounds.length / 4) * 4 + 4);
+    const minPads = Math.max(12, Math.ceil(sortedSounds.length / 4) * 4 + 4);
     const pads: SoundPad[] = [];
 
     for (let i = 0; i < minPads; i++) {
+      const item = sortedSounds[i];
       pads.push({
         index: i,
-        sound: filteredSounds[i] || null,
-        color: PAD_COLORS[i % PAD_COLORS.length]
+        sound: item?.sound || null,
+        color: PAD_COLORS[i % PAD_COLORS.length],
+        matchedIndices: item?.matchedIndices || []
       });
     }
 
     return pads;
   });
 
-  constructor(private tauri: TauriService) {
+  constructor(
+    private tauri: TauriService,
+    private fuzzySearch: FuzzySearchService
+  ) {
     this.loadState();
     this.initPreviewListeners();
     this.initSoundFinishedListener();
