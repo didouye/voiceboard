@@ -1,4 +1,4 @@
-import { Component, HostListener, signal, OnInit, OnDestroy, inject, ViewChild } from '@angular/core';
+import { Component, HostListener, signal, computed, OnInit, OnDestroy, inject, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { SoundboardService } from '../../core/services/soundboard.service';
 import { ShortcutService } from '../../core/services/shortcut.service';
@@ -72,6 +72,20 @@ import { SearchBarComponent } from './search-bar/search-bar.component';
             />
           }
         </div>
+
+        <!-- No results message -->
+        @if (hasNoResults()) {
+          <div class="flex flex-col items-center justify-center py-12 text-text-muted">
+            <span class="text-4xl mb-2">&#128269;</span>
+            <p class="text-sm">No sounds found for "{{ soundboard.searchQuery() }}"</p>
+            <button
+              class="mt-3 text-xs text-accent hover:underline"
+              (click)="soundboard.setSearchQuery('')"
+            >
+              Clear search
+            </button>
+          </div>
+        }
 
         <!-- Drop overlay -->
         @if (isDragging()) {
@@ -165,6 +179,12 @@ export class SoundboardComponent implements OnInit, OnDestroy {
   bulkWizardPads = signal<SoundPad[]>([]);
   pendingBulkPads = signal<SoundPad[]>([]);
   showBulkPrompt = signal(false);
+
+  hasNoResults = computed(() => {
+    const query = this.soundboard.searchQuery();
+    const padsWithSounds = this.soundboard.pads().filter(p => p.sound !== null);
+    return query.trim().length > 0 && padsWithSounds.length === 0;
+  });
 
   private readonly AUDIO_EXTENSIONS = ['mp3', 'ogg', 'wav', 'flac'];
   private unlistenDragEnter?: () => void;
