@@ -1,5 +1,6 @@
-import { Injectable, signal, computed } from '@angular/core';
+import { inject, Injectable, signal, computed } from '@angular/core';
 import { fetch } from '@tauri-apps/plugin-http';
+import { DebugConsoleService } from './debug-console.service';
 
 export interface ImageSearchResult {
   id: string;
@@ -12,6 +13,7 @@ export interface ImageSearchResult {
   providedIn: 'root'
 })
 export class ImageSearchService {
+  private debug = inject(DebugConsoleService);
   private _loading = signal(false);
   private _error = signal<string | null>(null);
 
@@ -26,6 +28,7 @@ export class ImageSearchService {
    */
   private async getVqdToken(query: string): Promise<string> {
     const url = `https://duckduckgo.com/?q=${encodeURIComponent(query)}&iax=images&ia=images`;
+    this.debug.log('debug', '[ImageSearch] Fetching vqd token', { query, url });
 
     const response = await fetch(url, {
       method: 'GET',
@@ -34,18 +37,24 @@ export class ImageSearchService {
       }
     });
 
+    this.debug.log('debug', '[ImageSearch] vqd token response', { status: response.status, ok: response.ok });
+
     if (!response.ok) {
-      throw new Error('Failed to get search token');
+      this.debug.log('error', '[ImageSearch] Failed to get vqd token', { status: response.status });
+      throw new Error(`Failed to get search token (status: ${response.status})`);
     }
 
     const html = await response.text();
+    this.debug.log('debug', '[ImageSearch] HTML received', { length: html.length });
 
     // Extract vqd token from HTML
     const vqdMatch = html.match(/vqd=["']([^"']+)["']/);
     if (!vqdMatch) {
+      this.debug.log('error', '[ImageSearch] Could not extract vqd token from HTML');
       throw new Error('Could not extract search token');
     }
 
+    this.debug.log('debug', '[ImageSearch] vqd token extracted', { token: vqdMatch[1].substring(0, 20) + '...' });
     return vqdMatch[1];
   }
 
@@ -53,6 +62,7 @@ export class ImageSearchService {
    * Search for images using DuckDuckGo
    */
   async search(query: string, page: number = 1, perPage: number = 12): Promise<ImageSearchResult[]> {
+    this.debug.log('info', '[ImageSearch] Starting search', { query, page, perPage });
     this._loading.set(true);
     this._error.set(null);
 
@@ -62,6 +72,7 @@ export class ImageSearchService {
 
       // Fetch images
       const url = `https://duckduckgo.com/i.js?l=fr-fr&o=json&q=${encodeURIComponent(query)}&vqd=${vqd}&p=${page}`;
+      this.debug.log('debug', '[ImageSearch] Fetching images', { url });
 
       const response = await fetch(url, {
         method: 'GET',
@@ -71,25 +82,34 @@ export class ImageSearchService {
         }
       });
 
+      this.debug.log('debug', '[ImageSearch] Images response', { status: response.status, ok: response.ok });
+
       if (!response.ok) {
-        throw new Error('Search failed');
+        this.debug.log('error', '[ImageSearch] Search request failed', { status: response.status });
+        throw new Error(`Search failed (status: ${response.status})`);
       }
 
       const data = await response.json() as { results?: Array<{ image: string; thumbnail: string; title: string }> };
+      this.debug.log('debug', '[ImageSearch] Results received', { count: data.results?.length ?? 0 });
 
       if (!data.results || data.results.length === 0) {
+        this.debug.log('warn', '[ImageSearch] No results found');
         return [];
       }
 
       // Map to our interface, limit to perPage
-      return data.results.slice(0, perPage).map((item, index) => ({
+      const results = data.results.slice(0, perPage).map((item, index) => ({
         id: `ddg-${index}-${Date.now()}`,
         thumbnailUrl: item.thumbnail,
         fullUrl: item.image,
         title: item.title || 'Image'
       }));
+
+      this.debug.log('info', '[ImageSearch] Search completed', { resultCount: results.length });
+      return results;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Search failed';
+      this.debug.log('error', '[ImageSearch] Search error', { error: message });
       this._error.set(message);
       throw err;
     } finally {
@@ -101,6 +121,8 @@ export class ImageSearchService {
    * Download an image and return as Uint8Array
    */
   async downloadImage(url: string): Promise<{ data: Uint8Array; extension: string }> {
+    this.debug.log('info', '[ImageSearch] Downloading image', { url: url.substring(0, 100) + '...' });
+
     const response = await fetch(url, {
       method: 'GET',
       headers: {
@@ -108,7 +130,10 @@ export class ImageSearchService {
       }
     });
 
+    this.debug.log('debug', '[ImageSearch] Download response', { status: response.status, ok: response.ok });
+
     if (!response.ok) {
+      this.debug.log('error', '[ImageSearch] Failed to download image', { status: response.status });
       throw new Error('Failed to download image');
     }
 
@@ -120,6 +145,8 @@ export class ImageSearchService {
     else if (contentType.includes('gif') || url.includes('.gif')) extension = 'gif';
 
     const buffer = await response.arrayBuffer();
+    this.debug.log('info', '[ImageSearch] Image downloaded', { extension, size: buffer.byteLength });
+
     return {
       data: new Uint8Array(buffer),
       extension
