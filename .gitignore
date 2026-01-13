@@ -44,3 +44,11 @@ Thumbs.db
 # Environment files
 .env
 .env.local
+
+# Backend
+backend/.env
+backend/db.sqlite3
+backend/static/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/*.pyc
