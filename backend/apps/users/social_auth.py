@@ -44,10 +44,12 @@ class GoogleAuthURLView(APIView):
 
         auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
 
-        return Response({
-            "auth_url": auth_url,
-            "state": state,
-        })
+        return Response(
+            {
+                "auth_url": auth_url,
+                "state": state,
+            }
+        )
 
 
 class GoogleCallbackView(APIView):
@@ -61,8 +63,7 @@ class GoogleCallbackView(APIView):
 
         if not code or not redirect_uri:
             return Response(
-                {"detail": "code and redirect_uri are required"},
-                status=status.HTTP_400_BAD_REQUEST
+                {"detail": "code and redirect_uri are required"}, status=status.HTTP_400_BAD_REQUEST
             )
 
         # Exchange code for tokens
@@ -80,8 +81,7 @@ class GoogleCallbackView(APIView):
 
         if not token_response.ok:
             return Response(
-                {"detail": "Failed to exchange code for tokens"},
-                status=status.HTTP_400_BAD_REQUEST
+                {"detail": "Failed to exchange code for tokens"}, status=status.HTTP_400_BAD_REQUEST
             )
 
         tokens = token_response.json()
@@ -96,8 +96,7 @@ class GoogleCallbackView(APIView):
 
         if not user_response.ok:
             return Response(
-                {"detail": "Failed to get user info"},
-                status=status.HTTP_400_BAD_REQUEST
+                {"detail": "Failed to get user info"}, status=status.HTTP_400_BAD_REQUEST
             )
 
         user_info = user_response.json()
@@ -106,8 +105,7 @@ class GoogleCallbackView(APIView):
 
         if not email:
             return Response(
-                {"detail": "Email not provided by Google"},
-                status=status.HTTP_400_BAD_REQUEST
+                {"detail": "Email not provided by Google"}, status=status.HTTP_400_BAD_REQUEST
             )
 
         # Get or create user
@@ -118,7 +116,7 @@ class GoogleCallbackView(APIView):
                 "first_name": user_info.get("given_name", ""),
                 "last_name": user_info.get("family_name", ""),
                 "avatar_url": user_info.get("picture", ""),
-            }
+            },
         )
 
         # Update Google ID if not set
@@ -129,17 +127,19 @@ class GoogleCallbackView(APIView):
         # Generate JWT tokens
         jwt_tokens = get_tokens_for_user(user)
 
-        return Response({
-            **jwt_tokens,
-            "user": {
-                "id": user.id,
-                "email": user.email,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "avatar_url": user.avatar_url,
-            },
-            "created": created,
-        })
+        return Response(
+            {
+                **jwt_tokens,
+                "user": {
+                    "id": user.id,
+                    "email": user.email,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
+                    "avatar_url": user.avatar_url,
+                },
+                "created": created,
+            }
+        )
 
 
 class DiscordAuthURLView(APIView):
@@ -161,10 +161,12 @@ class DiscordAuthURLView(APIView):
 
         auth_url = f"https://discord.com/api/oauth2/authorize?{urlencode(params)}"
 
-        return Response({
-            "auth_url": auth_url,
-            "state": state,
-        })
+        return Response(
+            {
+                "auth_url": auth_url,
+                "state": state,
+            }
+        )
 
 
 class DiscordCallbackView(APIView):
@@ -178,8 +180,7 @@ class DiscordCallbackView(APIView):
 
         if not code or not redirect_uri:
             return Response(
-                {"detail": "code and redirect_uri are required"},
-                status=status.HTTP_400_BAD_REQUEST
+                {"detail": "code and redirect_uri are required"}, status=status.HTTP_400_BAD_REQUEST
             )
 
         # Exchange code for tokens
@@ -198,8 +199,7 @@ class DiscordCallbackView(APIView):
 
         if not token_response.ok:
             return Response(
-                {"detail": "Failed to exchange code for tokens"},
-                status=status.HTTP_400_BAD_REQUEST
+                {"detail": "Failed to exchange code for tokens"}, status=status.HTTP_400_BAD_REQUEST
             )
 
         tokens = token_response.json()
@@ -214,8 +214,7 @@ class DiscordCallbackView(APIView):
 
         if not user_response.ok:
             return Response(
-                {"detail": "Failed to get user info"},
-                status=status.HTTP_400_BAD_REQUEST
+                {"detail": "Failed to get user info"}, status=status.HTTP_400_BAD_REQUEST
             )
 
         user_info = user_response.json()
@@ -227,7 +226,7 @@ class DiscordCallbackView(APIView):
         if not email:
             return Response(
                 {"detail": "Email not provided by Discord. Make sure to grant email permission."},
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         # Build avatar URL
@@ -242,7 +241,7 @@ class DiscordCallbackView(APIView):
                 "discord_id": discord_id,
                 "first_name": username,
                 "avatar_url": avatar_url,
-            }
+            },
         )
 
         # Update Discord ID if not set
@@ -253,14 +252,16 @@ class DiscordCallbackView(APIView):
         # Generate JWT tokens
         jwt_tokens = get_tokens_for_user(user)
 
-        return Response({
-            **jwt_tokens,
-            "user": {
-                "id": user.id,
-                "email": user.email,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "avatar_url": user.avatar_url,
-            },
-            "created": created,
-        })
+        return Response(
+            {
+                **jwt_tokens,
+                "user": {
+                    "id": user.id,
+                    "email": user.email,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
+                    "avatar_url": user.avatar_url,
+                },
+                "created": created,
+            }
+        )
