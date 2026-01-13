@@ -1,6 +1,22 @@
 [project]
 name = "voiceboard-backend"
 version = "0.1.0"
-description = "Add your description here"
+description = "Voiceboard cloud backend - REST API with Django"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "django>=5.1",
+    "djangorestframework>=3.15",
+    "djangorestframework-simplejwt>=5.3",
+    "django-allauth[socialaccount]>=65.0",
+    "channels>=4.0",
+    "channels-redis>=4.2",
+    "psycopg[binary]>=3.2",
+    "boto3>=1.35",
+    "python-dotenv>=1.0",
+    "django-cors-headers>=4.0",
+    "requests>=2.32",
+]
+
+[project.optional-dependencies]
+dev = ["django-debug-toolbar", "ruff", "pytest", "pytest-django"]
+prod = ["gunicorn", "daphne", "sentry-sdk[django]"]
