@@ -1,0 +1,25 @@
+# Development compose - just DB and Redis
+# Run Django locally with: uv run python manage.py runserver
+
+services:
+  db:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: voiceboard
+      POSTGRES_USER: voiceboard
+      POSTGRES_PASSWORD: voiceboard
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  postgres_data:
+  redis_data:
