@@ -1169,14 +1169,44 @@ pub async fn stop_all_sounds(state: State<'_, AppState>) -> Result<(), String> {
     Ok(())
 }
 
-/// Set microphone volume (0.0 - 2.0)
+/// Set microphone volume (0.0 - 2.0) with persistence
 #[tauri::command]
-pub async fn set_mic_volume(state: State<'_, AppState>, volume: f32) -> Result<(), String> {
+pub async fn set_mic_volume(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    volume: f32,
+) -> Result<(), String> {
+    let clamped_volume = volume.clamp(0.0, 2.0);
+
+    // Update settings
+    {
+        let mut settings = state.settings.write().await;
+        settings.audio.mic_volume = clamped_volume;
+    }
+
+    // Send to audio engine
     let engine = state.audio_engine.lock().await;
     engine
-        .send_command(AudioEngineCommand::SetMicVolume(volume))
+        .send_command(AudioEngineCommand::SetMicVolume(clamped_volume))
         .map_err(|e| format!("Failed to set mic volume: {}", e))?;
 
+    // Persist to store
+    let settings = state.settings.read().await;
+    let dto = AppSettingsDto::from(&*settings);
+    drop(settings);
+
+    let store = app.store(SETTINGS_STORE).map_err(|e| e.to_string())?;
+    let _ = store.reload();
+    store.set(
+        SETTINGS_KEY,
+        serde_json::to_value(&dto).map_err(|e| e.to_string())?,
+    );
+    store.save().map_err(|e| {
+        tracing::error!("Failed to save mic volume: {}", e);
+        e.to_string()
+    })?;
+
+    tracing::info!("Mic volume saved: {}", clamped_volume);
     Ok(())
 }
 
