@@ -121,10 +121,18 @@ pub struct AudioSettingsDto {
     pub mic_monitoring: bool,
     #[serde(default = "default_global_hotkeys")]
     pub global_hotkeys_enabled: bool,
+    #[serde(default = "default_volume")]
+    pub mic_volume: f32,
+    #[serde(default = "default_volume")]
+    pub soundboard_volume: f32,
 }
 
 fn default_global_hotkeys() -> bool {
     true
+}
+
+fn default_volume() -> f32 {
+    1.0
 }
 
 impl From<&AudioSettings> for AudioSettingsDto {
@@ -138,6 +146,8 @@ impl From<&AudioSettings> for AudioSettingsDto {
             buffer_size: settings.buffer_size,
             mic_monitoring: settings.mic_monitoring,
             global_hotkeys_enabled: settings.global_hotkeys_enabled,
+            mic_volume: settings.mic_volume,
+            soundboard_volume: settings.soundboard_volume,
         }
     }
 }
@@ -153,8 +163,8 @@ impl From<AudioSettingsDto> for AudioSettings {
             buffer_size: dto.buffer_size,
             mic_monitoring: dto.mic_monitoring,
             global_hotkeys_enabled: dto.global_hotkeys_enabled,
-            mic_volume: 1.0,
-            soundboard_volume: 1.0,
+            mic_volume: dto.mic_volume,
+            soundboard_volume: dto.soundboard_volume,
         }
     }
 }
@@ -1974,6 +1984,8 @@ mod tests {
             buffer_size: 256,
             mic_monitoring: false,
             global_hotkeys_enabled: true,
+            mic_volume: 0.8,
+            soundboard_volume: 1.5,
         };
 
         let settings = AudioSettings::from(dto);
@@ -1985,6 +1997,8 @@ mod tests {
         assert_eq!(settings.sample_rate, 44100);
         assert_eq!(settings.buffer_size, 256);
         assert!(!settings.mic_monitoring);
+        assert_eq!(settings.mic_volume, 0.8);
+        assert_eq!(settings.soundboard_volume, 1.5);
     }
 
     #[test]
@@ -2042,6 +2056,8 @@ mod tests {
                 buffer_size: 512,
                 mic_monitoring: false,
                 global_hotkeys_enabled: true,
+                mic_volume: 1.0,
+                soundboard_volume: 1.0,
             },
             start_minimized: false,
             auto_start_mixing: true,
@@ -2200,6 +2216,8 @@ mod tests {
             buffer_size: 512,
             mic_monitoring: true,
             global_hotkeys_enabled: true,
+            mic_volume: 1.0,
+            soundboard_volume: 1.0,
         };
 
         let json = serde_json::to_string(&dto).unwrap();
