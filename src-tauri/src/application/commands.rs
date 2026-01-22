@@ -534,7 +534,11 @@ pub async fn get_mixer_config(state: State<'_, AppState>) -> Result<MixerConfigD
 
 /// Set master volume
 #[tauri::command]
-pub async fn set_master_volume(state: State<'_, AppState>, volume: f32) -> Result<(), String> {
+pub async fn set_master_volume(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    volume: f32,
+) -> Result<(), String> {
     let clamped_volume = volume.clamp(0.0, 1.0);
 
     // Update mixer config
@@ -555,6 +559,23 @@ pub async fn set_master_volume(state: State<'_, AppState>, volume: f32) -> Resul
         .send_command(AudioEngineCommand::SetMasterVolume(clamped_volume))
         .map_err(|e| format!("Failed to set master volume: {}", e))?;
 
+    // Persist to store
+    let settings = state.settings.read().await;
+    let dto = AppSettingsDto::from(&*settings);
+    drop(settings);
+
+    let store = app.store(SETTINGS_STORE).map_err(|e| e.to_string())?;
+    let _ = store.reload();
+    store.set(
+        SETTINGS_KEY,
+        serde_json::to_value(&dto).map_err(|e| e.to_string())?,
+    );
+    store.save().map_err(|e| {
+        tracing::error!("Failed to save master volume: {}", e);
+        e.to_string()
+    })?;
+
+    tracing::info!("Master volume saved: {}", clamped_volume);
     Ok(())
 }
 
