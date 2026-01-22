@@ -35,6 +35,8 @@ export interface AudioSettings {
   bufferSize: number;
   micMonitoring: boolean;
   globalHotkeysEnabled: boolean;
+  micVolume: number;
+  soundboardVolume: number;
 }
 
 export interface AppSettings {
