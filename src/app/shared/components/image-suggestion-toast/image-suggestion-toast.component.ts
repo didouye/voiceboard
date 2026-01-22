@@ -1,28 +1,51 @@
-import { Component, Input, Output, EventEmitter, signal, inject, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { ImageSearchService, ImageSearchResult } from '../../../core/services/image-search.service';
+import {
+  Component,
+  Input,
+  Output,
+  EventEmitter,
+  signal,
+  inject,
+  OnInit,
+} from "@angular/core";
+import { CommonModule } from "@angular/common";
+import { FormsModule } from "@angular/forms";
+import {
+  ImageSearchService,
+  ImageSearchResult,
+} from "../../../core/services/image-search.service";
 
 @Component({
-  selector: 'app-image-suggestion-toast',
+  selector: "app-image-suggestion-toast",
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
     <div class="fixed bottom-4 right-4 z-50 animate-slide-in-up">
-      <div class="bg-surface border border-border rounded-xl shadow-xl p-4 w-80">
+      <div
+        class="bg-surface border border-border rounded-xl shadow-xl p-4 w-80"
+      >
         @if (!expanded()) {
           <!-- Compact view -->
           <div class="flex items-center gap-3">
             @if (suggestedImage()) {
-              <img [src]="suggestedImage()!.thumbnailUrl" alt="" class="w-12 h-12 rounded object-cover">
+              <img
+                [src]="suggestedImage()!.thumbnailUrl"
+                alt=""
+                class="w-12 h-12 rounded object-cover"
+              />
             } @else {
-              <div class="w-12 h-12 rounded bg-surface-hover flex items-center justify-center">
+              <div
+                class="w-12 h-12 rounded bg-surface-hover flex items-center justify-center"
+              >
                 <span class="text-text-muted">&#128247;</span>
               </div>
             }
             <div class="flex-1 min-w-0">
-              <p class="text-sm text-text-primary truncate">Image for "{{ soundName }}"</p>
-              <p class="text-xs text-text-muted">{{ suggestedImage() ? 'Suggestion found' : 'No results' }}</p>
+              <p class="text-sm text-text-primary truncate">
+                Image for "{{ soundName }}"
+              </p>
+              <p class="text-xs text-text-muted">
+                {{ suggestedImage() ? "Suggestion found" : "No results" }}
+              </p>
             </div>
           </div>
           <div class="flex gap-2 mt-3">
@@ -50,7 +73,9 @@ import { ImageSearchService, ImageSearchResult } from '../../../core/services/im
         } @else {
           <!-- Expanded view -->
           <div class="mb-3">
-            <p class="text-sm text-text-primary mb-2">Image for "{{ soundName }}"</p>
+            <p class="text-sm text-text-primary mb-2">
+              Image for "{{ soundName }}"
+            </p>
             <div class="flex gap-2">
               <input
                 type="text"
@@ -58,7 +83,7 @@ import { ImageSearchService, ImageSearchResult } from '../../../core/services/im
                 (keydown.enter)="search()"
                 placeholder="Search..."
                 class="flex-1 px-3 py-2 text-sm bg-surface-hover border border-border rounded text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
-              >
+              />
               <button
                 class="px-3 py-2 text-sm bg-accent text-white rounded"
                 (click)="search()"
@@ -73,10 +98,18 @@ import { ImageSearchService, ImageSearchResult } from '../../../core/services/im
               @for (result of searchResults(); track result.id) {
                 <button
                   class="aspect-square rounded overflow-hidden border-2 transition-all hover:scale-105"
-                  [class]="selectedResult()?.id === result.id ? 'border-accent' : 'border-transparent'"
+                  [class]="
+                    selectedResult()?.id === result.id
+                      ? 'border-accent'
+                      : 'border-transparent'
+                  "
                   (click)="selectedResult.set(result)"
                 >
-                  <img [src]="result.thumbnailUrl" alt="" class="w-full h-full object-cover">
+                  <img
+                    [src]="result.thumbnailUrl"
+                    alt=""
+                    class="w-full h-full object-cover"
+                  />
                 </button>
               }
             </div>
@@ -101,7 +134,7 @@ import { ImageSearchService, ImageSearchResult } from '../../../core/services/im
         }
       </div>
     </div>
-  `
+  `,
 })
 export class ImageSuggestionToastComponent implements OnInit {
   @Input({ required: true }) soundName!: string;
@@ -112,7 +145,7 @@ export class ImageSuggestionToastComponent implements OnInit {
   private imageSearch = inject(ImageSearchService);
 
   expanded = signal(false);
-  searchQuery = '';
+  searchQuery = "";
   suggestedImage = signal<ImageSearchResult | null>(null);
   searchResults = signal<ImageSearchResult[]>([]);
   selectedResult = signal<ImageSearchResult | null>(null);
@@ -137,7 +170,7 @@ export class ImageSuggestionToastComponent implements OnInit {
         this.suggestedImage.set(results[0]);
       }
     } catch (err) {
-      console.error('Search failed:', err);
+      console.error("Search failed:", err);
     }
   }
 }

@@ -8,7 +8,8 @@
     box-sizing: border-box;
   }
 
-  html, body {
+  html,
+  body {
     @apply m-0 p-0 font-sans bg-background text-text-primary overflow-x-hidden;
   }
 
@@ -42,20 +43,22 @@
 @layer components {
   .grain-overlay {
     @apply fixed inset-0 pointer-events-none opacity-[0.03] mix-blend-overlay;
-    background-image: url('/assets/noise.svg');
+    background-image: url("/assets/noise.svg");
   }
 }
 
 /* Custom utilities */
 @layer utilities {
   .glow-accent {
-    box-shadow: 0 0 20px rgba(157, 78, 221, 0.5),
-                0 0 40px rgba(157, 78, 221, 0.3);
+    box-shadow:
+      0 0 20px rgba(157, 78, 221, 0.5),
+      0 0 40px rgba(157, 78, 221, 0.3);
   }
 
   .glow-accent-hot {
-    box-shadow: 0 0 20px rgba(255, 0, 255, 0.5),
-                0 0 40px rgba(255, 0, 255, 0.3);
+    box-shadow:
+      0 0 20px rgba(255, 0, 255, 0.5),
+      0 0 40px rgba(255, 0, 255, 0.3);
   }
 
   .glow-subtle {

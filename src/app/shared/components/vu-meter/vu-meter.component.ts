@@ -1,8 +1,8 @@
-import { Component, Input } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, Input } from "@angular/core";
+import { CommonModule } from "@angular/common";
 
 @Component({
-  selector: 'app-vu-meter',
+  selector: "app-vu-meter",
   standalone: true,
   imports: [CommonModule],
   template: `
@@ -14,12 +14,12 @@ import { CommonModule } from '@angular/common';
       ></div>
     </div>
   `,
-  styles: []
+  styles: [],
 })
 export class VuMeterComponent {
   @Input() level = 0; // 0-1
 
-  readonly gradient = 'linear-gradient(to right, #22c55e, #eab308, #ef4444)';
+  readonly gradient = "linear-gradient(to right, #22c55e, #eab308, #ef4444)";
 
   // Amplify the level for better visibility
   // Only show if level is above noise floor threshold

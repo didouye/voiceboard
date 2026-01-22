@@ -1,26 +1,44 @@
-import { Component, HostListener, signal, computed, OnInit, OnDestroy, inject, ViewChild } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { SoundboardService } from '../../core/services/soundboard.service';
-import { ShortcutService } from '../../core/services/shortcut.service';
-import { TauriService } from '../../core/services/tauri.service';
-import { SoundPadComponent } from './sound-pad/sound-pad.component';
-import { listen, TauriEvent } from '@tauri-apps/api/event';
-import { eventMatchesShortcut, PadImage, SoundPad } from '../../core/models';
-import { ImageSuggestionToastComponent } from '../../shared/components/image-suggestion-toast/image-suggestion-toast.component';
-import { BulkImageWizardComponent } from '../../shared/components/bulk-image-wizard/bulk-image-wizard.component';
-import { ImageSearchService, ImageSearchResult } from '../../core/services/image-search.service';
-import { SearchBarComponent } from './search-bar/search-bar.component';
+import {
+  Component,
+  HostListener,
+  signal,
+  computed,
+  OnInit,
+  OnDestroy,
+  inject,
+  ViewChild,
+} from "@angular/core";
+import { CommonModule } from "@angular/common";
+import { SoundboardService } from "../../core/services/soundboard.service";
+import { ShortcutService } from "../../core/services/shortcut.service";
+import { TauriService } from "../../core/services/tauri.service";
+import { SoundPadComponent } from "./sound-pad/sound-pad.component";
+import { listen, TauriEvent } from "@tauri-apps/api/event";
+import { eventMatchesShortcut, PadImage, SoundPad } from "../../core/models";
+import { ImageSuggestionToastComponent } from "../../shared/components/image-suggestion-toast/image-suggestion-toast.component";
+import { BulkImageWizardComponent } from "../../shared/components/bulk-image-wizard/bulk-image-wizard.component";
+import {
+  ImageSearchService,
+  ImageSearchResult,
+} from "../../core/services/image-search.service";
+import { SearchBarComponent } from "./search-bar/search-bar.component";
 
 @Component({
-  selector: 'app-soundboard',
+  selector: "app-soundboard",
   standalone: true,
-  imports: [CommonModule, SoundPadComponent, ImageSuggestionToastComponent, BulkImageWizardComponent, SearchBarComponent],
+  imports: [
+    CommonModule,
+    SoundPadComponent,
+    ImageSuggestionToastComponent,
+    BulkImageWizardComponent,
+    SearchBarComponent,
+  ],
   template: `
     <div class="h-full flex flex-col">
       <!-- Header -->
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-lg font-semibold text-text-primary">
-          {{ soundboard.activeFolder().name || 'Soundboard' }}
+          {{ soundboard.activeFolder().name || "Soundboard" }}
         </h2>
         <div class="flex items-center gap-2">
           @if (soundboard.playingCount() > 0) {
@@ -41,8 +59,12 @@ import { SearchBarComponent } from './search-bar/search-bar.component';
 
       <!-- Error message -->
       @if (soundboard.error()) {
-        <div class="mb-4 px-4 py-3 bg-status-error/20 border border-status-error/50 rounded-lg flex items-center justify-between">
-          <span class="text-status-error text-sm">{{ soundboard.error() }}</span>
+        <div
+          class="mb-4 px-4 py-3 bg-status-error/20 border border-status-error/50 rounded-lg flex items-center justify-between"
+        >
+          <span class="text-status-error text-sm">{{
+            soundboard.error()
+          }}</span>
           <button
             class="px-3 py-1 text-xs text-status-error border border-status-error/50 rounded hover:bg-status-error/20 transition-colors"
             (click)="soundboard.clearError()"
@@ -54,8 +76,15 @@ import { SearchBarComponent } from './search-bar/search-bar.component';
 
       <!-- Pads grid -->
       <div class="flex-1 relative">
-        <div class="grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(100px, 140px));">
-          @for (pad of soundboard.pads(); track pad.sound?.id ?? pad.index; let i = $index) {
+        <div
+          class="grid gap-3"
+          style="grid-template-columns: repeat(auto-fill, minmax(100px, 140px));"
+        >
+          @for (
+            pad of soundboard.pads();
+            track pad.sound?.id ?? pad.index;
+            let i = $index
+          ) {
             <app-sound-pad
               [pad]="pad"
               [loading]="soundboard.loading()"
@@ -66,18 +95,26 @@ import { SearchBarComponent } from './search-bar/search-bar.component';
               (volumeChange)="soundboard.setSoundVolume(pad.sound!.id, $event)"
               (speedChange)="soundboard.setSoundSpeed(pad.sound!.id, $event)"
               (shortcutChange)="onShortcutChange(pad.sound!.id, $event)"
-              (customNameChange)="soundboard.setSoundCustomName(pad.sound!.id, $event)"
+              (customNameChange)="
+                soundboard.setSoundCustomName(pad.sound!.id, $event)
+              "
               (imageChange)="onImageChange(pad.sound!.id, $event)"
-              (folderToggle)="soundboard.toggleSoundFolder(pad.sound!.id, $event)"
+              (folderToggle)="
+                soundboard.toggleSoundFolder(pad.sound!.id, $event)
+              "
             />
           }
         </div>
 
         <!-- No results message -->
         @if (hasNoResults()) {
-          <div class="flex flex-col items-center justify-center py-12 text-text-muted">
+          <div
+            class="flex flex-col items-center justify-center py-12 text-text-muted"
+          >
             <span class="text-4xl mb-2">&#128269;</span>
-            <p class="text-sm">No sounds found for "{{ soundboard.searchQuery() }}"</p>
+            <p class="text-sm">
+              No sounds found for "{{ soundboard.searchQuery() }}"
+            </p>
             <button
               class="mt-3 text-xs text-accent hover:underline"
               (click)="soundboard.setSearchQuery('')"
@@ -89,9 +126,13 @@ import { SearchBarComponent } from './search-bar/search-bar.component';
 
         <!-- Drop overlay -->
         @if (isDragging()) {
-          <div class="absolute inset-0 bg-accent/80 border-2 border-dashed border-white rounded-xl flex items-center justify-center z-10">
+          <div
+            class="absolute inset-0 bg-accent/80 border-2 border-dashed border-white rounded-xl flex items-center justify-center z-10"
+          >
             <span class="text-white text-lg font-medium">
-              Drop to import {{ dragFileCount() }} file{{ dragFileCount() > 1 ? 's' : '' }}
+              Drop to import {{ dragFileCount() }} file{{
+                dragFileCount() > 1 ? "s" : ""
+              }}
             </span>
           </div>
         }
@@ -125,7 +166,9 @@ import { SearchBarComponent } from './search-bar/search-bar.component';
     <!-- Bulk Import Prompt -->
     @if (showBulkPrompt()) {
       <div class="fixed bottom-4 right-4 z-50 animate-slide-in-up">
-        <div class="bg-surface border border-border rounded-xl shadow-xl p-4 w-80">
+        <div
+          class="bg-surface border border-border rounded-xl shadow-xl p-4 w-80"
+        >
           <p class="text-sm text-text-primary mb-3">
             Assign images to {{ pendingBulkPads().length }} imported sounds?
           </p>
@@ -156,7 +199,7 @@ import { SearchBarComponent } from './search-bar/search-bar.component';
       />
     }
   `,
-  styles: []
+  styles: [],
 })
 export class SoundboardComponent implements OnInit, OnDestroy {
   @ViewChild(SearchBarComponent) searchBar!: SearchBarComponent;
@@ -171,9 +214,9 @@ export class SoundboardComponent implements OnInit, OnDestroy {
 
   // State for auto-suggestion
   showImageSuggestion = signal(false);
-  suggestionSoundName = '';
-  suggestionFilename = '';
-  suggestionSoundId = '';
+  suggestionSoundName = "";
+  suggestionFilename = "";
+  suggestionSoundId = "";
 
   showBulkWizard = signal(false);
   bulkWizardPads = signal<SoundPad[]>([]);
@@ -182,11 +225,13 @@ export class SoundboardComponent implements OnInit, OnDestroy {
 
   hasNoResults = computed(() => {
     const query = this.soundboard.searchQuery();
-    const padsWithSounds = this.soundboard.pads().filter(p => p.sound !== null);
+    const padsWithSounds = this.soundboard
+      .pads()
+      .filter((p) => p.sound !== null);
     return query.trim().length > 0 && padsWithSounds.length === 0;
   });
 
-  private readonly AUDIO_EXTENSIONS = ['mp3', 'ogg', 'wav', 'flac'];
+  private readonly AUDIO_EXTENSIONS = ["mp3", "ogg", "wav", "flac"];
   private unlistenDragEnter?: () => void;
   private unlistenDragOver?: () => void;
   private unlistenDragLeave?: () => void;
@@ -205,19 +250,19 @@ export class SoundboardComponent implements OnInit, OnDestroy {
 
   private async initDragDropListeners(): Promise<void> {
     // Listen to Tauri drag events
-    this.unlistenDragEnter = await listen<{ paths: string[]; position: { x: number; y: number } }>(
-      TauriEvent.DRAG_ENTER,
-      (event) => {
-        const audioPaths = event.payload.paths.filter(path => {
-          const ext = path.split('.').pop()?.toLowerCase();
-          return ext && this.AUDIO_EXTENSIONS.includes(ext);
-        });
-        if (audioPaths.length > 0) {
-          this.dragFileCount.set(audioPaths.length);
-          this.isDragging.set(true);
-        }
+    this.unlistenDragEnter = await listen<{
+      paths: string[];
+      position: { x: number; y: number };
+    }>(TauriEvent.DRAG_ENTER, (event) => {
+      const audioPaths = event.payload.paths.filter((path) => {
+        const ext = path.split(".").pop()?.toLowerCase();
+        return ext && this.AUDIO_EXTENSIONS.includes(ext);
+      });
+      if (audioPaths.length > 0) {
+        this.dragFileCount.set(audioPaths.length);
+        this.isDragging.set(true);
       }
-    );
+    });
 
     this.unlistenDragOver = await listen(TauriEvent.DRAG_OVER, () => {
       // Keep overlay visible during drag over
@@ -228,69 +273,75 @@ export class SoundboardComponent implements OnInit, OnDestroy {
       this.dragFileCount.set(0);
     });
 
-    this.unlistenDragDrop = await listen<{ paths: string[]; position: { x: number; y: number } }>(
-      TauriEvent.DRAG_DROP,
-      async (event) => {
-        this.isDragging.set(false);
-        this.dragFileCount.set(0);
+    this.unlistenDragDrop = await listen<{
+      paths: string[];
+      position: { x: number; y: number };
+    }>(TauriEvent.DRAG_DROP, async (event) => {
+      this.isDragging.set(false);
+      this.dragFileCount.set(0);
 
-        const audioPaths = event.payload.paths.filter(path => {
-          const ext = path.split('.').pop()?.toLowerCase();
-          return ext && this.AUDIO_EXTENSIONS.includes(ext);
-        });
+      const audioPaths = event.payload.paths.filter((path) => {
+        const ext = path.split(".").pop()?.toLowerCase();
+        return ext && this.AUDIO_EXTENSIONS.includes(ext);
+      });
 
-        if (audioPaths.length === 0) return;
+      if (audioPaths.length === 0) return;
 
-        // Take snapshot of existing sound paths before import
-        // We track paths because pads get reorganized after import (sorted alphabetically)
-        const existingPaths = new Set(
-          this.soundboard.pads()
-            .filter(p => p.sound)
-            .map(p => p.sound!.path)
+      // Take snapshot of existing sound paths before import
+      // We track paths because pads get reorganized after import (sorted alphabetically)
+      const existingPaths = new Set(
+        this.soundboard
+          .pads()
+          .filter((p) => p.sound)
+          .map((p) => p.sound!.path),
+      );
+
+      const result = await this.soundboard.importSoundsFromPaths(audioPaths);
+
+      if (result.errors.length > 0 || result.skippedDuplicates > 0) {
+        console.warn(
+          `Imported ${result.imported} files. Skipped ${result.skippedDuplicates} duplicates. Failed: ${result.errors.join(", ")}`,
+        );
+      }
+
+      // If successful imports, find pads with newly imported sounds
+      // A "new" sound is one whose path didn't exist before import
+      if (result.imported > 0) {
+        const padsAfter = this.soundboard.pads();
+        const newPads = padsAfter.filter(
+          (pad) => pad.sound && !existingPaths.has(pad.sound.path),
         );
 
-        const result = await this.soundboard.importSoundsFromPaths(audioPaths);
-
-        if (result.errors.length > 0 || result.skippedDuplicates > 0) {
-          console.warn(`Imported ${result.imported} files. Skipped ${result.skippedDuplicates} duplicates. Failed: ${result.errors.join(', ')}`);
-        }
-
-        // If successful imports, find pads with newly imported sounds
-        // A "new" sound is one whose path didn't exist before import
-        if (result.imported > 0) {
-          const padsAfter = this.soundboard.pads();
-          const newPads = padsAfter.filter(pad =>
-            pad.sound && !existingPaths.has(pad.sound.path)
-          );
-
-          if (newPads.length === 1) {
-            // Single import: show toast
-            this.triggerSingleImportSuggestion(newPads[0]);
-          } else if (newPads.length > 1) {
-            // Bulk import: show prompt
-            this.triggerBulkImportSuggestion(newPads);
-          }
+        if (newPads.length === 1) {
+          // Single import: show toast
+          this.triggerSingleImportSuggestion(newPads[0]);
+        } else if (newPads.length > 1) {
+          // Bulk import: show prompt
+          this.triggerBulkImportSuggestion(newPads);
         }
       }
-    );
+    });
   }
 
-  @HostListener('window:keydown', ['$event'])
+  @HostListener("window:keydown", ["$event"])
   handleKeydown(event: KeyboardEvent): void {
     // Ctrl+F: Focus search bar
-    if (event.ctrlKey && event.key === 'f') {
+    if (event.ctrlKey && event.key === "f") {
       event.preventDefault();
       this.searchBar?.focus();
       return;
     }
 
     // Ignore if user is typing in an input field
-    if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+    if (
+      event.target instanceof HTMLInputElement ||
+      event.target instanceof HTMLTextAreaElement
+    ) {
       return;
     }
 
     // Escape stops all sounds
-    if (event.key === 'Escape') {
+    if (event.key === "Escape") {
       this.soundboard.stopAll();
       return;
     }
@@ -311,9 +362,10 @@ export class SoundboardComponent implements OnInit, OnDestroy {
   async onImportSound(): Promise<void> {
     // Take snapshot of existing sound paths before import
     const existingPaths = new Set(
-      this.soundboard.pads()
-        .filter(p => p.sound)
-        .map(p => p.sound!.path)
+      this.soundboard
+        .pads()
+        .filter((p) => p.sound)
+        .map((p) => p.sound!.path),
     );
 
     // Do the import
@@ -321,8 +373,8 @@ export class SoundboardComponent implements OnInit, OnDestroy {
 
     // Find newly imported pad (if any)
     const padsAfter = this.soundboard.pads();
-    const newPads = padsAfter.filter(pad =>
-      pad.sound && !existingPaths.has(pad.sound.path)
+    const newPads = padsAfter.filter(
+      (pad) => pad.sound && !existingPaths.has(pad.sound.path),
     );
 
     // Trigger suggestion if a new sound was imported
@@ -335,23 +387,26 @@ export class SoundboardComponent implements OnInit, OnDestroy {
     // Take snapshot of existing sound paths before import
     // We track paths because pads get reorganized after import (sorted alphabetically)
     const existingPaths = new Set(
-      this.soundboard.pads()
-        .filter(p => p.sound)
-        .map(p => p.sound!.path)
+      this.soundboard
+        .pads()
+        .filter((p) => p.sound)
+        .map((p) => p.sound!.path),
     );
 
     const result = await this.soundboard.importMultipleSounds();
 
     if (result.errors.length > 0 || result.skippedDuplicates > 0) {
-      console.warn(`Imported ${result.imported} files. Skipped ${result.skippedDuplicates} duplicates.\nFailed (${result.errors.length}):\n${result.errors.join('\n')}`);
+      console.warn(
+        `Imported ${result.imported} files. Skipped ${result.skippedDuplicates} duplicates.\nFailed (${result.errors.length}):\n${result.errors.join("\n")}`,
+      );
     }
 
     // If successful imports, find pads with newly imported sounds
     // A "new" sound is one whose path didn't exist before import
     if (result.imported > 0) {
       const padsAfter = this.soundboard.pads();
-      const newPads = padsAfter.filter(pad =>
-        pad.sound && !existingPaths.has(pad.sound.path)
+      const newPads = padsAfter.filter(
+        (pad) => pad.sound && !existingPaths.has(pad.sound.path),
       );
 
       if (newPads.length === 1) {
@@ -364,7 +419,10 @@ export class SoundboardComponent implements OnInit, OnDestroy {
     }
   }
 
-  async onShortcutChange(soundId: string, shortcut: string | null): Promise<void> {
+  async onShortcutChange(
+    soundId: string,
+    shortcut: string | null,
+  ): Promise<void> {
     // Update sound
     this.soundboard.setSoundHotkey(soundId, shortcut);
 
@@ -373,7 +431,7 @@ export class SoundboardComponent implements OnInit, OnDestroy {
       try {
         await this.shortcutService.register(soundId, shortcut);
       } catch (err) {
-        console.error('Failed to register shortcut:', err);
+        console.error("Failed to register shortcut:", err);
       }
     } else {
       const oldShortcut = this.shortcutService.getShortcutForSound(soundId);
@@ -392,17 +450,23 @@ export class SoundboardComponent implements OnInit, OnDestroy {
    */
   async onAcceptSuggestion(result: ImageSearchResult): Promise<void> {
     try {
-      const { data, extension } = await this.imageSearch.downloadImage(result.fullUrl);
-      const localPath = await this.tauri.savePadImage(this.suggestionSoundId, data, extension);
+      const { data, extension } = await this.imageSearch.downloadImage(
+        result.fullUrl,
+      );
+      const localPath = await this.tauri.savePadImage(
+        this.suggestionSoundId,
+        data,
+        extension,
+      );
 
       const image: PadImage = {
         localPath,
         originalUrl: result.fullUrl,
-        attribution: result.title
+        attribution: result.title,
       };
       this.soundboard.setSoundImage(this.suggestionSoundId, image);
     } catch (err) {
-      console.error('Failed to save suggested image:', err);
+      console.error("Failed to save suggested image:", err);
     } finally {
       this.showImageSuggestion.set(false);
     }
@@ -435,19 +499,28 @@ export class SoundboardComponent implements OnInit, OnDestroy {
   /**
    * Handle selecting an image in the bulk wizard
    */
-  async onBulkSelectImage(event: { soundId: string; image: ImageSearchResult }): Promise<void> {
+  async onBulkSelectImage(event: {
+    soundId: string;
+    image: ImageSearchResult;
+  }): Promise<void> {
     try {
-      const { data, extension } = await this.imageSearch.downloadImage(event.image.fullUrl);
-      const localPath = await this.tauri.savePadImage(event.soundId, data, extension);
+      const { data, extension } = await this.imageSearch.downloadImage(
+        event.image.fullUrl,
+      );
+      const localPath = await this.tauri.savePadImage(
+        event.soundId,
+        data,
+        extension,
+      );
 
       const image: PadImage = {
         localPath,
         originalUrl: event.image.fullUrl,
-        attribution: event.image.title
+        attribution: event.image.title,
       };
       this.soundboard.setSoundImage(event.soundId, image);
     } catch (err) {
-      console.error('Failed to save image:', err);
+      console.error("Failed to save image:", err);
     }
   }
 
@@ -468,7 +541,7 @@ export class SoundboardComponent implements OnInit, OnDestroy {
 
     this.suggestionSoundId = pad.sound.id;
     this.suggestionSoundName = pad.sound.name;
-    this.suggestionFilename = pad.sound.path.split('/').pop() || pad.sound.name;
+    this.suggestionFilename = pad.sound.path.split("/").pop() || pad.sound.name;
     this.showImageSuggestion.set(true);
   }
 
@@ -481,5 +554,4 @@ export class SoundboardComponent implements OnInit, OnDestroy {
     this.pendingBulkPads.set(importedPads);
     this.showBulkPrompt.set(true);
   }
-
 }

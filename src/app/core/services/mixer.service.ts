@@ -1,13 +1,13 @@
-import { Injectable, signal, computed } from '@angular/core';
-import { TauriService } from './tauri.service';
-import { MixerConfig, MixerChannel, AudioDevice } from '../models';
+import { Injectable, signal, computed } from "@angular/core";
+import { TauriService } from "./tauri.service";
+import { MixerConfig, MixerChannel, AudioDevice } from "../models";
 
 /**
  * Service for managing mixer state and operations
  * Uses Angular signals for reactive state management
  */
 @Injectable({
-  providedIn: 'root'
+  providedIn: "root",
 })
 export class MixerService {
   // Reactive state using signals
@@ -31,7 +31,7 @@ export class MixerService {
   readonly masterVolume = computed(() => this._config()?.masterVolume ?? 1);
   readonly channels = computed(() => this._config()?.channels ?? []);
   readonly inputDevices = computed(() =>
-    this._devices().filter(d => d.deviceType === 'InputPhysical')
+    this._devices().filter((d) => d.deviceType === "InputPhysical"),
   );
   readonly soundboardVolume = this._soundboardVolume.asReadonly();
 
@@ -50,7 +50,7 @@ export class MixerService {
         this.tauri.getMixerConfig(),
         this.tauri.getAudioDevices(),
         this.tauri.checkVirtualDriver(),
-        this.tauri.isMixing()
+        this.tauri.isMixing(),
       ]);
 
       this._config.set(config);
@@ -73,15 +73,19 @@ export class MixerService {
         const hasOutput = !!settings.audio.outputDeviceId;
 
         if (hasInput && hasOutput) {
-          console.log('[MixerService] Auto-starting mixer...');
+          console.log("[MixerService] Auto-starting mixer...");
           await this.start();
         } else {
-          console.log('[MixerService] Cannot auto-start: missing input or output device');
+          console.log(
+            "[MixerService] Cannot auto-start: missing input or output device",
+          );
         }
       }
     } catch (err) {
-      this._error.set(err instanceof Error ? err.message : 'Initialization failed');
-      console.error('Failed to initialize mixer:', err);
+      this._error.set(
+        err instanceof Error ? err.message : "Initialization failed",
+      );
+      console.error("Failed to initialize mixer:", err);
     } finally {
       this._loading.set(false);
     }
@@ -95,7 +99,9 @@ export class MixerService {
       const devices = await this.tauri.getAudioDevices();
       this._devices.set(devices);
     } catch (err) {
-      this._error.set(err instanceof Error ? err.message : 'Failed to refresh devices');
+      this._error.set(
+        err instanceof Error ? err.message : "Failed to refresh devices",
+      );
     }
   }
 
@@ -110,7 +116,9 @@ export class MixerService {
         this._config.set({ ...config, masterVolume: volume });
       }
     } catch (err) {
-      this._error.set(err instanceof Error ? err.message : 'Failed to set master volume');
+      this._error.set(
+        err instanceof Error ? err.message : "Failed to set master volume",
+      );
     }
   }
 
@@ -122,7 +130,9 @@ export class MixerService {
       await this.tauri.setSoundboardVolume(volume);
       this._soundboardVolume.set(volume);
     } catch (err) {
-      this._error.set(err instanceof Error ? err.message : 'Failed to set soundboard volume');
+      this._error.set(
+        err instanceof Error ? err.message : "Failed to set soundboard volume",
+      );
     }
   }
 
@@ -136,7 +146,9 @@ export class MixerService {
       await this.refreshConfig();
       return channel;
     } catch (err) {
-      this._error.set(err instanceof Error ? err.message : 'Failed to add microphone channel');
+      this._error.set(
+        err instanceof Error ? err.message : "Failed to add microphone channel",
+      );
       return null;
     }
   }
@@ -151,7 +163,9 @@ export class MixerService {
       await this.refreshConfig();
       return channel;
     } catch (err) {
-      this._error.set(err instanceof Error ? err.message : 'Failed to add audio file channel');
+      this._error.set(
+        err instanceof Error ? err.message : "Failed to add audio file channel",
+      );
       return null;
     }
   }
@@ -164,7 +178,9 @@ export class MixerService {
       await this.tauri.removeChannel(channelId);
       await this.refreshConfig();
     } catch (err) {
-      this._error.set(err instanceof Error ? err.message : 'Failed to remove channel');
+      this._error.set(
+        err instanceof Error ? err.message : "Failed to remove channel",
+      );
     }
   }
 
@@ -176,7 +192,9 @@ export class MixerService {
       await this.tauri.setChannelVolume(channelId, volume);
       await this.refreshConfig();
     } catch (err) {
-      this._error.set(err instanceof Error ? err.message : 'Failed to set channel volume');
+      this._error.set(
+        err instanceof Error ? err.message : "Failed to set channel volume",
+      );
     }
   }
 
@@ -188,7 +206,9 @@ export class MixerService {
       await this.tauri.toggleChannelMute(channelId);
       await this.refreshConfig();
     } catch (err) {
-      this._error.set(err instanceof Error ? err.message : 'Failed to toggle mute');
+      this._error.set(
+        err instanceof Error ? err.message : "Failed to toggle mute",
+      );
     }
   }
 
@@ -200,7 +220,9 @@ export class MixerService {
       await this.tauri.startMixing();
       this._isRunning.set(true);
     } catch (err) {
-      this._error.set(err instanceof Error ? err.message : 'Failed to start mixing');
+      this._error.set(
+        err instanceof Error ? err.message : "Failed to start mixing",
+      );
     }
   }
 
@@ -212,7 +234,9 @@ export class MixerService {
       await this.tauri.stopMixing();
       this._isRunning.set(false);
     } catch (err) {
-      this._error.set(err instanceof Error ? err.message : 'Failed to stop mixing');
+      this._error.set(
+        err instanceof Error ? err.message : "Failed to stop mixing",
+      );
     }
   }
 
@@ -222,13 +246,15 @@ export class MixerService {
    */
   async restartIfRunning(): Promise<void> {
     if (this._isRunning()) {
-      console.log('[MixerService] Restarting mixer silently...');
+      console.log("[MixerService] Restarting mixer silently...");
       try {
         await this.tauri.stopMixing();
         await this.tauri.startMixing();
-        console.log('[MixerService] Mixer restarted successfully');
+        console.log("[MixerService] Mixer restarted successfully");
       } catch (err) {
-        this._error.set(err instanceof Error ? err.message : 'Failed to restart mixer');
+        this._error.set(
+          err instanceof Error ? err.message : "Failed to restart mixer",
+        );
         this._isRunning.set(false);
       }
     }
@@ -245,7 +271,9 @@ export class MixerService {
       const hasOutput = !!settings.audio.outputDeviceId;
 
       if (!hasInput || !hasOutput) {
-        console.log('[MixerService] Cannot start: missing input or output device');
+        console.log(
+          "[MixerService] Cannot start: missing input or output device",
+        );
         // Stop if running with incomplete config
         if (this._isRunning()) {
           await this.stop();
@@ -255,16 +283,18 @@ export class MixerService {
 
       // Both devices configured - start or restart
       if (this._isRunning()) {
-        console.log('[MixerService] Restarting mixer with new devices...');
+        console.log("[MixerService] Restarting mixer with new devices...");
         await this.tauri.stopMixing();
       }
 
-      console.log('[MixerService] Starting mixer...');
+      console.log("[MixerService] Starting mixer...");
       await this.tauri.startMixing();
       this._isRunning.set(true);
-      console.log('[MixerService] Mixer started successfully');
+      console.log("[MixerService] Mixer started successfully");
     } catch (err) {
-      this._error.set(err instanceof Error ? err.message : 'Failed to start/restart mixer');
+      this._error.set(
+        err instanceof Error ? err.message : "Failed to start/restart mixer",
+      );
       this._isRunning.set(false);
     }
   }
@@ -284,7 +314,7 @@ export class MixerService {
       const config = await this.tauri.getMixerConfig();
       this._config.set(config);
     } catch (err) {
-      console.error('Failed to refresh config:', err);
+      console.error("Failed to refresh config:", err);
     }
   }
 }

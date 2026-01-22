@@ -1,14 +1,25 @@
-import { Component, ElementRef, ViewChild, inject, Output, EventEmitter, signal, effect } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { SoundboardService } from '../../../core/services/soundboard.service';
+import {
+  Component,
+  ElementRef,
+  ViewChild,
+  inject,
+  Output,
+  EventEmitter,
+  signal,
+  effect,
+} from "@angular/core";
+import { CommonModule } from "@angular/common";
+import { SoundboardService } from "../../../core/services/soundboard.service";
 
 @Component({
-  selector: 'app-search-bar',
+  selector: "app-search-bar",
   standalone: true,
   imports: [CommonModule],
   template: `
     <div class="relative">
-      <div class="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none">
+      <div
+        class="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none"
+      >
         &#128269;
       </div>
       <input
@@ -35,16 +46,16 @@ import { SoundboardService } from '../../../core/services/soundboard.service';
         </button>
       }
     </div>
-  `
+  `,
 })
 export class SearchBarComponent {
-  @ViewChild('searchInput') searchInput!: ElementRef<HTMLInputElement>;
+  @ViewChild("searchInput") searchInput!: ElementRef<HTMLInputElement>;
   @Output() cleared = new EventEmitter<void>();
 
   private soundboard = inject(SoundboardService);
 
   // Local signal for immediate UI updates
-  inputValue = signal('');
+  inputValue = signal("");
 
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -83,8 +94,8 @@ export class SearchBarComponent {
   }
 
   clear(): void {
-    this.inputValue.set('');
-    this.soundboard.setSearchQuery('');
+    this.inputValue.set("");
+    this.soundboard.setSearchQuery("");
     this.cleared.emit();
   }
 }

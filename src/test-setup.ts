@@ -9,7 +9,7 @@
   },
   invoke: () => Promise.resolve(),
   metadata: {
-    currentWindow: { label: 'main' },
-    currentWebview: { label: 'main' }
-  }
+    currentWindow: { label: "main" },
+    currentWebview: { label: "main" },
+  },
 };

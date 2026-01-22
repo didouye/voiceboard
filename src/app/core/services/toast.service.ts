@@ -1,4 +1,4 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, signal } from "@angular/core";
 
 export interface Toast {
   id: string;
@@ -10,13 +10,13 @@ export interface Toast {
   duration?: number;
 }
 
-@Injectable({ providedIn: 'root' })
+@Injectable({ providedIn: "root" })
 export class ToastService {
   toasts = signal<Toast[]>([]);
 
-  show(toast: Omit<Toast, 'id'>): string {
+  show(toast: Omit<Toast, "id">): string {
     const id = crypto.randomUUID();
-    this.toasts.update(t => [...t, { ...toast, id }]);
+    this.toasts.update((t) => [...t, { ...toast, id }]);
 
     if (toast.duration !== 0) {
       setTimeout(() => this.dismiss(id), toast.duration ?? 10000);
@@ -26,6 +26,6 @@ export class ToastService {
   }
 
   dismiss(id: string): void {
-    this.toasts.update(t => t.filter(toast => toast.id !== id));
+    this.toasts.update((t) => t.filter((toast) => toast.id !== id));
   }
 }

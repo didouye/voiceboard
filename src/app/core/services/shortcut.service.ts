@@ -1,10 +1,10 @@
-import { Injectable, signal, OnDestroy, effect } from '@angular/core';
-import { TauriService } from './tauri.service';
-import { SoundboardService } from './soundboard.service';
-import { formatShortcut, shortcutFromEvent, isModifierKey } from '../models';
+import { Injectable, signal, OnDestroy, effect } from "@angular/core";
+import { TauriService } from "./tauri.service";
+import { SoundboardService } from "./soundboard.service";
+import { formatShortcut, shortcutFromEvent, isModifierKey } from "../models";
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: "root",
 })
 export class ShortcutService implements OnDestroy {
   // Map shortcut string -> sound id
@@ -16,11 +16,11 @@ export class ShortcutService implements OnDestroy {
 
   private unlistenGlobalShortcut?: () => void;
   private initialized = false;
-  private lastHotkeySnapshot = '';
+  private lastHotkeySnapshot = "";
 
   constructor(
     private tauri: TauriService,
-    private soundboard: SoundboardService
+    private soundboard: SoundboardService,
   ) {
     this.init();
 
@@ -29,10 +29,10 @@ export class ShortcutService implements OnDestroy {
       const sounds = Array.from(this.soundboard.sounds().values());
       // Create a snapshot of hotkey -> soundId associations
       const snapshot = sounds
-        .filter(s => s.hotkey)
-        .map(s => `${s.hotkey}:${s.id}`)
+        .filter((s) => s.hotkey)
+        .map((s) => `${s.hotkey}:${s.id}`)
         .sort()
-        .join('|');
+        .join("|");
 
       // Only sync if initialized and associations actually changed
       if (this.initialized && snapshot !== this.lastHotkeySnapshot) {
@@ -48,14 +48,16 @@ export class ShortcutService implements OnDestroy {
       const settings = await this.tauri.loadSettings();
       this._enabled.set(settings.audio.globalHotkeysEnabled);
     } catch (err) {
-      console.error('Failed to load global hotkeys setting:', err);
+      console.error("Failed to load global hotkeys setting:", err);
     }
 
     // Listen for global shortcut events from backend
-    this.unlistenGlobalShortcut = await this.tauri.listenGlobalShortcut((data) => {
-      console.log('[ShortcutService] Global shortcut triggered:', data);
-      this.soundboard.playSound(data.soundId);
-    });
+    this.unlistenGlobalShortcut = await this.tauri.listenGlobalShortcut(
+      (data) => {
+        console.log("[ShortcutService] Global shortcut triggered:", data);
+        this.soundboard.playSound(data.soundId);
+      },
+    );
 
     // Register all existing shortcuts from soundboard
     await this.syncFromSoundboard();
@@ -68,10 +70,10 @@ export class ShortcutService implements OnDestroy {
   private updateHotkeySnapshot(): void {
     const sounds = Array.from(this.soundboard.sounds().values());
     this.lastHotkeySnapshot = sounds
-      .filter(s => s.hotkey)
-      .map(s => `${s.hotkey}:${s.id}`)
+      .filter((s) => s.hotkey)
+      .map((s) => `${s.hotkey}:${s.id}`)
       .sort()
-      .join('|');
+      .join("|");
   }
 
   ngOnDestroy(): void {
@@ -95,7 +97,10 @@ export class ShortcutService implements OnDestroy {
           await this.tauri.registerGlobalShortcut(sound.id, sound.hotkey);
           this.registry.set(sound.hotkey, sound.id);
         } catch (err) {
-          console.error(`Failed to register shortcut ${sound.hotkey} for ${sound.id}:`, err);
+          console.error(
+            `Failed to register shortcut ${sound.hotkey} for ${sound.id}:`,
+            err,
+          );
         }
       }
     }
@@ -163,7 +168,7 @@ export class ShortcutService implements OnDestroy {
       await this.tauri.setGlobalHotkeysEnabled(enabled);
       this._enabled.set(enabled);
     } catch (err) {
-      console.error('Failed to set global hotkeys enabled:', err);
+      console.error("Failed to set global hotkeys enabled:", err);
       throw err;
     }
   }

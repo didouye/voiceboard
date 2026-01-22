@@ -1,29 +1,65 @@
-import { AudioDevice, AppSettings, MixerConfig, SoundFile } from '../models';
+import { AudioDevice, AppSettings, MixerConfig, SoundFile } from "../models";
 
 /**
  * Mock data for demo mode - used for screenshots and testing
  */
 
 export const DEMO_INPUT_DEVICES: AudioDevice[] = [
-  { id: 'mic-1', name: 'Blue Yeti X', deviceType: 'input', isDefault: true, isVirtual: false },
-  { id: 'mic-2', name: 'MacBook Pro Microphone', deviceType: 'input', isDefault: false, isVirtual: false },
+  {
+    id: "mic-1",
+    name: "Blue Yeti X",
+    deviceType: "input",
+    isDefault: true,
+    isVirtual: false,
+  },
+  {
+    id: "mic-2",
+    name: "MacBook Pro Microphone",
+    deviceType: "input",
+    isDefault: false,
+    isVirtual: false,
+  },
 ];
 
 export const DEMO_OUTPUT_DEVICES: AudioDevice[] = [
-  { id: 'out-1', name: 'VB-Cable', deviceType: 'output', isDefault: false, isVirtual: true },
-  { id: 'out-2', name: 'BlackHole 2ch', deviceType: 'output', isDefault: false, isVirtual: true },
+  {
+    id: "out-1",
+    name: "VB-Cable",
+    deviceType: "output",
+    isDefault: false,
+    isVirtual: true,
+  },
+  {
+    id: "out-2",
+    name: "BlackHole 2ch",
+    deviceType: "output",
+    isDefault: false,
+    isVirtual: true,
+  },
 ];
 
 export const DEMO_PREVIEW_DEVICES: AudioDevice[] = [
-  { id: 'preview-1', name: 'MacBook Pro Speakers', deviceType: 'output', isDefault: true, isVirtual: false },
-  { id: 'preview-2', name: 'AirPods Pro', deviceType: 'output', isDefault: false, isVirtual: false },
+  {
+    id: "preview-1",
+    name: "MacBook Pro Speakers",
+    deviceType: "output",
+    isDefault: true,
+    isVirtual: false,
+  },
+  {
+    id: "preview-2",
+    name: "AirPods Pro",
+    deviceType: "output",
+    isDefault: false,
+    isVirtual: false,
+  },
 ];
 
 export const DEMO_SETTINGS: AppSettings = {
   audio: {
-    inputDeviceId: 'mic-1',
-    outputDeviceId: 'out-1',
-    previewDeviceId: 'preview-1',
+    inputDeviceId: "mic-1",
+    outputDeviceId: "out-1",
+    previewDeviceId: "preview-1",
     masterVolume: 0.8,
     sampleRate: 48000,
     bufferSize: 1024,
@@ -39,19 +75,40 @@ export const DEMO_SETTINGS: AppSettings = {
 export const DEMO_MIXER_CONFIG: MixerConfig = {
   masterVolume: 0.8,
   channels: [
-    { id: 'mic', name: 'Microphone', channelType: 'Microphone', volume: 1.0, muted: false, solo: false },
+    {
+      id: "mic",
+      name: "Microphone",
+      channelType: "Microphone",
+      volume: 1.0,
+      muted: false,
+      solo: false,
+    },
   ],
   sampleRate: 48000,
   bufferSize: 1024,
 };
 
 const PAD_COLORS = [
-  '#e74c3c', '#e67e22', '#f1c40f', '#2ecc71',
-  '#1abc9c', '#3498db', '#9b59b6', '#e91e63',
-  '#00bcd4', '#8bc34a', '#ff5722', '#795548'
+  "#e74c3c",
+  "#e67e22",
+  "#f1c40f",
+  "#2ecc71",
+  "#1abc9c",
+  "#3498db",
+  "#9b59b6",
+  "#e91e63",
+  "#00bcd4",
+  "#8bc34a",
+  "#ff5722",
+  "#795548",
 ];
 
-function createDemoSound(id: string, name: string, path: string, duration: number): SoundFile {
+function createDemoSound(
+  id: string,
+  name: string,
+  path: string,
+  duration: number,
+): SoundFile {
   return { id, name, path, duration, sampleRate: 48000, channels: 2 };
 }
 
@@ -59,22 +116,115 @@ function createDemoSound(id: string, name: string, path: string, duration: numbe
  * Demo soundboard pads with sounds - matches SavedPad interface
  */
 export const DEMO_SOUNDBOARD_PADS = [
-  { id: 'pad-0', sound: createDemoSound('s1', 'Air Horn', '/sounds/airhorn.mp3', 1.5), color: PAD_COLORS[0], hotkey: '1', volume: 1.0, speed: 1.0 },
-  { id: 'pad-1', sound: createDemoSound('s2', 'Sad Trombone', '/sounds/sad-trombone.mp3', 3.2), color: PAD_COLORS[1], hotkey: '2', volume: 0.8, speed: 1.0 },
-  { id: 'pad-2', sound: createDemoSound('s3', 'Applause', '/sounds/applause.mp3', 5.0), color: PAD_COLORS[2], hotkey: '3', volume: 1.0, speed: 1.0 },
-  { id: 'pad-3', sound: createDemoSound('s4', 'Drum Roll', '/sounds/drumroll.mp3', 4.0), color: PAD_COLORS[3], hotkey: '4', volume: 0.9, speed: 1.0 },
-  { id: 'pad-4', sound: createDemoSound('s5', 'MLG Horn', '/sounds/mlg.mp3', 2.0), color: PAD_COLORS[4], hotkey: '5', volume: 1.0, speed: 1.0 },
-  { id: 'pad-5', sound: createDemoSound('s6', 'Bruh', '/sounds/bruh.mp3', 0.8), color: PAD_COLORS[5], hotkey: '6', volume: 0.7, speed: 1.0 },
-  { id: 'pad-6', sound: createDemoSound('s7', 'Ba Dum Tss', '/sounds/badumtss.mp3', 1.2), color: PAD_COLORS[6], hotkey: '7', volume: 1.0, speed: 1.0 },
-  { id: 'pad-7', sound: createDemoSound('s8', 'Victory', '/sounds/victory.mp3', 3.5), color: PAD_COLORS[7], hotkey: '8', volume: 1.0, speed: 1.0 },
-  { id: 'pad-8', sound: createDemoSound('s9', 'Fail', '/sounds/fail.mp3', 2.5), color: PAD_COLORS[8], hotkey: '9', volume: 0.8, speed: 1.0 },
-  { id: 'pad-9', sound: createDemoSound('s10', 'Laugh Track', '/sounds/laugh.mp3', 4.5), color: PAD_COLORS[9], hotkey: '0', volume: 1.0, speed: 1.0 },
-  { id: 'pad-10', sound: createDemoSound('s11', 'Suspense', '/sounds/suspense.mp3', 6.0), color: PAD_COLORS[10], hotkey: '-', volume: 0.9, speed: 1.0 },
-  { id: 'pad-11', sound: createDemoSound('s12', 'Ding', '/sounds/ding.mp3', 0.5), color: PAD_COLORS[11], hotkey: '=', volume: 1.0, speed: 1.0 },
+  {
+    id: "pad-0",
+    sound: createDemoSound("s1", "Air Horn", "/sounds/airhorn.mp3", 1.5),
+    color: PAD_COLORS[0],
+    hotkey: "1",
+    volume: 1.0,
+    speed: 1.0,
+  },
+  {
+    id: "pad-1",
+    sound: createDemoSound(
+      "s2",
+      "Sad Trombone",
+      "/sounds/sad-trombone.mp3",
+      3.2,
+    ),
+    color: PAD_COLORS[1],
+    hotkey: "2",
+    volume: 0.8,
+    speed: 1.0,
+  },
+  {
+    id: "pad-2",
+    sound: createDemoSound("s3", "Applause", "/sounds/applause.mp3", 5.0),
+    color: PAD_COLORS[2],
+    hotkey: "3",
+    volume: 1.0,
+    speed: 1.0,
+  },
+  {
+    id: "pad-3",
+    sound: createDemoSound("s4", "Drum Roll", "/sounds/drumroll.mp3", 4.0),
+    color: PAD_COLORS[3],
+    hotkey: "4",
+    volume: 0.9,
+    speed: 1.0,
+  },
+  {
+    id: "pad-4",
+    sound: createDemoSound("s5", "MLG Horn", "/sounds/mlg.mp3", 2.0),
+    color: PAD_COLORS[4],
+    hotkey: "5",
+    volume: 1.0,
+    speed: 1.0,
+  },
+  {
+    id: "pad-5",
+    sound: createDemoSound("s6", "Bruh", "/sounds/bruh.mp3", 0.8),
+    color: PAD_COLORS[5],
+    hotkey: "6",
+    volume: 0.7,
+    speed: 1.0,
+  },
+  {
+    id: "pad-6",
+    sound: createDemoSound("s7", "Ba Dum Tss", "/sounds/badumtss.mp3", 1.2),
+    color: PAD_COLORS[6],
+    hotkey: "7",
+    volume: 1.0,
+    speed: 1.0,
+  },
+  {
+    id: "pad-7",
+    sound: createDemoSound("s8", "Victory", "/sounds/victory.mp3", 3.5),
+    color: PAD_COLORS[7],
+    hotkey: "8",
+    volume: 1.0,
+    speed: 1.0,
+  },
+  {
+    id: "pad-8",
+    sound: createDemoSound("s9", "Fail", "/sounds/fail.mp3", 2.5),
+    color: PAD_COLORS[8],
+    hotkey: "9",
+    volume: 0.8,
+    speed: 1.0,
+  },
+  {
+    id: "pad-9",
+    sound: createDemoSound("s10", "Laugh Track", "/sounds/laugh.mp3", 4.5),
+    color: PAD_COLORS[9],
+    hotkey: "0",
+    volume: 1.0,
+    speed: 1.0,
+  },
+  {
+    id: "pad-10",
+    sound: createDemoSound("s11", "Suspense", "/sounds/suspense.mp3", 6.0),
+    color: PAD_COLORS[10],
+    hotkey: "-",
+    volume: 0.9,
+    speed: 1.0,
+  },
+  {
+    id: "pad-11",
+    sound: createDemoSound("s12", "Ding", "/sounds/ding.mp3", 0.5),
+    color: PAD_COLORS[11],
+    hotkey: "=",
+    volume: 1.0,
+    speed: 1.0,
+  },
 ];
 
 export function createDemoSoundFile(path: string): SoundFile {
-  const name = path.split('/').pop()?.replace(/\.[^.]+$/, '') || 'Sound';
+  const name =
+    path
+      .split("/")
+      .pop()
+      ?.replace(/\.[^.]+$/, "") || "Sound";
   return {
     id: `demo-${Date.now()}`,
     name,

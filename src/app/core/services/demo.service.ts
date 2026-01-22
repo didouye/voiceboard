@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable } from "@angular/core";
 
 /**
  * Service to detect and manage demo mode.
@@ -7,7 +7,7 @@ import { Injectable } from '@angular/core';
  * - Or when running outside of Tauri (no __TAURI_INTERNALS__)
  */
 @Injectable({
-  providedIn: 'root'
+  providedIn: "root",
 })
 export class DemoService {
   private readonly _isDemoMode: boolean;
@@ -16,7 +16,7 @@ export class DemoService {
     this._isDemoMode = this.detectDemoMode();
 
     if (this._isDemoMode) {
-      console.log('[DemoService] Running in demo mode');
+      console.log("[DemoService] Running in demo mode");
     }
   }
 
@@ -27,7 +27,7 @@ export class DemoService {
   private detectDemoMode(): boolean {
     // Check URL param
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.has('demo')) {
+    if (urlParams.has("demo")) {
       return true;
     }
 

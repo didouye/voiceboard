@@ -1,17 +1,17 @@
-import { inject, Injectable, signal } from '@angular/core';
-import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
-import * as Sentry from '@sentry/angular';
-import { DemoService } from './demo.service';
+import { inject, Injectable, signal } from "@angular/core";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import * as Sentry from "@sentry/angular";
+import { DemoService } from "./demo.service";
 
 export interface LogEntry {
   timestamp: Date;
-  level: 'debug' | 'info' | 'warn' | 'error';
+  level: "debug" | "info" | "warn" | "error";
   message: string;
   context?: Record<string, unknown>;
 }
 
-@Injectable({ providedIn: 'root' })
+@Injectable({ providedIn: "root" })
 export class DebugConsoleService {
   private readonly MAX_LOGS = 500;
   private readonly _logs = signal<LogEntry[]>([]);
@@ -31,32 +31,32 @@ export class DebugConsoleService {
     // In demo mode, enable debug console by default
     if (this.demoService.isDemoMode) {
       this._isEnabled.set(true);
-      this.log('info', 'Debug console initialized (demo mode)');
+      this.log("info", "Debug console initialized (demo mode)");
       return;
     }
 
     // Get initial debug mode from backend
     try {
-      const enabled = await invoke<boolean>('get_debug_mode');
+      const enabled = await invoke<boolean>("get_debug_mode");
       this._isEnabled.set(enabled);
 
       if (enabled) {
         this.setupEventListeners();
-        this.log('info', 'Debug console initialized');
+        this.log("info", "Debug console initialized");
       }
     } catch (e) {
-      console.error('Failed to get debug mode:', e);
+      console.error("Failed to get debug mode:", e);
     }
 
     // Listen for debug mode changes from menu toggle
     try {
-      await listen<boolean>('debug-mode-changed', (event) => {
+      await listen<boolean>("debug-mode-changed", (event) => {
         this._isEnabled.set(event.payload);
         if (event.payload) {
           this.setupEventListeners();
-          this.log('info', 'Debug mode enabled');
+          this.log("info", "Debug mode enabled");
         } else {
-          this.log('info', 'Debug mode disabled');
+          this.log("info", "Debug mode disabled");
         }
       });
     } catch {
@@ -67,7 +67,11 @@ export class DebugConsoleService {
   private async setupEventListeners() {
     // Listen for backend log events
     try {
-      await listen<{ level: string; message: string; fields?: Record<string, unknown> }>('log-event', (event) => {
+      await listen<{
+        level: string;
+        message: string;
+        fields?: Record<string, unknown>;
+      }>("log-event", (event) => {
         const level = this.parseLevel(event.payload.level);
         this.addLog({
           timestamp: new Date(),
@@ -82,24 +86,27 @@ export class DebugConsoleService {
 
     // Listen for audio engine log events
     try {
-      await listen<{ level: string; message: string }>('audio-engine-log', (event) => {
-        const level = this.parseLevel(event.payload.level);
-        this.addLog({
-          timestamp: new Date(),
-          level,
-          message: `[AudioEngine] ${event.payload.message}`,
-        });
-      });
+      await listen<{ level: string; message: string }>(
+        "audio-engine-log",
+        (event) => {
+          const level = this.parseLevel(event.payload.level);
+          this.addLog({
+            timestamp: new Date(),
+            level,
+            message: `[AudioEngine] ${event.payload.message}`,
+          });
+        },
+      );
     } catch {
       // Event listener not available
     }
 
     // Listen for audio debug events (sound loading info)
     try {
-      await listen<string>('audio-debug', (event) => {
+      await listen<string>("audio-debug", (event) => {
         this.addLog({
           timestamp: new Date(),
-          level: 'debug',
+          level: "debug",
           message: `[Audio] ${event.payload}`,
         });
       });
@@ -108,15 +115,19 @@ export class DebugConsoleService {
     }
   }
 
-  private parseLevel(level: string): LogEntry['level'] {
+  private parseLevel(level: string): LogEntry["level"] {
     const normalized = level.toLowerCase();
-    if (normalized.includes('error')) return 'error';
-    if (normalized.includes('warn')) return 'warn';
-    if (normalized.includes('debug')) return 'debug';
-    return 'info';
+    if (normalized.includes("error")) return "error";
+    if (normalized.includes("warn")) return "warn";
+    if (normalized.includes("debug")) return "debug";
+    return "info";
   }
 
-  log(level: LogEntry['level'], message: string, context?: Record<string, unknown>) {
+  log(
+    level: LogEntry["level"],
+    message: string,
+    context?: Record<string, unknown>,
+  ) {
     if (!this._isEnabled()) return;
 
     this.addLog({
@@ -128,7 +139,7 @@ export class DebugConsoleService {
   }
 
   private addLog(entry: LogEntry) {
-    this._logs.update(logs => {
+    this._logs.update((logs) => {
       const newLogs = [...logs, entry];
       if (newLogs.length > this.MAX_LOGS) {
         return newLogs.slice(-this.MAX_LOGS);
@@ -138,24 +149,28 @@ export class DebugConsoleService {
 
     // Send log as Sentry breadcrumb for error context
     Sentry.addBreadcrumb({
-      category: 'log',
+      category: "log",
       message: entry.message,
       level: this.toSentryLevel(entry.level),
       data: entry.context,
     });
   }
 
-  private toSentryLevel(level: LogEntry['level']): Sentry.SeverityLevel {
+  private toSentryLevel(level: LogEntry["level"]): Sentry.SeverityLevel {
     switch (level) {
-      case 'error': return 'error';
-      case 'warn': return 'warning';
-      case 'debug': return 'debug';
-      default: return 'info';
+      case "error":
+        return "error";
+      case "warn":
+        return "warning";
+      case "debug":
+        return "debug";
+      default:
+        return "info";
     }
   }
 
   toggle() {
-    this._isOpen.update(open => !open);
+    this._isOpen.update((open) => !open);
   }
 
   open() {
@@ -170,29 +185,32 @@ export class DebugConsoleService {
     this._logs.set([]);
   }
 
-  getLogsByLevel(level: LogEntry['level']): LogEntry[] {
-    return this._logs().filter(log => log.level === level);
+  getLogsByLevel(level: LogEntry["level"]): LogEntry[] {
+    return this._logs().filter((log) => log.level === level);
   }
 
   exportLogs(): string {
     return this._logs()
-      .map(log => `[${log.timestamp.toISOString()}] [${log.level.toUpperCase()}] ${log.message}${log.context ? ' ' + JSON.stringify(log.context) : ''}`)
-      .join('\n');
+      .map(
+        (log) =>
+          `[${log.timestamp.toISOString()}] [${log.level.toUpperCase()}] ${log.message}${log.context ? " " + JSON.stringify(log.context) : ""}`,
+      )
+      .join("\n");
   }
 
   /**
    * Send a test error to Sentry to verify integration
    */
   sendTestError(): void {
-    const testError = new Error('Sentry Test Error - Debug Console');
-    this.log('warn', 'Sending test error to Sentry...');
+    const testError = new Error("Sentry Test Error - Debug Console");
+    this.log("warn", "Sending test error to Sentry...");
 
     try {
       Sentry.captureException(testError);
-      this.log('info', 'Test error sent to Sentry successfully');
+      this.log("info", "Test error sent to Sentry successfully");
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : String(e);
-      this.log('error', `Failed to send test error to Sentry: ${errorMessage}`);
+      this.log("error", `Failed to send test error to Sentry: ${errorMessage}`);
     }
   }
 }

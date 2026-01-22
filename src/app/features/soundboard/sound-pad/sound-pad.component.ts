@@ -1,16 +1,32 @@
-import { Component, Input, Output, EventEmitter, HostListener, HostBinding, inject, OnInit, OnChanges, SimpleChanges, signal, computed } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { SoundPad, PadImage } from '../../../core/models';
-import { SoundboardService } from '../../../core/services/soundboard.service';
-import { ShortcutService } from '../../../core/services/shortcut.service';
-import { TauriService } from '../../../core/services/tauri.service';
-import { ImageSearchService, ImageSearchResult } from '../../../core/services/image-search.service';
-import { convertFileSrc, invoke } from '@tauri-apps/api/core';
-import { open } from '@tauri-apps/plugin-dialog';
+import {
+  Component,
+  Input,
+  Output,
+  EventEmitter,
+  HostListener,
+  HostBinding,
+  inject,
+  OnInit,
+  OnChanges,
+  SimpleChanges,
+  signal,
+  computed,
+} from "@angular/core";
+import { CommonModule } from "@angular/common";
+import { FormsModule } from "@angular/forms";
+import { SoundPad, PadImage } from "../../../core/models";
+import { SoundboardService } from "../../../core/services/soundboard.service";
+import { ShortcutService } from "../../../core/services/shortcut.service";
+import { TauriService } from "../../../core/services/tauri.service";
+import {
+  ImageSearchService,
+  ImageSearchResult,
+} from "../../../core/services/image-search.service";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 
 @Component({
-  selector: 'app-sound-pad',
+  selector: "app-sound-pad",
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
@@ -31,14 +47,18 @@ import { open } from '@tauri-apps/plugin-dialog';
           [src]="imageUrl()"
           alt=""
           class="absolute inset-0 w-full h-full object-cover"
-        >
+        />
         <!-- Gradient overlay for text readability -->
-        <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+        <div
+          class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"
+        ></div>
       }
 
       <!-- Hotkey badge -->
       @if (pad.sound?.hotkey; as hotkey) {
-        <span class="absolute top-2 left-2 px-1.5 py-0.5 bg-black/50 text-white/80 text-[10px] font-semibold rounded font-mono uppercase z-10">
+        <span
+          class="absolute top-2 left-2 px-1.5 py-0.5 bg-black/50 text-white/80 text-[10px] font-semibold rounded font-mono uppercase z-10"
+        >
           {{ hotkey }}
         </span>
       }
@@ -46,7 +66,9 @@ import { open } from '@tauri-apps/plugin-dialog';
       @if (pad.sound; as sound) {
         <!-- Sound content (positioned at bottom with z-index) -->
         <div class="text-center px-2 w-full pb-2 relative z-10">
-          <span class="block text-xs font-semibold text-white truncate mb-0.5 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+          <span
+            class="block text-xs font-semibold text-white truncate mb-0.5 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]"
+          >
             @for (segment of getHighlightedName(); track $index) {
               @if (segment.highlighted) {
                 <span class="text-accent font-bold">{{ segment.text }}</span>
@@ -56,7 +78,9 @@ import { open } from '@tauri-apps/plugin-dialog';
             }
           </span>
           @if (sound.customName) {
-            <span class="block text-[9px] text-white/70 truncate drop-shadow-md">
+            <span
+              class="block text-[9px] text-white/70 truncate drop-shadow-md"
+            >
               {{ sound.name }}
             </span>
           }
@@ -67,19 +91,40 @@ import { open } from '@tauri-apps/plugin-dialog';
 
         <!-- Playing indicator -->
         @if (sound.isPlaying) {
-          <div class="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-0.5 items-end h-4">
-            <span class="w-1 bg-white rounded-sm animate-[soundbar_0.4s_ease-in-out_infinite_alternate]" style="height: 8px"></span>
-            <span class="w-1 bg-white rounded-sm animate-[soundbar_0.4s_ease-in-out_infinite_alternate_0.1s]" style="height: 14px"></span>
-            <span class="w-1 bg-white rounded-sm animate-[soundbar_0.4s_ease-in-out_infinite_alternate_0.2s]" style="height: 10px"></span>
+          <div
+            class="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-0.5 items-end h-4"
+          >
+            <span
+              class="w-1 bg-white rounded-sm animate-[soundbar_0.4s_ease-in-out_infinite_alternate]"
+              style="height: 8px"
+            ></span>
+            <span
+              class="w-1 bg-white rounded-sm animate-[soundbar_0.4s_ease-in-out_infinite_alternate_0.1s]"
+              style="height: 14px"
+            ></span>
+            <span
+              class="w-1 bg-white rounded-sm animate-[soundbar_0.4s_ease-in-out_infinite_alternate_0.2s]"
+              style="height: 10px"
+            ></span>
           </div>
         }
 
         <!-- Action buttons (hidden when modal is open) -->
-        <div class="absolute top-2 right-2 flex gap-1 transition-opacity"
-             [class]="showSettingsPopup ? 'opacity-0 pointer-events-none' : 'opacity-0 group-hover:opacity-100'">
+        <div
+          class="absolute top-2 right-2 flex gap-1 transition-opacity"
+          [class]="
+            showSettingsPopup
+              ? 'opacity-0 pointer-events-none'
+              : 'opacity-0 group-hover:opacity-100'
+          "
+        >
           <button
             class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] transition-colors"
-            [class]="sound.volume !== 1.0 ? 'bg-status-warning text-black' : 'bg-black/50 text-white hover:bg-accent'"
+            [class]="
+              sound.volume !== 1.0
+                ? 'bg-status-warning text-black'
+                : 'bg-black/50 text-white hover:bg-accent'
+            "
             (click)="toggleSettingsPopup($event)"
             title="Settings"
           >
@@ -91,7 +136,7 @@ import { open } from '@tauri-apps/plugin-dialog';
             (click)="onPreview($event)"
             [title]="isPreviewing ? 'Stop preview' : 'Preview'"
           >
-            {{ isPreviewing ? '&#9632;' : '&#9654;' }}
+            {{ isPreviewing ? "&#9632;" : "&#9654;" }}
           </button>
           <button
             class="w-6 h-6 bg-black/50 hover:bg-status-error rounded-full flex items-center justify-center text-xs text-white transition-colors"
@@ -103,7 +148,9 @@ import { open } from '@tauri-apps/plugin-dialog';
         </div>
       } @else {
         <!-- Empty pad -->
-        <div class="flex flex-col items-center text-text-muted group-hover:text-text-secondary transition-colors">
+        <div
+          class="flex flex-col items-center text-text-muted group-hover:text-text-secondary transition-colors"
+        >
           <span class="text-3xl font-light">+</span>
           <span class="text-[10px] uppercase tracking-wide">Import</span>
         </div>
@@ -118,17 +165,23 @@ import { open } from '@tauri-apps/plugin-dialog';
         (click)="closePopup($event)"
       >
         <!-- Dark backdrop -->
-        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm rounded-lg"></div>
+        <div
+          class="absolute inset-0 bg-black/60 backdrop-blur-sm rounded-lg"
+        ></div>
 
         <!-- Modal content - fills available space with max width -->
         <div
           class="relative bg-surface border border-border rounded-xl p-6 w-full max-w-lg max-h-full overflow-y-auto shadow-xl transition-all duration-150"
-          [class]="modalVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'"
+          [class]="
+            modalVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+          "
           (click)="$event.stopPropagation()"
         >
           <!-- Header -->
           <div class="flex items-center justify-between mb-4">
-            <h3 class="text-sm font-semibold text-text-primary truncate">{{ sound.name }}</h3>
+            <h3 class="text-sm font-semibold text-text-primary truncate">
+              {{ sound.name }}
+            </h3>
             <button
               class="w-6 h-6 flex items-center justify-center rounded hover:bg-surface-hover text-text-secondary hover:text-text-primary transition-colors"
               (click)="closePopup($event)"
@@ -148,7 +201,7 @@ import { open } from '@tauri-apps/plugin-dialog';
               (ngModelChange)="onCustomNameChange($event)"
               [placeholder]="sound.name"
               class="w-full px-3 py-2 text-sm bg-surface-hover border border-border rounded text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
-            >
+            />
           </div>
 
           <!-- Image -->
@@ -165,16 +218,24 @@ import { open } from '@tauri-apps/plugin-dialog';
                 (click)="toggleImageOptions()"
               >
                 @if (imageUrl()) {
-                  <img [src]="imageUrl()" alt="" class="w-full h-full object-cover">
+                  <img
+                    [src]="imageUrl()"
+                    alt=""
+                    class="w-full h-full object-cover"
+                  />
                 } @else {
                   <!-- Placeholder -->
-                  <div class="flex flex-col items-center justify-center h-full text-text-muted">
+                  <div
+                    class="flex flex-col items-center justify-center h-full text-text-muted"
+                  >
                     <span class="text-3xl mb-1">&#128247;</span>
                     <span class="text-xs">Cliquez pour ajouter</span>
                   </div>
                 }
                 <!-- Hover overlay -->
-                <div class="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity">
+                <div
+                  class="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity"
+                >
                   <span class="text-white text-sm font-medium">Modifier</span>
                 </div>
               </button>
@@ -192,7 +253,9 @@ import { open } from '@tauri-apps/plugin-dialog';
 
               <!-- Loading overlay -->
               @if (imageLoading()) {
-                <div class="absolute inset-0 bg-black/50 flex items-center justify-center rounded-lg">
+                <div
+                  class="absolute inset-0 bg-black/50 flex items-center justify-center rounded-lg"
+                >
                   <span class="text-white text-sm">Chargement...</span>
                 </div>
               }
@@ -200,7 +263,9 @@ import { open } from '@tauri-apps/plugin-dialog';
 
             <!-- Image Options Modal -->
             @if (showImageOptions) {
-              <div class="mt-2 p-3 bg-background rounded-lg border border-border animate-fade-in">
+              <div
+                class="mt-2 p-3 bg-background rounded-lg border border-border animate-fade-in"
+              >
                 <div class="flex gap-2 mb-3">
                   <button
                     class="flex-1 px-3 py-2 text-sm bg-surface-hover hover:bg-border rounded transition-colors text-text-secondary hover:text-text-primary flex items-center justify-center gap-2"
@@ -212,7 +277,10 @@ import { open } from '@tauri-apps/plugin-dialog';
                   </button>
                   <button
                     class="flex-1 px-3 py-2 text-sm bg-surface-hover hover:bg-border rounded transition-colors text-text-secondary hover:text-text-primary flex items-center justify-center gap-2"
-                    (click)="showImageSearch = !showImageSearch; showImageOptions = false"
+                    (click)="
+                      showImageSearch = !showImageSearch;
+                      showImageOptions = false
+                    "
                     [disabled]="imageLoading()"
                   >
                     <span>&#128269;</span>
@@ -224,7 +292,9 @@ import { open } from '@tauri-apps/plugin-dialog';
 
             <!-- Search Section (expandable) -->
             @if (showImageSearch) {
-              <div class="mt-2 p-3 bg-background rounded-lg border border-border animate-fade-in">
+              <div
+                class="mt-2 p-3 bg-background rounded-lg border border-border animate-fade-in"
+              >
                 <div class="flex gap-2 mb-3">
                   <input
                     type="text"
@@ -232,13 +302,13 @@ import { open } from '@tauri-apps/plugin-dialog';
                     (keydown.enter)="searchImages()"
                     placeholder="Rechercher des images..."
                     class="flex-1 px-3 py-2 text-sm bg-surface-hover border border-border rounded text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
-                  >
+                  />
                   <button
                     class="px-4 py-2 text-sm bg-accent hover:bg-accent/80 text-white rounded transition-colors"
                     [disabled]="imageLoading()"
                     (click)="searchImages()"
                   >
-                    {{ imageLoading() ? '...' : 'Chercher' }}
+                    {{ imageLoading() ? "..." : "Chercher" }}
                   </button>
                 </div>
 
@@ -248,11 +318,19 @@ import { open } from '@tauri-apps/plugin-dialog';
                     @for (result of imageSearchResults(); track result.id) {
                       <button
                         class="aspect-square rounded overflow-hidden border-2 transition-all hover:scale-105"
-                        [class]="selectedImageId() === result.id ? 'border-accent' : 'border-transparent'"
+                        [class]="
+                          selectedImageId() === result.id
+                            ? 'border-accent'
+                            : 'border-transparent'
+                        "
                         (click)="selectImage(result)"
                         [disabled]="imageLoading()"
                       >
-                        <img [src]="result.thumbnailUrl" alt="" class="w-full h-full object-cover">
+                        <img
+                          [src]="result.thumbnailUrl"
+                          alt=""
+                          class="w-full h-full object-cover"
+                        />
                       </button>
                     }
                   </div>
@@ -277,17 +355,21 @@ import { open } from '@tauri-apps/plugin-dialog';
           <div class="mb-4">
             <div class="flex justify-between items-center mb-2 text-xs">
               <span class="text-text-secondary">Volume</span>
-              <span class="text-text-primary font-semibold">{{ Math.round(sound.volume * 100) }}%</span>
+              <span class="text-text-primary font-semibold"
+                >{{ Math.round(sound.volume * 100) }}%</span
+              >
             </div>
             <input
               type="range"
               [ngModel]="sound.volume"
               (ngModelChange)="onVolumeChange($event)"
-              min="0" max="2" step="0.05"
+              min="0"
+              max="2"
+              step="0.05"
               class="w-full h-1.5 bg-surface-hover rounded-full appearance-none cursor-pointer
                      [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3
                      [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer"
-            >
+            />
             <div class="flex justify-between text-[10px] text-text-muted mt-1">
               <span>0%</span>
               <span>100%</span>
@@ -299,15 +381,19 @@ import { open } from '@tauri-apps/plugin-dialog';
           <div class="mb-4 pt-4 border-t border-border">
             <div class="flex justify-between items-center mb-2 text-xs">
               <span class="text-text-secondary">Speed</span>
-              <span class="text-text-primary font-semibold">{{ sound.speed }}x</span>
+              <span class="text-text-primary font-semibold"
+                >{{ sound.speed }}x</span
+              >
             </div>
             <div class="flex flex-wrap gap-1">
               @for (s of speedOptions; track s) {
                 <button
                   class="flex-1 min-w-[40px] px-2 py-1.5 text-xs rounded border transition-colors"
-                  [class]="sound.speed === s
-                    ? 'bg-accent border-accent text-white'
-                    : 'bg-surface-hover border-border text-text-secondary hover:text-text-primary'"
+                  [class]="
+                    sound.speed === s
+                      ? 'bg-accent border-accent text-white'
+                      : 'bg-surface-hover border-border text-text-secondary hover:text-text-primary'
+                  "
                   (click)="onSpeedChange(s)"
                 >
                   {{ s }}x
@@ -324,22 +410,30 @@ import { open } from '@tauri-apps/plugin-dialog';
             <div class="flex gap-1">
               <button
                 class="flex-1 px-3 py-2 text-xs rounded border transition-colors text-left"
-                [class]="isRecording
-                  ? 'bg-accent border-accent text-white animate-pulse'
-                  : 'bg-surface-hover border-border text-text-primary hover:border-text-muted'"
+                [class]="
+                  isRecording
+                    ? 'bg-accent border-accent text-white animate-pulse'
+                    : 'bg-surface-hover border-border text-text-primary hover:border-text-muted'
+                "
                 (click)="startRecording($event)"
               >
-                {{ isRecording ? 'Press keys...' : (sound.hotkey || 'Click to set') }}
+                {{
+                  isRecording ? "Press keys..." : sound.hotkey || "Click to set"
+                }}
               </button>
               @if (sound.hotkey) {
                 <button
                   class="px-2 text-text-muted hover:text-status-error transition-colors"
                   (click)="clearShortcut($event)"
                   title="Clear shortcut"
-                >&times;</button>
+                >
+                  &times;
+                </button>
               }
             </div>
-            <p class="text-[10px] text-text-muted mt-1">Use Ctrl, Alt, Shift or Cmd + key</p>
+            <p class="text-[10px] text-text-muted mt-1">
+              Use Ctrl, Alt, Shift or Cmd + key
+            </p>
           </div>
 
           <!-- Folders -->
@@ -350,15 +444,19 @@ import { open } from '@tauri-apps/plugin-dialog';
               </div>
               <div class="space-y-1">
                 @for (folder of folders(); track folder.id) {
-                  @if (folder.id !== 'all') {
-                    <label class="flex items-center gap-2 py-1 cursor-pointer hover:bg-surface-hover rounded px-2 -mx-2">
+                  @if (folder.id !== "all") {
+                    <label
+                      class="flex items-center gap-2 py-1 cursor-pointer hover:bg-surface-hover rounded px-2 -mx-2"
+                    >
                       <input
                         type="checkbox"
                         [checked]="sound.folderIds.includes(folder.id)"
                         (change)="onFolderToggle(folder.id)"
                         class="w-4 h-4 rounded border-border bg-surface-hover text-accent focus:ring-accent focus:ring-offset-0"
-                      >
-                      <span class="text-sm text-text-primary">{{ folder.name }}</span>
+                      />
+                      <span class="text-sm text-text-primary">{{
+                        folder.name
+                      }}</span>
                     </label>
                   }
                 }
@@ -377,12 +475,18 @@ import { open } from '@tauri-apps/plugin-dialog';
       </div>
     }
   `,
-  styles: [`
-    @keyframes soundbar {
-      from { height: 4px; }
-      to { height: 16px; }
-    }
-  `]
+  styles: [
+    `
+      @keyframes soundbar {
+        from {
+          height: 4px;
+        }
+        to {
+          height: 16px;
+        }
+      }
+    `,
+  ],
 })
 export class SoundPadComponent implements OnInit, OnChanges {
   @Input({ required: true }) pad!: SoundPad;
@@ -399,8 +503,10 @@ export class SoundPadComponent implements OnInit, OnChanges {
   @Output() imageChange = new EventEmitter<PadImage | null>();
   @Output() folderToggle = new EventEmitter<string>();
 
-  @HostBinding('class') hostClass = 'relative';
-  @HostBinding('class.z-50') get isPopupOpen() { return this.showSettingsPopup; }
+  @HostBinding("class") hostClass = "relative";
+  @HostBinding("class.z-50") get isPopupOpen() {
+    return this.showSettingsPopup;
+  }
 
   private tauri = inject(TauriService);
   imageSearchService = inject(ImageSearchService);
@@ -428,19 +534,19 @@ export class SoundPadComponent implements OnInit, OnChanges {
   // Image management properties
   showImageOptions = false;
   showImageSearch = false;
-  imageSearchQuery = '';
+  imageSearchQuery = "";
   imageSearchResults = signal<ImageSearchResult[]>([]);
   selectedImageId = signal<string | null>(null);
   imageLoading = signal(false);
 
   constructor(
     private soundboardService: SoundboardService,
-    private shortcutService: ShortcutService
+    private shortcutService: ShortcutService,
   ) {}
 
   ngOnChanges(changes: SimpleChanges): void {
     // Sync pad.sound?.image to signal when input changes
-    if (changes['pad']) {
+    if (changes["pad"]) {
       this._padImage.set(this.pad.sound?.image);
     }
   }
@@ -453,12 +559,12 @@ export class SoundPadComponent implements OnInit, OnChanges {
     try {
       await this.tauri.getImagesDir();
     } catch (e) {
-      console.error('Failed to get images dir:', e);
+      console.error("Failed to get images dir:", e);
     }
   }
 
   get padClasses(): string {
-    const base = 'border-2';
+    const base = "border-2";
     const sound = this.pad.sound;
 
     if (!sound) {
@@ -474,25 +580,25 @@ export class SoundPadComponent implements OnInit, OnChanges {
 
     // Disable hover effects when modal is open
     if (!this.showSettingsPopup) {
-      classes += ' hover:scale-[1.02] hover:glow-subtle';
+      classes += " hover:scale-[1.02] hover:glow-subtle";
     }
 
     if (sound.isPlaying) {
-      classes += ' animate-glow-pulse border-white';
+      classes += " animate-glow-pulse border-white";
     }
 
     if (this.isPreviewing) {
-      classes += ' border-status-info';
+      classes += " border-status-info";
     }
 
     if (this.loading) {
-      classes += ' opacity-50 pointer-events-none';
+      classes += " opacity-50 pointer-events-none";
     }
 
     return classes;
   }
 
-  @HostListener('window:keydown', ['$event'])
+  @HostListener("window:keydown", ["$event"])
   onWindowKeydown(event: KeyboardEvent): void {
     if (!this.isRecording) return;
 
@@ -505,13 +611,20 @@ export class SoundPadComponent implements OnInit, OnChanges {
     this.isRecording = false;
 
     // Check for conflicts
-    const conflictSoundId = this.shortcutService.checkConflict(shortcut, this.pad.sound!.id);
+    const conflictSoundId = this.shortcutService.checkConflict(
+      shortcut,
+      this.pad.sound!.id,
+    );
     if (conflictSoundId) {
       const sounds = this.soundboardService.sounds();
       const conflictSound = sounds.get(conflictSoundId);
       const conflictName = conflictSound?.name || conflictSoundId;
 
-      if (!confirm(`"${shortcut}" is already assigned to "${conflictName}". Replace?`)) {
+      if (
+        !confirm(
+          `"${shortcut}" is already assigned to "${conflictName}". Replace?`,
+        )
+      ) {
         return;
       }
       // User confirmed replacement - the old pad will lose its shortcut
@@ -543,7 +656,8 @@ export class SoundPadComponent implements OnInit, OnChanges {
 
     // Store sound info before any async operation
     const soundId = this.pad.sound!.id;
-    const soundName = this.pad.sound?.customName || this.pad.sound?.name || 'this sound';
+    const soundName =
+      this.pad.sound?.customName || this.pad.sound?.name || "this sound";
 
     // Tauri's window.confirm returns a Promise, not a boolean
     const confirmed = await window.confirm(`Supprimer "${soundName}" ?`);
@@ -604,10 +718,12 @@ export class SoundPadComponent implements OnInit, OnChanges {
 
     try {
       this.imageLoading.set(true);
-      const results = await this.imageSearchService.search(this.imageSearchQuery);
+      const results = await this.imageSearchService.search(
+        this.imageSearchQuery,
+      );
       this.imageSearchResults.set(results);
     } catch (err) {
-      console.error('Image search failed:', err);
+      console.error("Image search failed:", err);
     } finally {
       this.imageLoading.set(false);
     }
@@ -624,35 +740,43 @@ export class SoundPadComponent implements OnInit, OnChanges {
       let usedUrl = result.fullUrl;
 
       try {
-        const downloaded = await this.imageSearchService.downloadImage(result.fullUrl);
+        const downloaded = await this.imageSearchService.downloadImage(
+          result.fullUrl,
+        );
         data = downloaded.data;
         extension = downloaded.extension;
       } catch (fullUrlErr) {
-        console.warn('Full URL failed, trying thumbnail:', fullUrlErr);
+        console.warn("Full URL failed, trying thumbnail:", fullUrlErr);
         // Fall back to thumbnail
-        const downloaded = await this.imageSearchService.downloadImage(result.thumbnailUrl);
+        const downloaded = await this.imageSearchService.downloadImage(
+          result.thumbnailUrl,
+        );
         data = downloaded.data;
         extension = downloaded.extension;
         usedUrl = result.thumbnailUrl;
       }
 
       // Save to backend
-      const localPath = await this.tauri.savePadImage(this.pad.sound!.id, data, extension);
+      const localPath = await this.tauri.savePadImage(
+        this.pad.sound!.id,
+        data,
+        extension,
+      );
 
       // Update pad
       const image: PadImage = {
         localPath,
         originalUrl: usedUrl,
-        attribution: result.title
+        attribution: result.title,
       };
       this.imageChange.emit(image);
 
       this.showImageSearch = false;
       this.selectedImageId.set(null);
     } catch (err) {
-      console.error('Failed to save image:', err);
+      console.error("Failed to save image:", err);
       this.selectedImageId.set(null);
-      alert('Failed to download image. Try another one.');
+      alert("Failed to download image. Try another one.");
     } finally {
       this.imageLoading.set(false);
     }
@@ -666,10 +790,12 @@ export class SoundPadComponent implements OnInit, OnChanges {
       // Open native file picker with image filter
       const selected = await open({
         multiple: false,
-        filters: [{
-          name: 'Images',
-          extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif']
-        }]
+        filters: [
+          {
+            name: "Images",
+            extensions: ["jpg", "jpeg", "png", "webp", "gif"],
+          },
+        ],
       });
 
       if (!selected) return; // User cancelled
@@ -678,23 +804,25 @@ export class SoundPadComponent implements OnInit, OnChanges {
       this.imageLoading.set(true);
 
       // Read file via backend (validates format and size)
-      const data = await invoke<number[]>('read_image_file', { path: filePath });
+      const data = await invoke<number[]>("read_image_file", {
+        path: filePath,
+      });
 
       // Get extension from path
-      const extension = filePath.split('.').pop()?.toLowerCase() || 'jpg';
+      const extension = filePath.split(".").pop()?.toLowerCase() || "jpg";
 
       // Save image
       const localPath = await this.tauri.savePadImage(
         this.pad.sound!.id,
         new Uint8Array(data),
-        extension
+        extension,
       );
 
       const image: PadImage = { localPath };
       this.imageChange.emit(image);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error('Failed to upload image:', err);
+      console.error("Failed to upload image:", err);
       alert(message);
     } finally {
       this.imageLoading.set(false);
@@ -706,7 +834,7 @@ export class SoundPadComponent implements OnInit, OnChanges {
       await this.tauri.deletePadImage(this.pad.sound!.id);
       this.imageChange.emit(null);
     } catch (err) {
-      console.error('Failed to remove image:', err);
+      console.error("Failed to remove image:", err);
     }
   }
 
@@ -737,8 +865,8 @@ export class SoundPadComponent implements OnInit, OnChanges {
 
   onDragStart(event: DragEvent): void {
     if (!this.pad.sound) return;
-    event.dataTransfer?.setData('text/plain', this.pad.sound.id);
-    event.dataTransfer!.effectAllowed = 'copy';
+    event.dataTransfer?.setData("text/plain", this.pad.sound.id);
+    event.dataTransfer!.effectAllowed = "copy";
   }
 
   onDragEnd(event: DragEvent): void {
@@ -757,14 +885,17 @@ export class SoundPadComponent implements OnInit, OnChanges {
     }
 
     const segments: { text: string; highlighted: boolean }[] = [];
-    let currentSegment = '';
+    let currentSegment = "";
     let currentHighlighted = indices.has(0);
 
     for (let i = 0; i < displayName.length; i++) {
       const isHighlighted = indices.has(i);
       if (isHighlighted !== currentHighlighted) {
         if (currentSegment) {
-          segments.push({ text: currentSegment, highlighted: currentHighlighted });
+          segments.push({
+            text: currentSegment,
+            highlighted: currentHighlighted,
+          });
         }
         currentSegment = displayName[i];
         currentHighlighted = isHighlighted;

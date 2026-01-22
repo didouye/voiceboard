@@ -1,8 +1,8 @@
-import { Component, inject, output } from '@angular/core';
-import { SetupWizardService } from '../../services/setup-wizard.service';
+import { Component, inject, output } from "@angular/core";
+import { SetupWizardService } from "../../services/setup-wizard.service";
 
 @Component({
-  selector: 'app-setup-wizard',
+  selector: "app-setup-wizard",
   standalone: true,
   template: `
     <div class="setup-overlay">
@@ -10,20 +10,20 @@ import { SetupWizardService } from '../../services/setup-wizard.service';
         <h2>Setup Required</h2>
 
         @switch (setupService.state().step) {
-          @case ('checking') {
+          @case ("checking") {
             <div class="setup-content">
               <div class="spinner"></div>
               <p>Checking audio devices...</p>
             </div>
           }
 
-          @case ('missing') {
+          @case ("missing") {
             <div class="setup-content">
               <div class="warning-icon">⚠️</div>
               <h3>Virtual Audio Driver Not Found</h3>
               <p>
-                Voiceboard needs VB-Audio Virtual Cable to create a virtual microphone
-                for Discord, Zoom, and other applications.
+                Voiceboard needs VB-Audio Virtual Cable to create a virtual
+                microphone for Discord, Zoom, and other applications.
               </p>
               <div class="setup-actions">
                 <button class="btn-primary" (click)="install()">
@@ -36,14 +36,14 @@ import { SetupWizardService } from '../../services/setup-wizard.service';
             </div>
           }
 
-          @case ('downloading') {
+          @case ("downloading") {
             <div class="setup-content">
               <div class="spinner"></div>
               <p>Downloading VB-Cable...</p>
             </div>
           }
 
-          @case ('installing') {
+          @case ("installing") {
             <div class="setup-content">
               <div class="spinner"></div>
               <p>Installing VB-Cable...</p>
@@ -51,7 +51,7 @@ import { SetupWizardService } from '../../services/setup-wizard.service';
             </div>
           }
 
-          @case ('done') {
+          @case ("done") {
             <div class="setup-content">
               <div class="success-icon">✅</div>
               <h3>Installation Complete</h3>
@@ -64,15 +64,13 @@ import { SetupWizardService } from '../../services/setup-wizard.service';
             </div>
           }
 
-          @case ('error') {
+          @case ("error") {
             <div class="setup-content">
               <div class="error-icon">❌</div>
               <h3>Installation Failed</h3>
               <p class="error-message">{{ setupService.state().error }}</p>
               <div class="setup-actions">
-                <button class="btn-primary" (click)="install()">
-                  Retry
-                </button>
+                <button class="btn-primary" (click)="install()">Retry</button>
                 <button class="btn-secondary" (click)="openWebsite()">
                   Download Manually
                 </button>
@@ -83,116 +81,122 @@ import { SetupWizardService } from '../../services/setup-wizard.service';
       </div>
     </div>
   `,
-  styles: [`
-    .setup-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.8);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 10000;
-    }
+  styles: [
+    `
+      .setup-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+      }
 
-    .setup-modal {
-      background: #1e1e1e;
-      border-radius: 12px;
-      padding: 32px;
-      max-width: 480px;
-      width: 90%;
-      text-align: center;
-      border: 1px solid #333;
-    }
+      .setup-modal {
+        background: #1e1e1e;
+        border-radius: 12px;
+        padding: 32px;
+        max-width: 480px;
+        width: 90%;
+        text-align: center;
+        border: 1px solid #333;
+      }
 
-    h2 {
-      margin: 0 0 24px;
-      color: #fff;
-      font-size: 24px;
-    }
+      h2 {
+        margin: 0 0 24px;
+        color: #fff;
+        font-size: 24px;
+      }
 
-    h3 {
-      margin: 16px 0 8px;
-      color: #fff;
-      font-size: 18px;
-    }
+      h3 {
+        margin: 16px 0 8px;
+        color: #fff;
+        font-size: 18px;
+      }
 
-    p {
-      color: #aaa;
-      margin: 8px 0;
-      line-height: 1.5;
-    }
+      p {
+        color: #aaa;
+        margin: 8px 0;
+        line-height: 1.5;
+      }
 
-    .hint {
-      font-size: 12px;
-      color: #666;
-    }
+      .hint {
+        font-size: 12px;
+        color: #666;
+      }
 
-    .setup-content {
-      padding: 16px 0;
-    }
+      .setup-content {
+        padding: 16px 0;
+      }
 
-    .warning-icon, .success-icon, .error-icon {
-      font-size: 48px;
-      margin-bottom: 16px;
-    }
+      .warning-icon,
+      .success-icon,
+      .error-icon {
+        font-size: 48px;
+        margin-bottom: 16px;
+      }
 
-    .setup-actions {
-      display: flex;
-      gap: 12px;
-      justify-content: center;
-      margin-top: 24px;
-    }
+      .setup-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        margin-top: 24px;
+      }
 
-    button {
-      padding: 12px 24px;
-      border-radius: 6px;
-      font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;
-      border: none;
-      transition: background 0.2s;
-    }
+      button {
+        padding: 12px 24px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        border: none;
+        transition: background 0.2s;
+      }
 
-    .btn-primary {
-      background: #007bff;
-      color: white;
-    }
+      .btn-primary {
+        background: #007bff;
+        color: white;
+      }
 
-    .btn-primary:hover {
-      background: #0056b3;
-    }
+      .btn-primary:hover {
+        background: #0056b3;
+      }
 
-    .btn-secondary {
-      background: #333;
-      color: #aaa;
-    }
+      .btn-secondary {
+        background: #333;
+        color: #aaa;
+      }
 
-    .btn-secondary:hover {
-      background: #444;
-    }
+      .btn-secondary:hover {
+        background: #444;
+      }
 
-    .spinner {
-      width: 40px;
-      height: 40px;
-      border: 3px solid #333;
-      border-top-color: #007bff;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin: 0 auto 16px;
-    }
+      .spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid #333;
+        border-top-color: #007bff;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 16px;
+      }
 
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
 
-    .error-message {
-      color: #ff6b6b;
-      font-size: 14px;
-      background: rgba(255, 107, 107, 0.1);
-      padding: 8px 12px;
-      border-radius: 4px;
-    }
-  `]
+      .error-message {
+        color: #ff6b6b;
+        font-size: 14px;
+        background: rgba(255, 107, 107, 0.1);
+        padding: 8px 12px;
+        border-radius: 4px;
+      }
+    `,
+  ],
 })
 export class SetupWizardComponent {
   setupService = inject(SetupWizardService);
@@ -212,12 +216,12 @@ export class SetupWizardComponent {
 
   restart() {
     // Tauri restart
-    import('@tauri-apps/plugin-process').then(({ relaunch }) => relaunch());
+    import("@tauri-apps/plugin-process").then(({ relaunch }) => relaunch());
   }
 
   openWebsite() {
-    import('@tauri-apps/plugin-opener').then(({ openUrl }) => {
-      openUrl('https://vb-audio.com/Cable/');
+    import("@tauri-apps/plugin-opener").then(({ openUrl }) => {
+      openUrl("https://vb-audio.com/Cable/");
     });
   }
 }

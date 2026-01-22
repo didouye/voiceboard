@@ -9,7 +9,7 @@ import { appConfig } from "./app/app.config";
 async function initSentry(): Promise<void> {
   try {
     const [dsn, version] = await Promise.all([
-      invoke<string | null>('get_sentry_dsn'),
+      invoke<string | null>("get_sentry_dsn"),
       getVersion(),
     ]);
 
@@ -17,14 +17,14 @@ async function initSentry(): Promise<void> {
       Sentry.init({
         dsn,
         release: version,
-        environment: 'production',
+        environment: "production",
         integrations: [],
         tracesSampleRate: 0,
       });
       console.log(`Sentry initialized (release: ${version})`);
     }
   } catch (e) {
-    console.warn('Failed to initialize Sentry:', e);
+    console.warn("Failed to initialize Sentry:", e);
   }
 }
 

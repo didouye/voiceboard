@@ -1,2 +1,2 @@
-export * from './audio-device.model';
-export * from './shortcut.model';
+export * from "./audio-device.model";
+export * from "./shortcut.model";

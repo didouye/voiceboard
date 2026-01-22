@@ -1,6 +1,6 @@
 // src/app/core/services/fuzzy-search.service.ts
-import { Injectable } from '@angular/core';
-import { Sound } from '../models';
+import { Injectable } from "@angular/core";
+import { Sound } from "../models";
 
 export interface SearchResult {
   sound: Sound;
@@ -9,10 +9,9 @@ export interface SearchResult {
 }
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: "root",
 })
 export class FuzzySearchService {
-
   search(query: string, sounds: Sound[]): SearchResult[] {
     const normalizedQuery = this.normalizeText(query);
     if (!normalizedQuery) return [];
@@ -31,7 +30,10 @@ export class FuzzySearchService {
       }
 
       // Try subsequence match
-      const subseqMatch = this.subsequenceMatch(normalizedQuery, normalizedName);
+      const subseqMatch = this.subsequenceMatch(
+        normalizedQuery,
+        normalizedName,
+      );
       if (subseqMatch) {
         results.push({ sound, ...subseqMatch });
         continue;
@@ -49,7 +51,10 @@ export class FuzzySearchService {
     return results.sort((a, b) => b.score - a.score);
   }
 
-  private exactMatch(query: string, normalizedText: string): { score: number; matchedIndices: number[] } | null {
+  private exactMatch(
+    query: string,
+    normalizedText: string,
+  ): { score: number; matchedIndices: number[] } | null {
     const index = normalizedText.indexOf(query);
     if (index === -1) return null;
 
@@ -61,7 +66,10 @@ export class FuzzySearchService {
     return { score: 100, matchedIndices };
   }
 
-  private subsequenceMatch(query: string, text: string): { score: number; matchedIndices: number[] } | null {
+  private subsequenceMatch(
+    query: string,
+    text: string,
+  ): { score: number; matchedIndices: number[] } | null {
     const indices: number[] = [];
     let queryIdx = 0;
 
@@ -78,12 +86,15 @@ export class FuzzySearchService {
     // Score based on density (how close together the matches are)
     const span = indices[indices.length - 1] - indices[0] + 1;
     const density = query.length / span;
-    const score = Math.round(60 + (density * 30)); // 60-90 range
+    const score = Math.round(60 + density * 30); // 60-90 range
 
     return { score: Math.min(score, 90), matchedIndices: indices };
   }
 
-  private levenshteinMatch(query: string, text: string): { score: number; matchedIndices: number[] } | null {
+  private levenshteinMatch(
+    query: string,
+    text: string,
+  ): { score: number; matchedIndices: number[] } | null {
     // Skip very long texts for performance
     if (text.length > 50) return null;
 
@@ -95,7 +106,7 @@ export class FuzzySearchService {
     if (distance > maxErrors) return null;
 
     // Score inversely proportional to distance (10-50 range)
-    const score = Math.max(10, 50 - (distance * 15));
+    const score = Math.max(10, 50 - distance * 15);
 
     return { score, matchedIndices: [] }; // No highlighting for levenshtein
   }
@@ -114,9 +125,9 @@ export class FuzzySearchService {
       for (let j = 1; j <= b.length; j++) {
         const cost = a[i - 1] === b[j - 1] ? 0 : 1;
         matrix[i][j] = Math.min(
-          matrix[i - 1][j] + 1,      // deletion
-          matrix[i][j - 1] + 1,      // insertion
-          matrix[i - 1][j - 1] + cost // substitution
+          matrix[i - 1][j] + 1, // deletion
+          matrix[i][j - 1] + 1, // insertion
+          matrix[i - 1][j - 1] + cost, // substitution
         );
       }
     }
@@ -127,7 +138,7 @@ export class FuzzySearchService {
   private normalizeText(text: string): string {
     return text
       .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, ''); // Remove accents
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, ""); // Remove accents
   }
 }

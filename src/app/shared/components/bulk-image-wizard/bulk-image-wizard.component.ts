@@ -1,8 +1,19 @@
-import { Component, Input, Output, EventEmitter, signal, inject, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { ImageSearchService, ImageSearchResult } from '../../../core/services/image-search.service';
-import { SoundPad, PadImage } from '../../../core/models';
+import {
+  Component,
+  Input,
+  Output,
+  EventEmitter,
+  signal,
+  inject,
+  OnInit,
+} from "@angular/core";
+import { CommonModule } from "@angular/common";
+import { FormsModule } from "@angular/forms";
+import {
+  ImageSearchService,
+  ImageSearchResult,
+} from "../../../core/services/image-search.service";
+import { SoundPad, PadImage } from "../../../core/models";
 
 interface PadImageSelection {
   pad: SoundPad;
@@ -10,20 +21,28 @@ interface PadImageSelection {
 }
 
 @Component({
-  selector: 'app-bulk-image-wizard',
+  selector: "app-bulk-image-wizard",
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
     <div class="fixed inset-0 z-50 flex items-center justify-center">
       <!-- Backdrop -->
-      <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" (click)="close.emit()"></div>
+      <div
+        class="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        (click)="close.emit()"
+      ></div>
 
       <!-- Modal -->
-      <div class="relative bg-surface border border-border rounded-xl p-6 w-full max-w-2xl animate-scale-in" (click)="$event.stopPropagation()">
+      <div
+        class="relative bg-surface border border-border rounded-xl p-6 w-full max-w-2xl animate-scale-in"
+        (click)="$event.stopPropagation()"
+      >
         <!-- Header -->
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-lg font-semibold text-text-primary">
-            Image pour "{{ currentSoundName() }}" ({{ currentIndex() + 1 }}/{{ pads.length }})
+            Image pour "{{ currentSoundName() }}" ({{ currentIndex() + 1 }}/{{
+              pads.length
+            }})
           </h2>
           <button
             class="text-text-muted hover:text-text-primary"
@@ -41,7 +60,7 @@ interface PadImageSelection {
             (keydown.enter)="search()"
             placeholder="Rechercher des images..."
             class="flex-1 px-3 py-2 text-sm bg-surface-hover border border-border rounded text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
-          >
+          />
           <button
             class="px-4 py-2 text-sm bg-accent hover:bg-accent/80 text-white rounded transition-colors"
             (click)="search()"
@@ -52,12 +71,24 @@ interface PadImageSelection {
 
         <!-- Selected Image Preview -->
         <div class="mb-4">
-          <div class="w-36 h-36 mx-auto rounded-xl overflow-hidden border-2 transition-all"
-               [class]="selectedImage() ? 'border-accent bg-surface-hover' : 'border-dashed border-border bg-surface-hover'">
+          <div
+            class="w-36 h-36 mx-auto rounded-xl overflow-hidden border-2 transition-all"
+            [class]="
+              selectedImage()
+                ? 'border-accent bg-surface-hover'
+                : 'border-dashed border-border bg-surface-hover'
+            "
+          >
             @if (selectedImage()) {
-              <img [src]="selectedImage()!.thumbnailUrl" alt="" class="w-full h-full object-cover">
+              <img
+                [src]="selectedImage()!.thumbnailUrl"
+                alt=""
+                class="w-full h-full object-cover"
+              />
             } @else {
-              <div class="w-full h-full flex flex-col items-center justify-center text-text-muted">
+              <div
+                class="w-full h-full flex flex-col items-center justify-center text-text-muted"
+              >
                 <span class="text-3xl mb-1">&#128247;</span>
                 <span class="text-xs">Sélectionnez une image</span>
               </div>
@@ -67,14 +98,24 @@ interface PadImageSelection {
 
         <!-- Results Grid -->
         @if (searchResults().length > 0) {
-          <div class="flex flex-wrap justify-center gap-2 mb-4 max-h-64 overflow-y-auto p-1">
+          <div
+            class="flex flex-wrap justify-center gap-2 mb-4 max-h-64 overflow-y-auto p-1"
+          >
             @for (result of searchResults(); track result.id) {
               <button
                 class="w-16 h-16 rounded-lg overflow-hidden border-2 transition-all hover:scale-105 flex-shrink-0"
-                [class]="selectedImage()?.id === result.id ? 'border-accent ring-2 ring-accent/50' : 'border-transparent hover:border-border'"
+                [class]="
+                  selectedImage()?.id === result.id
+                    ? 'border-accent ring-2 ring-accent/50'
+                    : 'border-transparent hover:border-border'
+                "
                 (click)="selectedImage.set(result)"
               >
-                <img [src]="result.thumbnailUrl" alt="" class="w-full h-full object-cover">
+                <img
+                  [src]="result.thumbnailUrl"
+                  alt=""
+                  class="w-full h-full object-cover"
+                />
               </button>
             }
           </div>
@@ -85,7 +126,9 @@ interface PadImageSelection {
         }
 
         <!-- Navigation -->
-        <div class="flex items-center justify-between pt-4 border-t border-border">
+        <div
+          class="flex items-center justify-between pt-4 border-t border-border"
+        >
           <button
             class="px-4 py-2 text-sm text-text-secondary hover:text-text-primary transition-colors"
             [disabled]="currentIndex() === 0"
@@ -100,14 +143,14 @@ interface PadImageSelection {
                 class="px-4 py-2 text-sm bg-accent hover:bg-accent/80 text-white rounded transition-colors"
                 (click)="selectAndNext()"
               >
-                {{ isLast() ? 'Terminer' : 'Valider & Suivant' }}
+                {{ isLast() ? "Terminer" : "Valider & Suivant" }}
               </button>
             }
             <button
               class="px-4 py-2 text-sm bg-surface-hover hover:bg-border text-text-secondary rounded transition-colors"
               (click)="nextOrFinish()"
             >
-              {{ isLast() ? 'Terminer' : 'Suivant &rarr;' }}
+              {{ isLast() ? "Terminer" : "Suivant &rarr;" }}
             </button>
           </div>
         </div>
@@ -121,24 +164,27 @@ interface PadImageSelection {
         </button>
       </div>
     </div>
-  `
+  `,
 })
 export class BulkImageWizardComponent implements OnInit {
   @Input({ required: true }) pads!: SoundPad[];
   @Output() close = new EventEmitter<void>();
-  @Output() selectImage = new EventEmitter<{ soundId: string; image: ImageSearchResult }>();
+  @Output() selectImage = new EventEmitter<{
+    soundId: string;
+    image: ImageSearchResult;
+  }>();
 
   private imageSearch = inject(ImageSearchService);
 
   currentIndex = signal(0);
-  searchQuery = '';
+  searchQuery = "";
   searchResults = signal<ImageSearchResult[]>([]);
   selectedImage = signal<ImageSearchResult | null>(null);
   selections = new Map<string, ImageSearchResult>();
 
   readonly currentPad = () => this.pads[this.currentIndex()];
-  readonly currentSoundName = () => this.currentPad()?.sound?.name || '';
-  readonly currentSoundId = () => this.currentPad()?.sound?.id || '';
+  readonly currentSoundName = () => this.currentPad()?.sound?.name || "";
+  readonly currentSoundId = () => this.currentPad()?.sound?.id || "";
   readonly isLast = () => this.currentIndex() === this.pads.length - 1;
 
   async ngOnInit(): Promise<void> {
@@ -158,7 +204,9 @@ export class BulkImageWizardComponent implements OnInit {
     }
 
     // Auto-search based on sound name
-    this.searchQuery = this.imageSearch.extractQueryFromFilename(pad.sound.name);
+    this.searchQuery = this.imageSearch.extractQueryFromFilename(
+      pad.sound.name,
+    );
     if (this.searchQuery && this.imageSearch.hasApiKey()) {
       await this.search();
     }
@@ -170,13 +218,13 @@ export class BulkImageWizardComponent implements OnInit {
       const results = await this.imageSearch.search(this.searchQuery, 1, 12);
       this.searchResults.set(results);
     } catch (err) {
-      console.error('Search failed:', err);
+      console.error("Search failed:", err);
     }
   }
 
   previous(): void {
     if (this.currentIndex() > 0) {
-      this.currentIndex.update(i => i - 1);
+      this.currentIndex.update((i) => i - 1);
       this.loadCurrentPad();
     }
   }
@@ -204,7 +252,7 @@ export class BulkImageWizardComponent implements OnInit {
     if (this.isLast()) {
       this.finish();
     } else {
-      this.currentIndex.update(i => i + 1);
+      this.currentIndex.update((i) => i + 1);
       this.loadCurrentPad();
     }
   }

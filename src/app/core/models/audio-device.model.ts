@@ -13,7 +13,7 @@ export interface AudioDevice {
 export interface MixerChannel {
   id: string;
   name: string;
-  channelType: 'Microphone' | 'AudioFile' | 'SystemAudio';
+  channelType: "Microphone" | "AudioFile" | "SystemAudio";
   volume: number;
   muted: boolean;
   solo: boolean;
@@ -58,7 +58,7 @@ export interface SoundFile {
   id: string;
   name: string;
   path: string;
-  duration: number;  // in seconds
+  duration: number; // in seconds
   sampleRate: number;
   channels: number;
 }
