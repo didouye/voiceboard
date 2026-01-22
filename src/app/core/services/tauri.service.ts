@@ -204,7 +204,9 @@ export class TauriService {
         sampleRate: s.audio.sample_rate,
         bufferSize: s.audio.buffer_size,
         micMonitoring: s.audio.mic_monitoring ?? false,
-        globalHotkeysEnabled: s.audio.global_hotkeys_enabled ?? true
+        globalHotkeysEnabled: s.audio.global_hotkeys_enabled ?? true,
+        micVolume: s.audio.mic_volume ?? 1.0,
+        soundboardVolume: s.audio.soundboard_volume ?? 1.0
       },
       startMinimized: s.start_minimized,
       autoStartMixing: s.auto_start_mixing
@@ -224,7 +226,9 @@ export class TauriService {
         sample_rate: s.audio.sampleRate,
         buffer_size: s.audio.bufferSize,
         mic_monitoring: s.audio.micMonitoring,
-        global_hotkeys_enabled: s.audio.globalHotkeysEnabled
+        global_hotkeys_enabled: s.audio.globalHotkeysEnabled,
+        mic_volume: s.audio.micVolume,
+        soundboard_volume: s.audio.soundboardVolume
       },
       start_minimized: s.startMinimized,
       auto_start_mixing: s.autoStartMixing
@@ -733,5 +737,54 @@ export class TauriService {
       callback(event.payload);
     });
     return unlisten;
+  }
+
+  // =========================================================================
+  // Volume Control
+  // =========================================================================
+
+  /**
+   * Set soundboard global volume (0.0 to 2.0)
+   */
+  async setSoundboardVolume(volume: number): Promise<void> {
+    if (this.demoService.isDemoMode) return;
+    await invoke('set_soundboard_volume', { volume });
+  }
+
+  // =========================================================================
+  // Sound Import with Normalization
+  // =========================================================================
+
+  /**
+   * Import and normalize a sound file to -3dB peak
+   * @returns The imported sound with hash, name, path, and duration
+   */
+  async importAndNormalizeSound(path: string): Promise<{ hash: string; name: string; path: string; duration: number }> {
+    if (this.demoService.isDemoMode) {
+      return {
+        hash: 'demo_' + Math.random().toString(36).substring(7),
+        name: path.split('/').pop()?.replace(/\.[^.]+$/, '') || 'demo',
+        path,
+        duration: 5.0
+      };
+    }
+    return invoke('import_and_normalize_sound', { path });
+  }
+
+  /**
+   * Import and normalize multiple sound files
+   * @returns Array of results (success with sound data or error string)
+   */
+  async importMultipleAndNormalize(paths: string[]): Promise<Array<{ ok: { hash: string; name: string; path: string; duration: number } } | { err: string }>> {
+    const results = [];
+    for (const path of paths) {
+      try {
+        const result = await this.importAndNormalizeSound(path);
+        results.push({ ok: result });
+      } catch (err) {
+        results.push({ err: String(err) });
+      }
+    }
+    return results;
   }
 }

@@ -29,6 +29,8 @@ export const DEMO_SETTINGS: AppSettings = {
     bufferSize: 1024,
     micMonitoring: false,
     globalHotkeysEnabled: true,
+    micVolume: 1.0,
+    soundboardVolume: 1.0,
   },
   startMinimized: false,
   autoStartMixing: true,
