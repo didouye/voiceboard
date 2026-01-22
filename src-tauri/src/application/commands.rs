@@ -937,6 +937,111 @@ pub async fn import_multiple_sounds_with_hash(
     join_all(futures).await
 }
 
+/// Import and normalize a sound file to -3dB peak
+/// Copies the normalized file to AppData/sounds/{hash}.wav
+#[tauri::command]
+pub async fn import_and_normalize_sound(
+    app: tauri::AppHandle,
+    path: String,
+) -> Result<ImportedSoundDto, String> {
+    use rodio::Source;
+    use sha2::{Digest, Sha256};
+    use std::fs::File;
+    use std::io::BufReader;
+    use std::path::Path;
+
+    // Read file and calculate hash of ORIGINAL
+    let original_data = std::fs::read(&path).map_err(|e| format!("Failed to read file: {}", e))?;
+    let hash = format!("{:x}", Sha256::digest(&original_data));
+
+    // Decode audio
+    let file = File::open(&path).map_err(|e| format!("Failed to open file: {}", e))?;
+    let reader = BufReader::new(file);
+    let decoder =
+        rodio::Decoder::new(reader).map_err(|e| format!("Failed to decode audio: {}", e))?;
+
+    let sample_rate = decoder.sample_rate();
+    let channels = decoder.channels();
+
+    // Collect samples as f32
+    let samples: Vec<f32> = decoder.convert_samples::<f32>().collect();
+
+    if samples.is_empty() {
+        return Err("Audio file contains no samples".to_string());
+    }
+
+    // Find peak amplitude
+    let peak = samples.iter().fold(0.0f32, |max, &s| max.max(s.abs()));
+
+    // Calculate gain for -3dB peak (0.708 = 10^(-3/20))
+    let target_peak = 0.708f32;
+    let gain = if peak > 0.0 { target_peak / peak } else { 1.0 };
+
+    // Apply gain (normalize)
+    let normalized: Vec<f32> = samples
+        .iter()
+        .map(|&s| (s * gain).clamp(-1.0, 1.0))
+        .collect();
+
+    // Get sounds directory in AppData
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+    let sounds_dir = app_data_dir.join("sounds");
+    std::fs::create_dir_all(&sounds_dir)
+        .map_err(|e| format!("Failed to create sounds directory: {}", e))?;
+
+    // Save as WAV
+    let output_path = sounds_dir.join(format!("{}.wav", hash));
+
+    // Write WAV file
+    let spec = hound::WavSpec {
+        channels,
+        sample_rate,
+        bits_per_sample: 32,
+        sample_format: hound::SampleFormat::Float,
+    };
+
+    let mut writer = hound::WavWriter::create(&output_path, spec)
+        .map_err(|e| format!("Failed to create WAV file: {}", e))?;
+
+    for sample in &normalized {
+        writer
+            .write_sample(*sample)
+            .map_err(|e| format!("Failed to write sample: {}", e))?;
+    }
+
+    writer
+        .finalize()
+        .map_err(|e| format!("Failed to finalize WAV: {}", e))?;
+
+    // Calculate duration
+    let duration = samples.len() as f64 / (sample_rate as f64 * channels as f64);
+
+    // Extract filename
+    let name = Path::new(&path)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("unknown")
+        .to_string();
+
+    tracing::info!(
+        "Normalized sound: {} (peak {:.3} -> {:.3}, gain {:.2}x)",
+        name,
+        peak,
+        target_peak,
+        gain
+    );
+
+    Ok(ImportedSoundDto {
+        hash,
+        name,
+        path: output_path.to_string_lossy().to_string(),
+        duration,
+    })
+}
+
 /// Play a sound file (mix with microphone) with optional volume (0.0-2.0, default 1.0)
 /// and optional speed (0.5-2.0, default 1.0)
 #[tauri::command]

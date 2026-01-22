@@ -32,6 +32,7 @@ serde_json = "1"
 # Audio
 cpal = "0.15"                    # Cross-platform audio I/O
 rodio = "0.19"                   # Audio playback and decoding
+hound = "3.5"                    # WAV encoding for normalized sounds
 crossbeam-channel = "0.5"        # Lock-free channels for real-time audio
 ringbuf = "0.4"                  # Lock-free ring buffer for audio streaming
 
