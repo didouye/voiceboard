@@ -47,6 +47,7 @@ use application::{
         get_sentry_dsn,
         // Settings
         get_settings,
+        get_sounds_dir,
         get_virtual_output_devices,
         get_virtual_outputs_by_priority,
         hash_file,
@@ -61,6 +62,7 @@ use application::{
         // Sound playback
         load_sound_file,
         load_soundboard,
+        migrate_sound_to_normalized,
         play_sound,
         preview_sound,
         read_image_file,
@@ -284,6 +286,8 @@ pub fn run() {
             import_sound_with_hash,
             import_multiple_sounds_with_hash,
             import_and_normalize_sound,
+            get_sounds_dir,
+            migrate_sound_to_normalized,
             play_sound,
             stop_sound,
             stop_all_sounds,

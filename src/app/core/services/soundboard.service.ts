@@ -453,9 +453,7 @@ export class SoundboardService {
   /**
    * Import sounds from file paths (for drag & drop)
    */
-  async importSoundsFromPaths(
-    paths: string[],
-  ): Promise<{
+  async importSoundsFromPaths(paths: string[]): Promise<{
     imported: number;
     skippedDuplicates: number;
     errors: string[];
@@ -661,6 +659,9 @@ export class SoundboardService {
       }
 
       this._initialized = true;
+
+      // Migrate any sounds that aren't in AppData yet
+      await this.migrateExistingSoundsToNormalized();
     } catch (err) {
       console.error("Failed to load state:", err);
       this._initialized = true;
@@ -668,6 +669,48 @@ export class SoundboardService {
 
     // Also load preview device setting
     this.loadPreviewDevice();
+  }
+
+  /**
+   * Migrate existing sounds to normalized WAV format in AppData
+   * This handles sounds imported before normalization was added
+   */
+  private async migrateExistingSoundsToNormalized(): Promise<void> {
+    try {
+      const soundsDir = await this.tauri.getSoundsDir();
+      const sounds = this._sounds();
+      let migratedCount = 0;
+
+      for (const [id, sound] of sounds) {
+        // Check if sound is already in AppData sounds directory
+        if (sound.path.startsWith(soundsDir)) {
+          continue;
+        }
+
+        // Check if original file still exists by trying to migrate
+        try {
+          console.log(`Migrating sound: ${sound.name} (${sound.path})`);
+          const newPath = await this.tauri.migrateSoundToNormalized(
+            sound.path,
+            id,
+          );
+
+          // Update sound with new path
+          this.updateSound(id, { path: newPath });
+          migratedCount++;
+        } catch (err) {
+          console.error(`Failed to migrate sound ${sound.name}:`, err);
+          // Keep the old path - sound might still work or user can re-import
+        }
+      }
+
+      if (migratedCount > 0) {
+        console.log(`Migrated ${migratedCount} sounds to normalized format`);
+        await this.saveState();
+      }
+    } catch (err) {
+      console.error("Failed to migrate sounds:", err);
+    }
   }
 
   private async migrateFromOldFormat(pads: any[]): Promise<void> {

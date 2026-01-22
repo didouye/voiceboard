@@ -1042,6 +1042,130 @@ pub async fn import_and_normalize_sound(
     })
 }
 
+/// Get the sounds directory path
+#[tauri::command]
+pub async fn get_sounds_dir(app: tauri::AppHandle) -> Result<String, String> {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+
+    let sounds_dir = app_data_dir.join("sounds");
+
+    // Create directory if it doesn't exist
+    std::fs::create_dir_all(&sounds_dir)
+        .map_err(|e| format!("Failed to create sounds directory: {}", e))?;
+
+    Ok(sounds_dir.to_string_lossy().to_string())
+}
+
+/// Migrate an existing sound to normalized format
+/// Takes an existing sound file path and returns the new normalized path
+/// If the file is already in the sounds directory, returns it as-is
+#[tauri::command]
+pub async fn migrate_sound_to_normalized(
+    app: tauri::AppHandle,
+    original_path: String,
+    sound_id: String,
+) -> Result<String, String> {
+    use rodio::Source;
+    use std::fs::File;
+    use std::io::BufReader;
+    use std::path::Path;
+
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+    let sounds_dir = app_data_dir.join("sounds");
+
+    // Check if already in sounds directory
+    let original = Path::new(&original_path);
+    if let Some(parent) = original.parent() {
+        if parent == sounds_dir {
+            tracing::debug!("Sound {} already in sounds directory", sound_id);
+            return Ok(original_path);
+        }
+    }
+
+    // Check if normalized file already exists
+    let output_path = sounds_dir.join(format!("{}.wav", sound_id));
+    if output_path.exists() {
+        tracing::debug!("Sound {} already normalized", sound_id);
+        return Ok(output_path.to_string_lossy().to_string());
+    }
+
+    // Check if original file exists
+    if !original.exists() {
+        return Err(format!("Original file not found: {}", original_path));
+    }
+
+    // Create sounds directory
+    std::fs::create_dir_all(&sounds_dir)
+        .map_err(|e| format!("Failed to create sounds directory: {}", e))?;
+
+    // Decode audio
+    let file = File::open(&original_path).map_err(|e| format!("Failed to open file: {}", e))?;
+    let reader = BufReader::new(file);
+    let decoder =
+        rodio::Decoder::new(reader).map_err(|e| format!("Failed to decode audio: {}", e))?;
+
+    let sample_rate = decoder.sample_rate();
+    let channels = decoder.channels();
+
+    // Collect samples as f32
+    let samples: Vec<f32> = decoder.convert_samples::<f32>().collect();
+
+    if samples.is_empty() {
+        return Err("Audio file contains no samples".to_string());
+    }
+
+    // Find peak amplitude
+    let peak = samples.iter().fold(0.0f32, |max, &s| max.max(s.abs()));
+
+    // Calculate gain for -3dB peak (0.708 = 10^(-3/20))
+    let target_peak = 0.708f32;
+    let gain = if peak > 0.0 { target_peak / peak } else { 1.0 };
+
+    // Apply gain (normalize)
+    let normalized: Vec<f32> = samples
+        .iter()
+        .map(|&s| (s * gain).clamp(-1.0, 1.0))
+        .collect();
+
+    // Write WAV file
+    let spec = hound::WavSpec {
+        channels,
+        sample_rate,
+        bits_per_sample: 32,
+        sample_format: hound::SampleFormat::Float,
+    };
+
+    let mut writer = hound::WavWriter::create(&output_path, spec)
+        .map_err(|e| format!("Failed to create WAV file: {}", e))?;
+
+    for sample in &normalized {
+        writer
+            .write_sample(*sample)
+            .map_err(|e| format!("Failed to write sample: {}", e))?;
+    }
+
+    writer
+        .finalize()
+        .map_err(|e| format!("Failed to finalize WAV: {}", e))?;
+
+    tracing::info!(
+        "Migrated sound {}: {} (peak {:.3} -> {:.3}, gain {:.2}x)",
+        sound_id,
+        original_path,
+        peak,
+        target_peak,
+        gain
+    );
+
+    Ok(output_path.to_string_lossy().to_string())
+}
+
 /// Play a sound file (mix with microphone) with optional volume (0.0-2.0, default 1.0)
 /// and optional speed (0.5-2.0, default 1.0)
 #[tauri::command]

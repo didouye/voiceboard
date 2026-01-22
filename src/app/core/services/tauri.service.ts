@@ -878,4 +878,24 @@ export class TauriService {
     }
     return results;
   }
+
+  /**
+   * Get the sounds directory path (in AppData)
+   */
+  async getSoundsDir(): Promise<string> {
+    return invoke("get_sounds_dir");
+  }
+
+  /**
+   * Migrate an existing sound to normalized format in AppData
+   * @param originalPath The original path to the sound file
+   * @param soundId Unique ID for the migrated sound
+   * @returns The new path to the normalized WAV file
+   */
+  async migrateSoundToNormalized(
+    originalPath: string,
+    soundId: string,
+  ): Promise<string> {
+    return invoke("migrate_sound_to_normalized", { originalPath, soundId });
+  }
 }
