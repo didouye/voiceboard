@@ -1210,6 +1210,41 @@ pub async fn set_mic_volume(
     Ok(())
 }
 
+/// Set soundboard global volume (0.0 - 2.0) with persistence
+#[tauri::command]
+pub async fn set_soundboard_volume(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    volume: f32,
+) -> Result<(), String> {
+    let clamped_volume = volume.clamp(0.0, 2.0);
+
+    // Update settings
+    {
+        let mut settings = state.settings.write().await;
+        settings.audio.soundboard_volume = clamped_volume;
+    }
+
+    // Persist to store
+    let settings = state.settings.read().await;
+    let dto = AppSettingsDto::from(&*settings);
+    drop(settings);
+
+    let store = app.store(SETTINGS_STORE).map_err(|e| e.to_string())?;
+    let _ = store.reload();
+    store.set(
+        SETTINGS_KEY,
+        serde_json::to_value(&dto).map_err(|e| e.to_string())?,
+    );
+    store.save().map_err(|e| {
+        tracing::error!("Failed to save soundboard volume: {}", e);
+        e.to_string()
+    })?;
+
+    tracing::info!("Soundboard volume saved: {}", clamped_volume);
+    Ok(())
+}
+
 /// Mute/unmute microphone
 #[tauri::command]
 pub async fn set_mic_muted(state: State<'_, AppState>, muted: bool) -> Result<(), String> {

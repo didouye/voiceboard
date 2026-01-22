@@ -79,6 +79,7 @@ use application::{
         set_mic_volume,
         set_output_device,
         set_preview_device,
+        set_soundboard_volume,
         // Mixing control
         start_mixing,
         stop_all_sounds,
@@ -289,6 +290,7 @@ pub fn run() {
             get_preview_state,
             set_mic_volume,
             set_mic_muted,
+            set_soundboard_volume,
             // Soundboard persistence
             save_soundboard,
             load_soundboard,
