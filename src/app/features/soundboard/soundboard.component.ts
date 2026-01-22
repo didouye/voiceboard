@@ -35,8 +35,8 @@ import { SearchBarComponent } from "./search-bar/search-bar.component";
   ],
   template: `
     <div class="h-full flex flex-col">
-      <!-- Header -->
-      <div class="flex items-center justify-between mb-4">
+      <!-- Header (fixed) -->
+      <div class="flex items-center justify-between mb-4 flex-shrink-0">
         <h2 class="text-lg font-semibold text-text-primary">
           {{ soundboard.activeFolder().name || "Soundboard" }}
         </h2>
@@ -52,104 +52,107 @@ import { SearchBarComponent } from "./search-bar/search-bar.component";
         </div>
       </div>
 
-      <!-- Search bar -->
-      <div class="mb-4">
-        <app-search-bar />
-      </div>
-
-      <!-- Error message -->
-      @if (soundboard.error()) {
-        <div
-          class="mb-4 px-4 py-3 bg-status-error/20 border border-status-error/50 rounded-lg flex items-center justify-between"
-        >
-          <span class="text-status-error text-sm">{{
-            soundboard.error()
-          }}</span>
-          <button
-            class="px-3 py-1 text-xs text-status-error border border-status-error/50 rounded hover:bg-status-error/20 transition-colors"
-            (click)="soundboard.clearError()"
-          >
-            Dismiss
-          </button>
-        </div>
-      }
-
-      <!-- Pads grid -->
-      <div class="flex-1 relative">
-        <div
-          class="grid gap-3"
-          style="grid-template-columns: repeat(auto-fill, minmax(100px, 140px));"
-        >
-          @for (
-            pad of soundboard.pads();
-            track pad.sound?.id ?? pad.index;
-            let i = $index
-          ) {
-            <app-sound-pad
-              [pad]="pad"
-              [loading]="soundboard.loading()"
-              [isPreviewing]="soundboard.previewingSoundId() === pad.sound?.id"
-              (play)="soundboard.playSound(pad.sound!.id)"
-              (preview)="soundboard.previewSound(pad.sound!.id)"
-              (import)="onImportSound()"
-              (volumeChange)="soundboard.setSoundVolume(pad.sound!.id, $event)"
-              (speedChange)="soundboard.setSoundSpeed(pad.sound!.id, $event)"
-              (shortcutChange)="onShortcutChange(pad.sound!.id, $event)"
-              (customNameChange)="
-                soundboard.setSoundCustomName(pad.sound!.id, $event)
-              "
-              (imageChange)="onImageChange(pad.sound!.id, $event)"
-              (folderToggle)="
-                soundboard.toggleSoundFolder(pad.sound!.id, $event)
-              "
-            />
-          }
+      <!-- Scrollable content area -->
+      <div class="flex-1 overflow-y-auto relative" #scrollContainer>
+        <!-- Sticky search bar -->
+        <div class="sticky top-0 z-20 bg-background pb-4">
+          <app-search-bar />
         </div>
 
-        <!-- No results message -->
-        @if (hasNoResults()) {
+        <!-- Error message -->
+        @if (soundboard.error()) {
           <div
-            class="flex flex-col items-center justify-center py-12 text-text-muted"
+            class="mb-4 px-4 py-3 bg-status-error/20 border border-status-error/50 rounded-lg flex items-center justify-between"
           >
-            <span class="text-4xl mb-2">&#128269;</span>
-            <p class="text-sm">
-              No sounds found for "{{ soundboard.searchQuery() }}"
-            </p>
+            <span class="text-status-error text-sm">{{
+              soundboard.error()
+            }}</span>
             <button
-              class="mt-3 text-xs text-accent hover:underline"
-              (click)="soundboard.setSearchQuery('')"
+              class="px-3 py-1 text-xs text-status-error border border-status-error/50 rounded hover:bg-status-error/20 transition-colors"
+              (click)="soundboard.clearError()"
             >
-              Clear search
+              Dismiss
             </button>
           </div>
         }
 
-        <!-- Drop overlay -->
-        @if (isDragging()) {
+        <!-- Pads grid -->
+        <div class="relative">
           <div
-            class="absolute inset-0 bg-accent/80 border-2 border-dashed border-white rounded-xl flex items-center justify-center z-10"
+            class="grid gap-3"
+            style="grid-template-columns: repeat(auto-fill, minmax(100px, 140px));"
           >
-            <span class="text-white text-lg font-medium">
-              Drop to import {{ dragFileCount() }} file{{
-                dragFileCount() > 1 ? "s" : ""
-              }}
-            </span>
+            @for (
+              pad of soundboard.pads();
+              track pad.sound?.id ?? pad.index;
+              let i = $index
+            ) {
+              <app-sound-pad
+                [pad]="pad"
+                [loading]="soundboard.loading()"
+                [isPreviewing]="soundboard.previewingSoundId() === pad.sound?.id"
+                (play)="soundboard.playSound(pad.sound!.id)"
+                (preview)="soundboard.previewSound(pad.sound!.id)"
+                (import)="onImportSound()"
+                (volumeChange)="soundboard.setSoundVolume(pad.sound!.id, $event)"
+                (speedChange)="soundboard.setSoundSpeed(pad.sound!.id, $event)"
+                (shortcutChange)="onShortcutChange(pad.sound!.id, $event)"
+                (customNameChange)="
+                  soundboard.setSoundCustomName(pad.sound!.id, $event)
+                "
+                (imageChange)="onImageChange(pad.sound!.id, $event)"
+                (folderToggle)="
+                  soundboard.toggleSoundFolder(pad.sound!.id, $event)
+                "
+              />
+            }
           </div>
-        }
-      </div>
 
-      <!-- Footer -->
-      <div class="mt-4 flex justify-center">
-        <button
-          class="px-6 py-3 bg-surface-hover border border-dashed border-border hover:border-accent text-text-secondary hover:text-text-primary rounded-lg text-sm transition-all flex items-center gap-2"
-          [class.opacity-50]="soundboard.loading()"
-          [class.cursor-not-allowed]="soundboard.loading()"
-          [disabled]="soundboard.loading()"
-          (click)="importMultiple()"
-        >
-          <span>&#128193;</span>
-          Import Multiple
-        </button>
+          <!-- No results message -->
+          @if (hasNoResults()) {
+            <div
+              class="flex flex-col items-center justify-center py-12 text-text-muted"
+            >
+              <span class="text-4xl mb-2">&#128269;</span>
+              <p class="text-sm">
+                No sounds found for "{{ soundboard.searchQuery() }}"
+              </p>
+              <button
+                class="mt-3 text-xs text-accent hover:underline"
+                (click)="soundboard.setSearchQuery('')"
+              >
+                Clear search
+              </button>
+            </div>
+          }
+
+          <!-- Drop overlay -->
+          @if (isDragging()) {
+            <div
+              class="absolute inset-0 bg-accent/80 border-2 border-dashed border-white rounded-xl flex items-center justify-center z-10"
+            >
+              <span class="text-white text-lg font-medium">
+                Drop to import {{ dragFileCount() }} file{{
+                  dragFileCount() > 1 ? "s" : ""
+                }}
+              </span>
+            </div>
+          }
+        </div>
+
+        <!-- Footer -->
+        <div class="mt-4 pb-4 flex justify-center">
+          <button
+            class="px-6 py-3 bg-surface-hover border border-dashed border-border hover:border-accent text-text-secondary hover:text-text-primary rounded-lg text-sm transition-all flex items-center gap-2"
+            [class.opacity-50]="soundboard.loading()"
+            [class.cursor-not-allowed]="soundboard.loading()"
+            [disabled]="soundboard.loading()"
+            (click)="importMultiple()"
+          >
+            <span>&#128193;</span>
+            Import Multiple
+          </button>
+        </div>
       </div>
     </div>
 
