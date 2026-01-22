@@ -119,13 +119,34 @@ import { AudioDevice, AppSettings } from '../../../core/models';
               <input
                 type="range"
                 min="0"
-                max="100"
+                max="200"
                 [value]="micVolume() * 100"
                 (input)="onMicVolumeChange($event)"
-                class="w-full h-2 bg-surface rounded-full appearance-none cursor-pointer
+                class="w-full h-2 rounded-full appearance-none cursor-pointer
                        [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4
                        [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer
                        [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-110"
+                [style.background]="'linear-gradient(to right, #9d4edd 0%, #9d4edd ' + (micVolume() * 50) + '%, #12121a ' + (micVolume() * 50) + '%, #12121a 100%)'"
+              >
+            </div>
+
+            <!-- Soundboard Volume -->
+            <div class="mb-4">
+              <div class="flex items-center justify-between mb-2">
+                <label class="text-sm text-text-secondary">Soundboard Volume</label>
+                <span class="text-sm text-text-primary font-mono">{{ Math.round(soundboardVolume() * 100) }}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="200"
+                [value]="soundboardVolume() * 100"
+                (input)="onSoundboardVolumeChange($event)"
+                class="w-full h-2 rounded-full appearance-none cursor-pointer
+                       [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4
+                       [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer
+                       [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-110"
+                [style.background]="'linear-gradient(to right, #9d4edd 0%, #9d4edd ' + (soundboardVolume() * 50) + '%, #12121a ' + (soundboardVolume() * 50) + '%, #12121a 100%)'"
               >
             </div>
 
@@ -141,10 +162,11 @@ import { AudioDevice, AppSettings } from '../../../core/models';
                 max="100"
                 [value]="masterVolume() * 100"
                 (input)="onMasterVolumeChange($event)"
-                class="w-full h-2 bg-surface rounded-full appearance-none cursor-pointer
+                class="w-full h-2 rounded-full appearance-none cursor-pointer
                        [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4
                        [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer
                        [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-110"
+                [style.background]="'linear-gradient(to right, #9d4edd 0%, #9d4edd ' + (masterVolume() * 100) + '%, #12121a ' + (masterVolume() * 100) + '%, #12121a 100%)'"
               >
             </div>
 
@@ -244,6 +266,10 @@ export class SettingsPopupComponent implements OnInit {
   readonly micVolume = this._micVolume.asReadonly();
   readonly micMuted = this._micMuted.asReadonly();
 
+  // Soundboard volume
+  private _soundboardVolume = signal(1.0);
+  readonly soundboardVolume = this._soundboardVolume.asReadonly();
+
   // Global hotkeys enabled state
   readonly globalHotkeysEnabled = computed(() => this.shortcutService.enabled());
 
@@ -277,6 +303,10 @@ export class SettingsPopupComponent implements OnInit {
       this._physicalOutputDevices.set(physicalOutputs);
       this._virtualOutputDevices.set(virtualOutputs);
       this._settings.set(settings);
+
+      // Load volume values
+      this._micVolume.set(settings.audio.micVolume ?? 1.0);
+      this._soundboardVolume.set(settings.audio.soundboardVolume ?? 1.0);
     } catch (err) {
       console.error('Failed to load settings data:', err);
     } finally {
@@ -318,6 +348,13 @@ export class SettingsPopupComponent implements OnInit {
     const input = event.target as HTMLInputElement;
     const volume = parseFloat(input.value) / 100;
     await this.mixer.setMasterVolume(volume);
+  }
+
+  async onSoundboardVolumeChange(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const volume = parseFloat(input.value) / 100;
+    this._soundboardVolume.set(volume);
+    await this.mixer.setSoundboardVolume(volume);
   }
 
   async toggleMicMute(): Promise<void> {
