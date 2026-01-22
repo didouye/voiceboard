@@ -1,6 +1,7 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { TauriService } from './tauri.service';
 import { FuzzySearchService } from './fuzzy-search.service';
+import { MixerService } from './mixer.service';
 import { Sound, SoundPad, Folder, PadImage } from '../models';
 import { open } from '@tauri-apps/plugin-dialog';
 import { listen } from '@tauri-apps/api/event';
@@ -104,7 +105,8 @@ export class SoundboardService {
 
   constructor(
     private tauri: TauriService,
-    private fuzzySearch: FuzzySearchService
+    private fuzzySearch: FuzzySearchService,
+    private mixer: MixerService
   ) {
     this.loadState();
     this.initPreviewListeners();
@@ -173,7 +175,14 @@ export class SoundboardService {
         return;
       }
 
-      await this.tauri.playSound(soundId, sound.path, sound.volume, sound.speed);
+      // Calculate effective volume:
+      // If sound volume was modified (not 1.0), use it
+      // Otherwise, use global soundboard volume
+      const effectiveVolume = sound.volume !== 1.0
+        ? sound.volume
+        : this.mixer.soundboardVolume();
+
+      await this.tauri.playSound(soundId, sound.path, effectiveVolume, sound.speed);
       this.updateSound(soundId, { isPlaying: true });
     } catch (err) {
       console.error('Failed to play sound:', err);
@@ -312,7 +321,7 @@ export class SoundboardService {
       if (!selected) return;
 
       const path = selected as string;
-      const imported = await this.tauri.importSoundWithHash(path);
+      const imported = await this.tauri.importAndNormalizeSound(path);
 
       // Check for duplicate
       if (this._sounds().has(imported.hash)) {
@@ -362,7 +371,7 @@ export class SoundboardService {
       }
 
       const paths = Array.isArray(selected) ? selected : [selected];
-      const importResults = await this.tauri.importMultipleSoundsWithHash(paths);
+      const importResults = await this.tauri.importMultipleAndNormalize(paths);
 
       for (const res of importResults) {
         if ('err' in res) {
@@ -415,7 +424,7 @@ export class SoundboardService {
 
     try {
       this._loading.set(true);
-      const importResults = await this.tauri.importMultipleSoundsWithHash(paths);
+      const importResults = await this.tauri.importMultipleAndNormalize(paths);
 
       for (const res of importResults) {
         if ('err' in res) {
