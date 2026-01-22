@@ -6,6 +6,10 @@ fn default_global_hotkeys() -> bool {
     true
 }
 
+fn default_volume() -> f32 {
+    1.0
+}
+
 /// User preferences for audio devices
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AudioSettings {
@@ -27,6 +31,12 @@ pub struct AudioSettings {
     /// Enable global hotkeys for keyboard shortcuts
     #[serde(default = "default_global_hotkeys")]
     pub global_hotkeys_enabled: bool,
+    /// Microphone volume (0.0 to 2.0)
+    #[serde(default = "default_volume")]
+    pub mic_volume: f32,
+    /// Soundboard global volume (0.0 to 2.0)
+    #[serde(default = "default_volume")]
+    pub soundboard_volume: f32,
 }
 
 impl AudioSettings {
@@ -40,6 +50,8 @@ impl AudioSettings {
             buffer_size: 1024,
             mic_monitoring: false,
             global_hotkeys_enabled: true,
+            mic_volume: 1.0,
+            soundboard_volume: 1.0,
         }
     }
 }

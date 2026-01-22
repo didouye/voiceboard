@@ -153,6 +153,8 @@ impl From<AudioSettingsDto> for AudioSettings {
             buffer_size: dto.buffer_size,
             mic_monitoring: dto.mic_monitoring,
             global_hotkeys_enabled: dto.global_hotkeys_enabled,
+            mic_volume: 1.0,
+            soundboard_volume: 1.0,
         }
     }
 }
@@ -1946,6 +1948,8 @@ mod tests {
             buffer_size: 512,
             mic_monitoring: true,
             global_hotkeys_enabled: true,
+            mic_volume: 1.0,
+            soundboard_volume: 1.0,
         };
 
         let dto = AudioSettingsDto::from(&settings);
@@ -1994,6 +1998,8 @@ mod tests {
             buffer_size: 1024,
             mic_monitoring: true,
             global_hotkeys_enabled: true,
+            mic_volume: 1.0,
+            soundboard_volume: 1.0,
         };
 
         let dto = AudioSettingsDto::from(&original);
@@ -2059,6 +2065,8 @@ mod tests {
                 buffer_size: 256,
                 mic_monitoring: true,
                 global_hotkeys_enabled: true,
+                mic_volume: 1.0,
+                soundboard_volume: 1.0,
             },
             start_minimized: true,
             auto_start_mixing: true,
