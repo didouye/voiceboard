@@ -62,6 +62,11 @@ export class MixerService {
       const settings = await this.tauri.loadSettings();
       this._soundboardVolume.set(settings.audio.soundboardVolume ?? 1.0);
 
+      // Apply mic volume to audio engine on startup
+      if (settings.audio.micVolume !== undefined) {
+        await this.tauri.setMicVolume(settings.audio.micVolume);
+      }
+
       // Auto-start if not already running and config is valid
       if (!isMixing) {
         const hasInput = !!settings.audio.inputDeviceId;
