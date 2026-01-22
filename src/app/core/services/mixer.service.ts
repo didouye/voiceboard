@@ -17,6 +17,7 @@ export class MixerService {
   private _virtualDriverInstalled = signal<boolean | null>(null);
   private _loading = signal(false);
   private _error = signal<string | null>(null);
+  private _soundboardVolume = signal(1.0);
 
   // Public computed signals
   readonly config = this._config.asReadonly();
@@ -32,6 +33,7 @@ export class MixerService {
   readonly inputDevices = computed(() =>
     this._devices().filter(d => d.deviceType === 'InputPhysical')
   );
+  readonly soundboardVolume = this._soundboardVolume.asReadonly();
 
   constructor(private tauri: TauriService) {}
 
@@ -56,9 +58,12 @@ export class MixerService {
       this._virtualDriverInstalled.set(virtualDriver);
       this._isRunning.set(isMixing);
 
+      // Load settings for auto-start and soundboard volume
+      const settings = await this.tauri.loadSettings();
+      this._soundboardVolume.set(settings.audio.soundboardVolume ?? 1.0);
+
       // Auto-start if not already running and config is valid
       if (!isMixing) {
-        const settings = await this.tauri.loadSettings();
         const hasInput = !!settings.audio.inputDeviceId;
         const hasOutput = !!settings.audio.outputDeviceId;
 
@@ -101,6 +106,18 @@ export class MixerService {
       }
     } catch (err) {
       this._error.set(err instanceof Error ? err.message : 'Failed to set master volume');
+    }
+  }
+
+  /**
+   * Set the soundboard volume
+   */
+  async setSoundboardVolume(volume: number): Promise<void> {
+    try {
+      await this.tauri.setSoundboardVolume(volume);
+      this._soundboardVolume.set(volume);
+    } catch (err) {
+      this._error.set(err instanceof Error ? err.message : 'Failed to set soundboard volume');
     }
   }
 
