@@ -216,10 +216,25 @@ All data stored in `${DATA_PATH:-./data}/`:
 
 1. Go to **Stacks** → **Add stack**
 2. Name: `voiceboard`
-3. **Web editor**: paste content from `docker-compose.yml` (and merge `docker-compose.letsencrypt.yml` if needed)
-4. **Environment variables**: add your configuration
-5. **Advanced**: set `COMPOSE_PROFILES` to `db,redis,s3` (or as needed)
-6. Click **Deploy the stack**
+3. **Build method**: choose **Repository** or **Web editor**
+   - Repository: `https://github.com/didouye/voiceboard`, path: `backend/docker-compose.yml`
+   - Web editor: paste content from [docker-compose.yml](https://raw.githubusercontent.com/didouye/voiceboard/main/backend/docker-compose.yml)
+4. **Environment variables** - add these required variables:
+
+   | Variable | Value |
+   |----------|-------|
+   | `DOMAIN` | `voiceboard.example.com` |
+   | `SECRET_KEY` | `your-random-secret-key` |
+   | `POSTGRES_PASSWORD` | `your-db-password` |
+   | `AWS_ACCESS_KEY_ID` | `minioadmin` |
+   | `AWS_SECRET_ACCESS_KEY` | `your-minio-password` |
+   | `COMPOSE_PROFILES` | `db,redis,s3` |
+
+5. Click **Deploy the stack**
+
+For Let's Encrypt SSL, also add:
+- Merge `docker-compose.letsencrypt.yml` content into the compose file
+- Add `LETSENCRYPT_EMAIL=admin@example.com`
 
 ---
 

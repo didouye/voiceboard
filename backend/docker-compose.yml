@@ -19,12 +19,30 @@ services:
 
   # === Django REST API ===
   web:
-    image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-voiceboard}/voiceboard-backend:${IMAGE_TAG:-latest}
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-didouye}/voiceboard-backend:${IMAGE_TAG:-latest}
     command: uv run gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3
-    env_file: .env
     environment:
-      - DATABASE_URL=${DATABASE_URL:-postgres://${POSTGRES_USER:-voiceboard}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-voiceboard}}
+      # Django core
+      - DJANGO_SETTINGS_MODULE=config.settings.production
+      - DJANGO_SECRET_KEY=${SECRET_KEY:?SECRET_KEY is required}
+      - DJANGO_ALLOWED_HOSTS=${DOMAIN:?DOMAIN is required}
+      # Database (embedded or external)
+      - POSTGRES_HOST=${POSTGRES_HOST:-db}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB:-voiceboard}
+      - POSTGRES_USER=${POSTGRES_USER:-voiceboard}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      # Redis (embedded or external)
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      # S3 Storage
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_STORAGE_BUCKET_NAME=${AWS_STORAGE_BUCKET_NAME:-voiceboard}
+      - AWS_S3_ENDPOINT_URL=${AWS_S3_ENDPOINT_URL:-http://minio:9000}
+      - AWS_S3_REGION_NAME=${AWS_S3_REGION_NAME:-}
+      # Optional
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-https://${DOMAIN}}
+      - SENTRY_DSN=${SENTRY_DSN:-}
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.web.rule=Host(`${DOMAIN}`)"
@@ -45,12 +63,23 @@ services:
 
   # === Django WebSocket (Channels) ===
   channels:
-    image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-voiceboard}/voiceboard-backend:${IMAGE_TAG:-latest}
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-didouye}/voiceboard-backend:${IMAGE_TAG:-latest}
     command: uv run daphne config.asgi:application --bind 0.0.0.0:8001
-    env_file: .env
     environment:
-      - DATABASE_URL=${DATABASE_URL:-postgres://${POSTGRES_USER:-voiceboard}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-voiceboard}}
+      # Django core
+      - DJANGO_SETTINGS_MODULE=config.settings.production
+      - DJANGO_SECRET_KEY=${SECRET_KEY}
+      - DJANGO_ALLOWED_HOSTS=${DOMAIN}
+      # Database
+      - POSTGRES_HOST=${POSTGRES_HOST:-db}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB:-voiceboard}
+      - POSTGRES_USER=${POSTGRES_USER:-voiceboard}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      # Redis
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      # Optional
+      - SENTRY_DSN=${SENTRY_DSN:-}
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.channels.rule=Host(`${DOMAIN}`) && PathPrefix(`/ws/`)"
