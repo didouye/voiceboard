@@ -465,17 +465,39 @@ fn run_engine_thread(
                         let input_ch = input_channels;
 
                         // Create noise suppression filter
-                        let noise_enabled = Arc::new(AtomicBool::new(noise_suppression_enabled));
+                        // IMPORTANT: nnnoiseless only works at 48kHz - disable if sample rate differs
+                        let actual_noise_enabled = if sample_rate.0 != 48000 {
+                            if noise_suppression_enabled {
+                                tracing::warn!(
+                                    "Noise suppression disabled: sample rate {}Hz != 48000Hz (nnnoiseless requires 48kHz)",
+                                    sample_rate.0
+                                );
+                                let _ = event_tx.send(AudioEngineEvent::Info(format!(
+                                    "Noise suppression disabled: {}Hz not supported (requires 48kHz)",
+                                    sample_rate.0
+                                )));
+                            }
+                            false
+                        } else {
+                            noise_suppression_enabled
+                        };
+
+                        let noise_enabled = Arc::new(AtomicBool::new(actual_noise_enabled));
                         let noise_filter =
                             Arc::new(Mutex::new(NoiseFilter::new(noise_enabled.clone())));
                         let noise_filter_clone = noise_filter.clone();
 
                         tracing::info!(
-                            "Noise suppression: {}",
-                            if noise_suppression_enabled {
+                            "Noise suppression: {}{}",
+                            if actual_noise_enabled {
                                 "enabled"
                             } else {
                                 "disabled"
+                            },
+                            if sample_rate.0 != 48000 {
+                                " (48kHz required)"
+                            } else {
+                                ""
                             }
                         );
 
