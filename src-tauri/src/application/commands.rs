@@ -125,6 +125,12 @@ pub struct AudioSettingsDto {
     pub mic_volume: f32,
     #[serde(default = "default_volume")]
     pub soundboard_volume: f32,
+    #[serde(default = "default_noise_suppression")]
+    pub noise_suppression_enabled: bool,
+}
+
+fn default_noise_suppression() -> bool {
+    true
 }
 
 fn default_global_hotkeys() -> bool {
@@ -148,6 +154,7 @@ impl From<&AudioSettings> for AudioSettingsDto {
             global_hotkeys_enabled: settings.global_hotkeys_enabled,
             mic_volume: settings.mic_volume,
             soundboard_volume: settings.soundboard_volume,
+            noise_suppression_enabled: settings.noise_suppression_enabled,
         }
     }
 }
@@ -165,6 +172,7 @@ impl From<AudioSettingsDto> for AudioSettings {
             global_hotkeys_enabled: dto.global_hotkeys_enabled,
             mic_volume: dto.mic_volume,
             soundboard_volume: dto.soundboard_volume,
+            noise_suppression_enabled: dto.noise_suppression_enabled,
         }
     }
 }
@@ -2275,6 +2283,7 @@ mod tests {
             global_hotkeys_enabled: true,
             mic_volume: 1.0,
             soundboard_volume: 1.0,
+            noise_suppression_enabled: true,
         };
 
         let dto = AudioSettingsDto::from(&settings);
@@ -2301,6 +2310,7 @@ mod tests {
             global_hotkeys_enabled: true,
             mic_volume: 0.8,
             soundboard_volume: 1.5,
+            noise_suppression_enabled: true,
         };
 
         let settings = AudioSettings::from(dto);
@@ -2329,6 +2339,7 @@ mod tests {
             global_hotkeys_enabled: true,
             mic_volume: 1.0,
             soundboard_volume: 1.0,
+            noise_suppression_enabled: true,
         };
 
         let dto = AudioSettingsDto::from(&original);
@@ -2373,6 +2384,7 @@ mod tests {
                 global_hotkeys_enabled: true,
                 mic_volume: 1.0,
                 soundboard_volume: 1.0,
+                noise_suppression_enabled: true,
             },
             start_minimized: false,
             auto_start_mixing: true,
@@ -2398,6 +2410,7 @@ mod tests {
                 global_hotkeys_enabled: true,
                 mic_volume: 1.0,
                 soundboard_volume: 1.0,
+                noise_suppression_enabled: true,
             },
             start_minimized: true,
             auto_start_mixing: true,
@@ -2533,6 +2546,7 @@ mod tests {
             global_hotkeys_enabled: true,
             mic_volume: 1.0,
             soundboard_volume: 1.0,
+            noise_suppression_enabled: true,
         };
 
         let json = serde_json::to_string(&dto).unwrap();

@@ -10,6 +10,10 @@ fn default_volume() -> f32 {
     1.0
 }
 
+fn default_noise_suppression() -> bool {
+    true
+}
+
 /// User preferences for audio devices
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AudioSettings {
@@ -37,6 +41,9 @@ pub struct AudioSettings {
     /// Soundboard global volume (0.0 to 2.0)
     #[serde(default = "default_volume")]
     pub soundboard_volume: f32,
+    /// Enable noise suppression on microphone input
+    #[serde(default = "default_noise_suppression")]
+    pub noise_suppression_enabled: bool,
 }
 
 impl AudioSettings {
@@ -52,6 +59,7 @@ impl AudioSettings {
             global_hotkeys_enabled: true,
             mic_volume: 1.0,
             soundboard_volume: 1.0,
+            noise_suppression_enabled: true,
         }
     }
 }
@@ -242,5 +250,31 @@ mod tests {
         let mut settings = AudioSettings::new();
         settings.sample_rate = 96000;
         assert_eq!(settings.sample_rate, 96000);
+    }
+
+    #[test]
+    fn test_audio_settings_noise_suppression_default() {
+        let settings = AudioSettings::new();
+        assert!(settings.noise_suppression_enabled);
+    }
+
+    #[test]
+    fn test_audio_settings_noise_suppression_serialization() {
+        let mut settings = AudioSettings::new();
+        settings.noise_suppression_enabled = false;
+
+        let json = serde_json::to_string(&settings).unwrap();
+        assert!(json.contains("noise_suppression_enabled"));
+
+        let deserialized: AudioSettings = serde_json::from_str(&json).unwrap();
+        assert!(!deserialized.noise_suppression_enabled);
+    }
+
+    #[test]
+    fn test_audio_settings_noise_suppression_default_on_missing() {
+        // Old settings without the field should default to true
+        let json = r#"{"input_device_id":null,"output_device_id":null,"preview_device_id":null,"master_volume":1.0,"sample_rate":48000,"buffer_size":1024,"mic_monitoring":false}"#;
+        let settings: AudioSettings = serde_json::from_str(json).unwrap();
+        assert!(settings.noise_suppression_enabled);
     }
 }
