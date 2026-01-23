@@ -165,7 +165,7 @@
 - **Payments**: Stripe
 
 ### Backend Cloud
-- [ ] **Infrastructure**
+- [x] **Infrastructure**
   - REST API with DRF
   - PostgreSQL database
   - Audio file storage (S3-compatible)
