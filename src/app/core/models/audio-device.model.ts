@@ -37,6 +37,7 @@ export interface AudioSettings {
   globalHotkeysEnabled: boolean;
   micVolume: number;
   soundboardVolume: number;
+  noiseSuppressionEnabled: boolean;
 }
 
 export interface AppSettings {

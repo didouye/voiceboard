@@ -223,6 +223,7 @@ export class TauriService {
         globalHotkeysEnabled: s.audio.global_hotkeys_enabled ?? true,
         micVolume: s.audio.mic_volume ?? 1.0,
         soundboardVolume: s.audio.soundboard_volume ?? 1.0,
+        noiseSuppressionEnabled: s.audio.noise_suppression_enabled ?? true,
       },
       startMinimized: s.start_minimized,
       autoStartMixing: s.auto_start_mixing,
@@ -245,6 +246,7 @@ export class TauriService {
         global_hotkeys_enabled: s.audio.globalHotkeysEnabled,
         mic_volume: s.audio.micVolume,
         soundboard_volume: s.audio.soundboardVolume,
+        noise_suppression_enabled: s.audio.noiseSuppressionEnabled,
       },
       start_minimized: s.startMinimized,
       auto_start_mixing: s.autoStartMixing,
@@ -897,5 +899,30 @@ export class TauriService {
     soundId: string,
   ): Promise<string> {
     return invoke("migrate_sound_to_normalized", { originalPath, soundId });
+  }
+
+  // =========================================================================
+  // Noise Suppression
+  // =========================================================================
+
+  /**
+   * Get noise suppression enabled state
+   */
+  async getNoiseSuppression(): Promise<boolean> {
+    if (this.demoService.isDemoMode) {
+      return true; // Default enabled in demo
+    }
+    return invoke<boolean>("get_noise_suppression");
+  }
+
+  /**
+   * Set noise suppression enabled state
+   */
+  async setNoiseSuppression(enabled: boolean): Promise<void> {
+    if (this.demoService.isDemoMode) {
+      console.log("[Demo] Noise suppression set to:", enabled);
+      return;
+    }
+    await invoke("set_noise_suppression", { enabled });
   }
 }

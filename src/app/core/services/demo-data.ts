@@ -67,6 +67,7 @@ export const DEMO_SETTINGS: AppSettings = {
     globalHotkeysEnabled: true,
     micVolume: 1.0,
     soundboardVolume: 1.0,
+    noiseSuppressionEnabled: true,
   },
   startMinimized: false,
   autoStartMixing: true,

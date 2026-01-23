@@ -258,6 +258,28 @@ import { AudioDevice, AppSettings } from "../../../core/models";
                 ></div>
               </button>
             </div>
+
+            <!-- Noise Suppression -->
+            <div
+              class="flex items-center justify-between py-3 px-4 bg-background rounded-lg mt-3"
+            >
+              <div>
+                <span class="text-sm text-text-primary">Noise Suppression</span>
+                <p class="text-xs text-text-muted mt-0.5">
+                  Reduce background noise (fans, keyboard)
+                </p>
+              </div>
+              <button
+                class="w-12 h-6 rounded-full transition-colors relative"
+                [class]="noiseSuppression() ? 'bg-accent' : 'bg-surface'"
+                (click)="toggleNoiseSuppression()"
+              >
+                <div
+                  class="absolute top-1 w-4 h-4 bg-white rounded-full transition-transform"
+                  [class]="noiseSuppression() ? 'left-7' : 'left-1'"
+                ></div>
+              </button>
+            </div>
           </div>
 
           <!-- Keyboard Section -->
@@ -376,6 +398,10 @@ export class SettingsPopupComponent implements OnInit {
   // Debug mode enabled state
   readonly debugEnabled = computed(() => this.debugConsole.isEnabled());
 
+  // Noise suppression state
+  private _noiseSuppression = signal(true);
+  readonly noiseSuppression = this._noiseSuppression.asReadonly();
+
   Math = Math;
 
   constructor(
@@ -408,6 +434,10 @@ export class SettingsPopupComponent implements OnInit {
       // Load volume values
       this._micVolume.set(settings.audio.micVolume ?? 1.0);
       this._soundboardVolume.set(settings.audio.soundboardVolume ?? 1.0);
+
+      // Load noise suppression state
+      const noiseSuppressionEnabled = await this.tauri.getNoiseSuppression();
+      this._noiseSuppression.set(noiseSuppressionEnabled);
     } catch (err) {
       console.error("Failed to load settings data:", err);
     } finally {
@@ -485,6 +515,18 @@ export class SettingsPopupComponent implements OnInit {
       await invoke("set_debug_mode", { enabled: newValue });
     } catch (err) {
       console.error("Failed to toggle debug mode:", err);
+    }
+  }
+
+  async toggleNoiseSuppression(): Promise<void> {
+    const newValue = !this.noiseSuppression();
+    try {
+      await this.tauri.setNoiseSuppression(newValue);
+      this._noiseSuppression.set(newValue);
+      // Restart mixing to apply the change
+      await this.mixer.startOrRestartWithDevices();
+    } catch (err) {
+      console.error("Failed to toggle noise suppression:", err);
     }
   }
 
