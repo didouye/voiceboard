@@ -509,12 +509,17 @@ fn run_engine_thread(
                                 let count = input_callback_count_clone.fetch_add(1, Ordering::Relaxed);
                                 if count < 5 || count.is_multiple_of(1000) {
                                     let max_sample = data.iter().fold(0.0f32, |a, &b| a.max(b.abs()));
+                                    let filter_enabled = noise_filter_clone
+                                        .try_lock()
+                                        .map(|f| f.is_enabled())
+                                        .unwrap_or(false);
                                     tracing::info!(
-                                        "[AudioEngine] Input callback #{}: {} samples, {}ch, max amplitude: {:.6}",
+                                        "[AudioEngine] Input callback #{}: {} samples, {}ch, max amplitude: {:.6}, noise_filter: {}",
                                         count,
                                         data.len(),
                                         input_ch,
-                                        max_sample
+                                        max_sample,
+                                        if filter_enabled { "ON" } else { "OFF" }
                                     );
                                 }
 
