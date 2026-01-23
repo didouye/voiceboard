@@ -1,51 +1,122 @@
 services:
-  nginx:
-    image: nginx:alpine
+  # === Reverse Proxy ===
+  traefik:
+    image: traefik:v3.0
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/ssl:/etc/nginx/ssl:ro
-      - ./static:/app/static:ro
-    depends_on:
-      - web
-      - channels
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${DATA_PATH:-./data}/traefik:/letsencrypt
     restart: unless-stopped
 
+  # === Django REST API ===
   web:
-    build: .
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-voiceboard}/voiceboard-backend:${IMAGE_TAG:-latest}
     command: uv run gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3
     env_file: .env
-    volumes:
-      - ./static:/app/static
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgres://${POSTGRES_USER:-voiceboard}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-voiceboard}}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.web.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.web.entrypoints=websecure"
+      - "traefik.http.routers.web.tls=true"
+      - "traefik.http.services.web.loadbalancer.server.port=8000"
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+        required: false
+      redis:
+        condition: service_healthy
+        required: false
+      minio:
+        condition: service_healthy
+        required: false
     restart: unless-stopped
 
+  # === Django WebSocket (Channels) ===
   channels:
-    build: .
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-voiceboard}/voiceboard-backend:${IMAGE_TAG:-latest}
     command: uv run daphne config.asgi:application --bind 0.0.0.0:8001
     env_file: .env
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgres://${POSTGRES_USER:-voiceboard}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-voiceboard}}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.channels.rule=Host(`${DOMAIN}`) && PathPrefix(`/ws/`)"
+      - "traefik.http.routers.channels.entrypoints=websecure"
+      - "traefik.http.routers.channels.tls=true"
+      - "traefik.http.services.channels.loadbalancer.server.port=8001"
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+        required: false
+      redis:
+        condition: service_healthy
+        required: false
     restart: unless-stopped
 
+  # === PostgreSQL (embedded, optional) ===
   db:
     image: postgres:16-alpine
+    profiles: ["db"]
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-    env_file: .env
+      - ${DATA_PATH:-./data}/postgres:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-voiceboard}
+      POSTGRES_USER: ${POSTGRES_USER:-voiceboard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-voiceboard} -d ${POSTGRES_DB:-voiceboard}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
+  # === Redis (embedded, optional) ===
   redis:
     image: redis:7-alpine
+    profiles: ["redis"]
     volumes:
-      - redis_data:/data
+      - ${DATA_PATH:-./data}/redis:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
-volumes:
-  postgres_data:
-  redis_data:
+  # === MinIO S3 (embedded, optional) ===
+  minio:
+    image: minio/minio
+    profiles: ["s3"]
+    command: server /data --console-address ":9001"
+    volumes:
+      - ${DATA_PATH:-./data}/minio:/data
+    environment:
+      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID:?AWS_ACCESS_KEY_ID is required}
+      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY:?AWS_SECRET_ACCESS_KEY is required}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.minio-console.rule=Host(`minio.${DOMAIN}`)"
+      - "traefik.http.routers.minio-console.entrypoints=websecure"
+      - "traefik.http.routers.minio-console.tls=true"
+      - "traefik.http.routers.minio-console.service=minio-console"
+      - "traefik.http.services.minio-console.loadbalancer.server.port=9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
