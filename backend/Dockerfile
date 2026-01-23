@@ -15,8 +15,13 @@ RUN uv sync --frozen --no-dev --extra prod
 # Copy application code
 COPY . .
 
-# Collect static files
-RUN uv run python manage.py collectstatic --noinput
+# Use production settings for build
+ENV DJANGO_SETTINGS_MODULE=config.settings.production
+
+# Collect static files (provide minimal env vars for build)
+RUN DJANGO_SECRET_KEY=build-secret \
+    DJANGO_ALLOWED_HOSTS=localhost \
+    uv run python manage.py collectstatic --noinput
 
 # Expose port
 EXPOSE 8000
