@@ -383,11 +383,11 @@
   - Sound plays locally on each member's device
   - Benefits: better audio quality (no voice codec compression), bypasses noise gates
 
-- [ ] **Noise & Echo Cancellation**
-  - Implement noise reduction similar to Krisp
-  - Research open-source alternatives (RNNoise, Speex, etc.)
-  - Real-time processing in audio pipeline
-  - Configurable sensitivity/aggressiveness
+- [x] **Noise Suppression** *(completed 2026-01-23)*
+  - Real-time noise reduction using nnnoiseless (RNNoise port)
+  - On/Off toggle in settings (enabled by default)
+  - Processes mic input in 480-sample frames (~10ms latency)
+  - Future: Echo cancellation, intensity slider
 
 ### Local AI Features
 - [ ] **Auto Sound Naming (Speech-to-Text)**
