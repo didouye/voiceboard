@@ -15,6 +15,8 @@ use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
+use crate::application::noise_filter::NoiseFilter;
+
 /// Size of the ring buffer in samples (not frames)
 const RING_BUFFER_SIZE: usize = 8192;
 
@@ -30,6 +32,7 @@ pub enum AudioEngineCommand {
         output_device: String,
         sample_rate: u32,
         channels: u16,
+        noise_suppression_enabled: bool,
     },
     /// Stop mixing
     Stop,
@@ -54,6 +57,8 @@ pub enum AudioEngineCommand {
     SetMicMonitoring(bool),
     /// Set monitoring output device
     SetMonitoringDevice(String),
+    /// Enable/disable noise suppression
+    SetNoiseSuppression(bool),
     /// Shutdown the engine
     Shutdown,
 }
@@ -248,6 +253,7 @@ fn run_engine_thread(
                         output_device,
                         sample_rate: _,
                         channels: _,
+                        noise_suppression_enabled,
                     } => {
                         // Stop any existing streams
                         input_stream = None;
@@ -458,6 +464,21 @@ fn run_engine_thread(
                         let input_callback_count_clone = input_callback_count.clone();
                         let input_ch = input_channels;
 
+                        // Create noise suppression filter
+                        let noise_enabled = Arc::new(AtomicBool::new(noise_suppression_enabled));
+                        let noise_filter =
+                            Arc::new(Mutex::new(NoiseFilter::new(noise_enabled.clone())));
+                        let noise_filter_clone = noise_filter.clone();
+
+                        tracing::info!(
+                            "Noise suppression: {}",
+                            if noise_suppression_enabled {
+                                "enabled"
+                            } else {
+                                "disabled"
+                            }
+                        );
+
                         // Build input stream (may be mono or stereo)
                         let input_result = input_dev.build_input_stream(
                             &input_config,
@@ -487,17 +508,26 @@ fn run_engine_thread(
                                 let num_frames = data.len() / input_ch as usize;
 
                                 if let Ok(mut prod) = producer_clone.try_lock() {
-                                    for frame in 0..num_frames {
-                                        // Average all channels to produce mono sample
-                                        let mut sum = 0.0f32;
-                                        for ch in 0..input_ch as usize {
-                                            let idx = frame * input_ch as usize + ch;
-                                            sum += data.get(idx).copied().unwrap_or(0.0);
+                                    if let Ok(mut filter) = noise_filter_clone.try_lock() {
+                                        for frame in 0..num_frames {
+                                            // Average all channels to produce mono sample
+                                            let mut sum = 0.0f32;
+                                            for ch in 0..input_ch as usize {
+                                                let idx = frame * input_ch as usize + ch;
+                                                sum += data.get(idx).copied().unwrap_or(0.0);
+                                            }
+                                            let mono_sample = sum / input_ch as f32;
+
+                                            // Process through noise filter
+                                            let filtered_samples = filter.process_sample(mono_sample);
+
+                                            // Push filtered samples to ring buffer
+                                            for &sample in filtered_samples {
+                                                let processed = if muted { 0.0 } else { sample * volume };
+                                                sum_squares += processed * processed;
+                                                let _ = prod.try_push(processed);
+                                            }
                                         }
-                                        let mono_sample = sum / input_ch as f32;
-                                        let processed = if muted { 0.0 } else { mono_sample * volume };
-                                        sum_squares += processed * processed;
-                                        let _ = prod.try_push(processed);
                                     }
                                 }
 
@@ -1123,6 +1153,15 @@ fn run_engine_thread(
                         tracing::info!("Monitoring device set to: {}", device_name);
                     }
 
+                    AudioEngineCommand::SetNoiseSuppression(enabled) => {
+                        tracing::info!(
+                            "Noise suppression set to: {} (requires restart to take effect)",
+                            enabled
+                        );
+                        // The setting is applied on next Start command
+                        // Frontend should restart mixing when this changes
+                    }
+
                     AudioEngineCommand::Shutdown => {
                         // Pause streams before dropping
                         if let Some(ref stream) = input_stream {
@@ -1342,6 +1381,7 @@ mod tests {
             output_device: "VB-Cable".to_string(),
             sample_rate: 48000,
             channels: 2,
+            noise_suppression_enabled: true,
         };
 
         if let AudioEngineCommand::Start {
@@ -1349,12 +1389,14 @@ mod tests {
             output_device,
             sample_rate,
             channels,
+            noise_suppression_enabled,
         } = cmd
         {
             assert_eq!(input_device, "Microphone");
             assert_eq!(output_device, "VB-Cable");
             assert_eq!(sample_rate, 48000);
             assert_eq!(channels, 2);
+            assert!(noise_suppression_enabled);
         } else {
             panic!("Expected Start command");
         }

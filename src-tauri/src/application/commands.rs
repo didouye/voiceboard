@@ -686,6 +686,7 @@ pub async fn start_mixing(state: State<'_, AppState>) -> Result<(), String> {
         .clone()
         .unwrap_or_else(|| "default".to_string());
     let mic_monitoring = settings.audio.mic_monitoring;
+    let noise_suppression_enabled = settings.audio.noise_suppression_enabled;
     drop(settings);
 
     // Send monitoring device BEFORE start (so it's available when stream is created)
@@ -708,6 +709,7 @@ pub async fn start_mixing(state: State<'_, AppState>) -> Result<(), String> {
             output_device,
             sample_rate,
             channels: 2, // Stereo
+            noise_suppression_enabled,
         })
         .map_err(|e| format!("Failed to start audio engine: {}", e))?;
 
