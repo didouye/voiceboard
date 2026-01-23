@@ -42,6 +42,7 @@ use application::{
         get_input_devices,
         // Mixer configuration
         get_mixer_config,
+        get_noise_suppression,
         get_physical_output_devices,
         get_preview_state,
         get_sentry_dsn,
@@ -80,6 +81,7 @@ use application::{
         set_mic_monitoring,
         set_mic_muted,
         set_mic_volume,
+        set_noise_suppression,
         set_output_device,
         set_preview_device,
         set_soundboard_volume,
@@ -316,6 +318,9 @@ pub fn run() {
             get_debug_mode,
             set_debug_mode,
             get_sentry_dsn,
+            // Noise suppression
+            get_noise_suppression,
+            set_noise_suppression,
             // VB-Cable setup
             check_vb_cable_installed,
             download_and_install_vb_cable,

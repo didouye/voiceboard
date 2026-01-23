@@ -2134,6 +2134,46 @@ fn run_installer(path: &std::path::Path) -> Result<(), String> {
     }
 }
 
+// ============================================================================
+// Noise Suppression
+// ============================================================================
+
+/// Get noise suppression enabled state
+#[tauri::command]
+pub fn get_noise_suppression(state: State<AppState>) -> bool {
+    let settings = state.settings.blocking_read();
+    settings.audio.noise_suppression_enabled
+}
+
+/// Set noise suppression enabled state
+#[tauri::command]
+pub fn set_noise_suppression(
+    app: tauri::AppHandle,
+    state: State<AppState>,
+    enabled: bool,
+) -> Result<(), String> {
+    // Update in-memory state
+    {
+        let mut settings = state.settings.blocking_write();
+        settings.audio.noise_suppression_enabled = enabled;
+    }
+
+    // Persist to store
+    let store = app
+        .store(SETTINGS_STORE)
+        .map_err(|e| format!("Failed to open store: {}", e))?;
+
+    let settings = state.settings.blocking_read();
+    store.set(SETTINGS_KEY, serde_json::to_value(&*settings).unwrap());
+    store.save().map_err(|e| format!("Failed to save: {}", e))?;
+
+    // Emit event for frontend
+    let _ = app.emit("noise-suppression-changed", enabled);
+
+    tracing::info!(enabled = enabled, "Noise suppression toggled");
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
