@@ -5,6 +5,7 @@
 
 pub mod audio_engine;
 pub mod commands;
+pub mod noise_filter;
 pub mod preview_engine;
 mod services;
 pub mod shortcut_commands;
