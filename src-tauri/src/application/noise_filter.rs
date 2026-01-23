@@ -1,6 +1,9 @@
 //! Noise suppression filter using nnnoiseless (RNNoise port)
 //!
 //! Processes audio in 480-sample frames at 48kHz.
+//!
+//! IMPORTANT: nnnoiseless expects samples in 16-bit integer scale [-32768, 32767],
+//! not normalized [-1.0, 1.0]. We scale internally before/after processing.
 
 use nnnoiseless::DenoiseState;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -8,6 +11,9 @@ use std::sync::Arc;
 
 /// Frame size required by nnnoiseless (10ms at 48kHz)
 pub const DENOISE_FRAME_SIZE: usize = 480;
+
+/// Scale factor to convert normalized audio [-1.0, 1.0] to 16-bit scale [-32768, 32767]
+const SCALE_TO_16BIT: f32 = 32768.0;
 
 /// Real-time noise suppression filter
 pub struct NoiseFilter {
@@ -37,6 +43,8 @@ impl NoiseFilter {
     /// Call this for each input sample. When enough samples have accumulated (480),
     /// the filter processes them and returns the denoised samples.
     /// Returns an empty slice if not enough samples yet.
+    ///
+    /// Input/output are in normalized range [-1.0, 1.0]. Scaling to 16-bit is done internally.
     pub fn process_sample(&mut self, sample: f32) -> &[f32] {
         // Clear output buffer
         self.output_buffer.clear();
@@ -47,17 +55,22 @@ impl NoiseFilter {
             return &self.output_buffer;
         }
 
-        // Accumulate sample
-        self.buffer.push(sample);
+        // Accumulate sample (scaled to 16-bit range for nnnoiseless)
+        self.buffer.push(sample * SCALE_TO_16BIT);
 
         // Process when we have a full frame
         if self.buffer.len() >= DENOISE_FRAME_SIZE {
             // Resize output buffer to match frame size
             self.output_buffer.resize(DENOISE_FRAME_SIZE, 0.0);
 
-            // Process the frame (input -> output)
+            // Process the frame (input -> output) - both in 16-bit scale
             self.denoiser
                 .process_frame(&mut self.output_buffer, &self.buffer);
+
+            // Scale output back to normalized range [-1.0, 1.0]
+            for sample in &mut self.output_buffer {
+                *sample /= SCALE_TO_16BIT;
+            }
 
             // Clear input buffer
             self.buffer.clear();
@@ -72,7 +85,7 @@ impl NoiseFilter {
             return Vec::new();
         }
 
-        // Pad with zeros to complete the frame
+        // Pad with zeros to complete the frame (buffer already has scaled samples)
         while self.buffer.len() < DENOISE_FRAME_SIZE {
             self.buffer.push(0.0);
         }
@@ -80,6 +93,11 @@ impl NoiseFilter {
         let mut output = vec![0.0; DENOISE_FRAME_SIZE];
         self.denoiser.process_frame(&mut output, &self.buffer);
         self.buffer.clear();
+
+        // Scale output back to normalized range
+        for sample in &mut output {
+            *sample /= SCALE_TO_16BIT;
+        }
         output
     }
 
@@ -154,7 +172,8 @@ mod tests {
         let enabled = Arc::new(AtomicBool::new(true));
         let mut filter = NoiseFilter::new(enabled);
 
-        // Generate white noise (random-ish values)
+        // Generate white noise in normalized range [-1.0, 1.0]
+        // (random-ish values simulating background noise)
         let noise: Vec<f32> = (0..DENOISE_FRAME_SIZE)
             .map(|i| ((i * 7919) % 1000) as f32 / 1000.0 - 0.5)
             .collect();
@@ -162,7 +181,7 @@ mod tests {
         // Calculate input RMS
         let input_rms: f32 = (noise.iter().map(|s| s * s).sum::<f32>() / noise.len() as f32).sqrt();
 
-        // Process the noise
+        // Process the noise (filter handles scaling internally)
         let mut output: Vec<f32> = Vec::new();
         for sample in noise {
             output.extend(filter.process_sample(sample));
@@ -173,6 +192,7 @@ mod tests {
             (output.iter().map(|s| s * s).sum::<f32>() / output.len() as f32).sqrt();
 
         // Output should have lower RMS than input (noise reduced)
+        // Note: With proper scaling, RNNoise should significantly reduce non-voice noise
         assert!(
             output_rms < input_rms,
             "Noise should be reduced: input_rms={}, output_rms={}",
