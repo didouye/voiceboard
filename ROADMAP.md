@@ -171,6 +171,12 @@
   - Audio file storage (S3-compatible)
   - JWT Authentication
 
+- [ ] **Auto-Deploy Pipeline**
+  - GitHub Action triggered after backend-release.yml succeeds
+  - SSH to production server
+  - Pull new image and restart containers
+  - Requires: SERVER_HOST, SERVER_USER, SERVER_SSH_KEY secrets
+
 - [ ] **User Management**
   - Account creation
   - User profile
