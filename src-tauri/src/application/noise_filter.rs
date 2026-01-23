@@ -25,6 +25,8 @@ pub struct NoiseFilter {
     output_buffer: Vec<f32>,
     /// Whether noise suppression is enabled
     enabled: Arc<AtomicBool>,
+    /// Last VAD (Voice Activity Detection) probability from process_frame (0.0 to 1.0)
+    last_vad: f32,
 }
 
 impl NoiseFilter {
@@ -35,6 +37,7 @@ impl NoiseFilter {
             buffer: Vec::with_capacity(DENOISE_FRAME_SIZE),
             output_buffer: Vec::with_capacity(DENOISE_FRAME_SIZE),
             enabled,
+            last_vad: 0.0,
         }
     }
 
@@ -64,7 +67,9 @@ impl NoiseFilter {
             self.output_buffer.resize(DENOISE_FRAME_SIZE, 0.0);
 
             // Process the frame (input -> output) - both in 16-bit scale
-            self.denoiser
+            // process_frame returns VAD probability (0.0 = no voice, 1.0 = voice)
+            self.last_vad = self
+                .denoiser
                 .process_frame(&mut self.output_buffer, &self.buffer);
 
             // Scale output back to normalized range [-1.0, 1.0]
@@ -109,6 +114,14 @@ impl NoiseFilter {
     /// Set enabled state
     pub fn set_enabled(&self, enabled: bool) {
         self.enabled.store(enabled, Ordering::Relaxed);
+    }
+
+    /// Get the last VAD (Voice Activity Detection) probability
+    ///
+    /// Returns a value between 0.0 (no voice) and 1.0 (voice detected).
+    /// Only valid when noise suppression is enabled; returns 0.0 otherwise.
+    pub fn last_vad(&self) -> f32 {
+        self.last_vad
     }
 }
 
@@ -214,5 +227,27 @@ mod tests {
         // Flush should return padded frame
         let flushed = filter.flush();
         assert_eq!(flushed.len(), DENOISE_FRAME_SIZE);
+    }
+
+    #[test]
+    fn test_noise_filter_vad() {
+        let enabled = Arc::new(AtomicBool::new(true));
+        let mut filter = NoiseFilter::new(enabled);
+
+        // Initial VAD should be 0
+        assert_eq!(filter.last_vad(), 0.0);
+
+        // Process a full frame of silence/noise
+        for _ in 0..DENOISE_FRAME_SIZE {
+            filter.process_sample(0.01); // Very quiet
+        }
+
+        // VAD should now have a value (likely low for noise)
+        let vad = filter.last_vad();
+        assert!(
+            vad >= 0.0 && vad <= 1.0,
+            "VAD should be between 0 and 1, got {}",
+            vad
+        );
     }
 }

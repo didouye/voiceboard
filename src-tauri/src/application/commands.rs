@@ -127,6 +127,8 @@ pub struct AudioSettingsDto {
     pub soundboard_volume: f32,
     #[serde(default = "default_noise_suppression")]
     pub noise_suppression_enabled: bool,
+    #[serde(default)]
+    pub voice_gate_enabled: bool,
 }
 
 fn default_noise_suppression() -> bool {
@@ -155,6 +157,7 @@ impl From<&AudioSettings> for AudioSettingsDto {
             mic_volume: settings.mic_volume,
             soundboard_volume: settings.soundboard_volume,
             noise_suppression_enabled: settings.noise_suppression_enabled,
+            voice_gate_enabled: settings.voice_gate_enabled,
         }
     }
 }
@@ -173,6 +176,7 @@ impl From<AudioSettingsDto> for AudioSettings {
             mic_volume: dto.mic_volume,
             soundboard_volume: dto.soundboard_volume,
             noise_suppression_enabled: dto.noise_suppression_enabled,
+            voice_gate_enabled: dto.voice_gate_enabled,
         }
     }
 }
@@ -687,6 +691,7 @@ pub async fn start_mixing(state: State<'_, AppState>) -> Result<(), String> {
         .unwrap_or_else(|| "default".to_string());
     let mic_monitoring = settings.audio.mic_monitoring;
     let noise_suppression_enabled = settings.audio.noise_suppression_enabled;
+    let voice_gate_enabled = settings.audio.voice_gate_enabled;
     drop(settings);
 
     // Send monitoring device BEFORE start (so it's available when stream is created)
@@ -710,6 +715,7 @@ pub async fn start_mixing(state: State<'_, AppState>) -> Result<(), String> {
             sample_rate,
             channels: 2, // Stereo
             noise_suppression_enabled,
+            voice_gate_enabled,
         })
         .map_err(|e| format!("Failed to start audio engine: {}", e))?;
 
@@ -2176,6 +2182,46 @@ pub fn set_noise_suppression(
     Ok(())
 }
 
+// ============================================================================
+// Voice Gate (VAD Auto-Mute)
+// ============================================================================
+
+/// Get voice gate enabled state
+#[tauri::command]
+pub fn get_voice_gate(state: State<AppState>) -> bool {
+    let settings = state.settings.blocking_read();
+    settings.audio.voice_gate_enabled
+}
+
+/// Set voice gate enabled state
+#[tauri::command]
+pub fn set_voice_gate(
+    app: tauri::AppHandle,
+    state: State<AppState>,
+    enabled: bool,
+) -> Result<(), String> {
+    // Update in-memory state
+    {
+        let mut settings = state.settings.blocking_write();
+        settings.audio.voice_gate_enabled = enabled;
+    }
+
+    // Persist to store
+    let store = app
+        .store(SETTINGS_STORE)
+        .map_err(|e| format!("Failed to open store: {}", e))?;
+
+    let settings = state.settings.blocking_read();
+    store.set(SETTINGS_KEY, serde_json::to_value(&*settings).unwrap());
+    store.save().map_err(|e| format!("Failed to save: {}", e))?;
+
+    // Emit event for frontend
+    let _ = app.emit("voice-gate-changed", enabled);
+
+    tracing::info!(enabled = enabled, "Voice gate toggled");
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2326,6 +2372,7 @@ mod tests {
             mic_volume: 1.0,
             soundboard_volume: 1.0,
             noise_suppression_enabled: true,
+            voice_gate_enabled: false,
         };
 
         let dto = AudioSettingsDto::from(&settings);
@@ -2353,6 +2400,7 @@ mod tests {
             mic_volume: 0.8,
             soundboard_volume: 1.5,
             noise_suppression_enabled: true,
+            voice_gate_enabled: false,
         };
 
         let settings = AudioSettings::from(dto);
@@ -2382,6 +2430,7 @@ mod tests {
             mic_volume: 1.0,
             soundboard_volume: 1.0,
             noise_suppression_enabled: true,
+            voice_gate_enabled: false,
         };
 
         let dto = AudioSettingsDto::from(&original);
@@ -2427,6 +2476,7 @@ mod tests {
                 mic_volume: 1.0,
                 soundboard_volume: 1.0,
                 noise_suppression_enabled: true,
+                voice_gate_enabled: false,
             },
             start_minimized: false,
             auto_start_mixing: true,
@@ -2453,6 +2503,7 @@ mod tests {
                 mic_volume: 1.0,
                 soundboard_volume: 1.0,
                 noise_suppression_enabled: true,
+                voice_gate_enabled: false,
             },
             start_minimized: true,
             auto_start_mixing: true,
@@ -2589,6 +2640,7 @@ mod tests {
             mic_volume: 1.0,
             soundboard_volume: 1.0,
             noise_suppression_enabled: true,
+            voice_gate_enabled: false,
         };
 
         let json = serde_json::to_string(&dto).unwrap();

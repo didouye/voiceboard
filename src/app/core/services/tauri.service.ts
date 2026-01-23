@@ -224,6 +224,7 @@ export class TauriService {
         micVolume: s.audio.mic_volume ?? 1.0,
         soundboardVolume: s.audio.soundboard_volume ?? 1.0,
         noiseSuppressionEnabled: s.audio.noise_suppression_enabled ?? true,
+        voiceGateEnabled: s.audio.voice_gate_enabled ?? false,
       },
       startMinimized: s.start_minimized,
       autoStartMixing: s.auto_start_mixing,
@@ -247,6 +248,7 @@ export class TauriService {
         mic_volume: s.audio.micVolume,
         soundboard_volume: s.audio.soundboardVolume,
         noise_suppression_enabled: s.audio.noiseSuppressionEnabled,
+        voice_gate_enabled: s.audio.voiceGateEnabled,
       },
       start_minimized: s.startMinimized,
       auto_start_mixing: s.autoStartMixing,
@@ -924,5 +926,30 @@ export class TauriService {
       return;
     }
     await invoke("set_noise_suppression", { enabled });
+  }
+
+  // =========================================================================
+  // Voice Gate (VAD Auto-Mute)
+  // =========================================================================
+
+  /**
+   * Get voice gate enabled state
+   */
+  async getVoiceGate(): Promise<boolean> {
+    if (this.demoService.isDemoMode) {
+      return false; // Default disabled in demo
+    }
+    return invoke<boolean>("get_voice_gate");
+  }
+
+  /**
+   * Set voice gate enabled state
+   */
+  async setVoiceGate(enabled: boolean): Promise<void> {
+    if (this.demoService.isDemoMode) {
+      console.log("[Demo] Voice gate set to:", enabled);
+      return;
+    }
+    await invoke("set_voice_gate", { enabled });
   }
 }

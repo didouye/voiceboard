@@ -10,10 +10,10 @@ use ringbuf::{
     HeapRb,
 };
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::application::noise_filter::NoiseFilter;
 
@@ -33,6 +33,7 @@ pub enum AudioEngineCommand {
         sample_rate: u32,
         channels: u16,
         noise_suppression_enabled: bool,
+        voice_gate_enabled: bool,
     },
     /// Stop mixing
     Stop,
@@ -59,6 +60,8 @@ pub enum AudioEngineCommand {
     SetMonitoringDevice(String),
     /// Enable/disable noise suppression
     SetNoiseSuppression(bool),
+    /// Enable/disable voice gate (VAD auto-mute)
+    SetVoiceGate(bool),
     /// Shutdown the engine
     Shutdown,
 }
@@ -254,6 +257,7 @@ fn run_engine_thread(
                         sample_rate: _,
                         channels: _,
                         noise_suppression_enabled,
+                        voice_gate_enabled: voice_gate_param,
                     } => {
                         // Stop any existing streams
                         input_stream = None;
@@ -487,8 +491,23 @@ fn run_engine_thread(
                             Arc::new(Mutex::new(NoiseFilter::new(noise_enabled.clone())));
                         let noise_filter_clone = noise_filter.clone();
 
+                        // Voice gate (VAD auto-mute) state
+                        // Only effective when noise suppression is also enabled
+                        let voice_gate_enabled =
+                            Arc::new(AtomicBool::new(voice_gate_param && actual_noise_enabled));
+                        let voice_gate_enabled_clone = voice_gate_enabled.clone();
+                        // Timestamp (ms since engine start) until which voice is considered detected
+                        let voice_detected_until = Arc::new(AtomicU64::new(0));
+                        let voice_detected_until_clone = voice_detected_until.clone();
+                        // Reference time for voice gate timing
+                        let engine_start_time = Instant::now();
+
+                        // Voice gate constants
+                        const VAD_THRESHOLD: f32 = 0.7;
+                        const VOICE_HOLDOFF_MS: u64 = 200;
+
                         tracing::info!(
-                            "Noise suppression: {}{}",
+                            "Noise suppression: {}{}, Voice gate: {}",
                             if actual_noise_enabled {
                                 "enabled"
                             } else {
@@ -498,6 +517,13 @@ fn run_engine_thread(
                                 " (48kHz required)"
                             } else {
                                 ""
+                            },
+                            if voice_gate_param && actual_noise_enabled {
+                                "enabled"
+                            } else if voice_gate_param {
+                                "disabled (requires noise suppression)"
+                            } else {
+                                "disabled"
                             }
                         );
 
@@ -536,6 +562,10 @@ fn run_engine_thread(
 
                                 if let Ok(mut prod) = producer_clone.try_lock() {
                                     if let Ok(mut filter) = noise_filter_clone.try_lock() {
+                                        // Voice gate state
+                                        let voice_gate_on = voice_gate_enabled_clone.load(Ordering::Relaxed);
+                                        let filter_enabled = filter.is_enabled();
+
                                         for frame in 0..num_frames {
                                             // Average all channels to produce mono sample
                                             let mut sum = 0.0f32;
@@ -545,12 +575,38 @@ fn run_engine_thread(
                                             }
                                             let mono_sample = sum / input_ch as f32;
 
-                                            // Process through noise filter
-                                            let filtered_samples = filter.process_sample(mono_sample);
+                                            // Process through noise filter and collect samples
+                                            // (must collect to end the mutable borrow before calling last_vad)
+                                            let filtered_samples: Vec<f32> = filter.process_sample(mono_sample).to_vec();
+
+                                            // Voice gate: check VAD and apply muting
+                                            // Only effective when noise suppression is enabled (VAD requires it)
+                                            let voice_gate_muted = if voice_gate_on && filter_enabled && !filtered_samples.is_empty() {
+                                                let vad = filter.last_vad();
+                                                let now_ms = engine_start_time.elapsed().as_millis() as u64;
+
+                                                if vad >= VAD_THRESHOLD {
+                                                    // Voice detected - extend hold-off
+                                                    voice_detected_until_clone.store(
+                                                        now_ms + VOICE_HOLDOFF_MS,
+                                                        Ordering::Relaxed
+                                                    );
+                                                    false // Not muted
+                                                } else {
+                                                    // Check if hold-off has expired
+                                                    now_ms > voice_detected_until_clone.load(Ordering::Relaxed)
+                                                }
+                                            } else {
+                                                false // Voice gate not active
+                                            };
 
                                             // Push filtered samples to ring buffer
-                                            for &sample in filtered_samples {
-                                                let processed = if muted { 0.0 } else { sample * volume };
+                                            for sample in filtered_samples {
+                                                let processed = if muted || voice_gate_muted {
+                                                    0.0
+                                                } else {
+                                                    sample * volume
+                                                };
                                                 sum_squares += processed * processed;
                                                 let _ = prod.try_push(processed);
                                             }
@@ -1189,6 +1245,15 @@ fn run_engine_thread(
                         // Frontend should restart mixing when this changes
                     }
 
+                    AudioEngineCommand::SetVoiceGate(enabled) => {
+                        tracing::info!(
+                            "Voice gate set to: {} (requires restart to take effect)",
+                            enabled
+                        );
+                        // The setting is applied on next Start command
+                        // Frontend should restart mixing when this changes
+                    }
+
                     AudioEngineCommand::Shutdown => {
                         // Pause streams before dropping
                         if let Some(ref stream) = input_stream {
@@ -1409,6 +1474,7 @@ mod tests {
             sample_rate: 48000,
             channels: 2,
             noise_suppression_enabled: true,
+            voice_gate_enabled: false,
         };
 
         if let AudioEngineCommand::Start {
@@ -1417,6 +1483,7 @@ mod tests {
             sample_rate,
             channels,
             noise_suppression_enabled,
+            voice_gate_enabled,
         } = cmd
         {
             assert_eq!(input_device, "Microphone");
@@ -1424,6 +1491,7 @@ mod tests {
             assert_eq!(sample_rate, 48000);
             assert_eq!(channels, 2);
             assert!(noise_suppression_enabled);
+            assert!(!voice_gate_enabled);
         } else {
             panic!("Expected Start command");
         }

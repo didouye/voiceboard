@@ -14,6 +14,10 @@ fn default_noise_suppression() -> bool {
     true
 }
 
+fn default_voice_gate() -> bool {
+    false
+}
+
 /// User preferences for audio devices
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AudioSettings {
@@ -44,6 +48,10 @@ pub struct AudioSettings {
     /// Enable noise suppression on microphone input
     #[serde(default = "default_noise_suppression")]
     pub noise_suppression_enabled: bool,
+    /// Enable voice gate (auto-mute when no voice detected)
+    /// Requires noise_suppression_enabled to be true
+    #[serde(default = "default_voice_gate")]
+    pub voice_gate_enabled: bool,
 }
 
 impl AudioSettings {
@@ -60,6 +68,7 @@ impl AudioSettings {
             mic_volume: 1.0,
             soundboard_volume: 1.0,
             noise_suppression_enabled: true,
+            voice_gate_enabled: false,
         }
     }
 }

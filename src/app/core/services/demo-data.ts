@@ -68,6 +68,7 @@ export const DEMO_SETTINGS: AppSettings = {
     micVolume: 1.0,
     soundboardVolume: 1.0,
     noiseSuppressionEnabled: true,
+    voiceGateEnabled: false,
   },
   startMinimized: false,
   autoStartMixing: true,

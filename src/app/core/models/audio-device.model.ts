@@ -38,6 +38,7 @@ export interface AudioSettings {
   micVolume: number;
   soundboardVolume: number;
   noiseSuppressionEnabled: boolean;
+  voiceGateEnabled: boolean;
 }
 
 export interface AppSettings {

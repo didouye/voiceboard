@@ -51,6 +51,7 @@ use application::{
         get_sounds_dir,
         get_virtual_output_devices,
         get_virtual_outputs_by_priority,
+        get_voice_gate,
         hash_file,
         import_and_normalize_sound,
         import_multiple_sounds_with_hash,
@@ -85,6 +86,7 @@ use application::{
         set_output_device,
         set_preview_device,
         set_soundboard_volume,
+        set_voice_gate,
         // Mixing control
         start_mixing,
         stop_all_sounds,
@@ -321,6 +323,9 @@ pub fn run() {
             // Noise suppression
             get_noise_suppression,
             set_noise_suppression,
+            // Voice gate (VAD auto-mute)
+            get_voice_gate,
+            set_voice_gate,
             // VB-Cable setup
             check_vb_cable_installed,
             download_and_install_vb_cable,

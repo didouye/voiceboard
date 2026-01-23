@@ -280,6 +280,35 @@ import { AudioDevice, AppSettings } from "../../../core/models";
                 ></div>
               </button>
             </div>
+
+            <!-- Voice Gate -->
+            <div
+              class="flex items-center justify-between py-3 px-4 bg-background rounded-lg mt-3 transition-opacity"
+              [class.opacity-50]="!noiseSuppression()"
+              [class.pointer-events-none]="!noiseSuppression()"
+            >
+              <div>
+                <span class="text-sm text-text-primary">Voice Gate</span>
+                <p class="text-xs text-text-muted mt-0.5">
+                  @if (noiseSuppression()) {
+                    Auto-mute when not speaking
+                  } @else {
+                    Requires Noise Suppression
+                  }
+                </p>
+              </div>
+              <button
+                class="w-12 h-6 rounded-full transition-colors relative"
+                [class]="voiceGate() ? 'bg-accent' : 'bg-surface'"
+                (click)="toggleVoiceGate()"
+                [disabled]="!noiseSuppression()"
+              >
+                <div
+                  class="absolute top-1 w-4 h-4 bg-white rounded-full transition-transform"
+                  [class]="voiceGate() ? 'left-7' : 'left-1'"
+                ></div>
+              </button>
+            </div>
           </div>
 
           <!-- Keyboard Section -->
@@ -402,6 +431,10 @@ export class SettingsPopupComponent implements OnInit {
   private _noiseSuppression = signal(true);
   readonly noiseSuppression = this._noiseSuppression.asReadonly();
 
+  // Voice gate state
+  private _voiceGate = signal(false);
+  readonly voiceGate = this._voiceGate.asReadonly();
+
   Math = Math;
 
   constructor(
@@ -435,9 +468,12 @@ export class SettingsPopupComponent implements OnInit {
       this._micVolume.set(settings.audio.micVolume ?? 1.0);
       this._soundboardVolume.set(settings.audio.soundboardVolume ?? 1.0);
 
-      // Load noise suppression state
+      // Load noise suppression and voice gate states
       const noiseSuppressionEnabled = await this.tauri.getNoiseSuppression();
       this._noiseSuppression.set(noiseSuppressionEnabled);
+
+      const voiceGateEnabled = await this.tauri.getVoiceGate();
+      this._voiceGate.set(voiceGateEnabled);
     } catch (err) {
       console.error("Failed to load settings data:", err);
     } finally {
@@ -523,10 +559,30 @@ export class SettingsPopupComponent implements OnInit {
     try {
       await this.tauri.setNoiseSuppression(newValue);
       this._noiseSuppression.set(newValue);
+      // If disabling noise suppression, also disable voice gate
+      if (!newValue && this._voiceGate()) {
+        await this.tauri.setVoiceGate(false);
+        this._voiceGate.set(false);
+      }
       // Restart mixing to apply the change
       await this.mixer.startOrRestartWithDevices();
     } catch (err) {
       console.error("Failed to toggle noise suppression:", err);
+    }
+  }
+
+  async toggleVoiceGate(): Promise<void> {
+    // Only allow toggle if noise suppression is enabled
+    if (!this.noiseSuppression()) return;
+
+    const newValue = !this.voiceGate();
+    try {
+      await this.tauri.setVoiceGate(newValue);
+      this._voiceGate.set(newValue);
+      // Restart mixing to apply the change
+      await this.mixer.startOrRestartWithDevices();
+    } catch (err) {
+      console.error("Failed to toggle voice gate:", err);
     }
   }
 
