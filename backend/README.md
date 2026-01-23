@@ -13,221 +13,154 @@ Django backend for Voiceboard application.
 
 ### Quick Deploy
 
-**1. Create a directory and the docker-compose.yml file:**
+**1. Create a directory and download the compose files:**
 
 ```bash
 mkdir -p /opt/voiceboard && cd /opt/voiceboard
+
+# Download compose files
+curl -O https://raw.githubusercontent.com/didouye/voiceboard/main/backend/docker-compose.yml
+curl -O https://raw.githubusercontent.com/didouye/voiceboard/main/backend/docker-compose.letsencrypt.yml
+curl -O https://raw.githubusercontent.com/didouye/voiceboard/main/backend/.env.example
+
+# Create your .env
+cp .env.example .env
+nano .env
 ```
 
-**2. Create `docker-compose.yml` with this content:**
-
-```yaml
-services:
-  traefik:
-    image: traefik:v3.0
-    command:
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
-      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
-      # Let's Encrypt (comment out if behind Cloudflare)
-      - "--certificatesresolvers.letsencrypt.acme.email=${LETSENCRYPT_EMAIL}"
-      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
-      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ${DATA_PATH:-./data}/traefik:/letsencrypt
-    restart: unless-stopped
-
-  web:
-    image: ghcr.io/didouye/voiceboard-backend:latest
-    command: uv run gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3
-    environment:
-      - DJANGO_SETTINGS_MODULE=config.settings.production
-      - DJANGO_SECRET_KEY=${SECRET_KEY}
-      - DJANGO_ALLOWED_HOSTS=${DOMAIN}
-      - DATABASE_URL=postgres://${POSTGRES_USER:-voiceboard}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-voiceboard}
-      - REDIS_URL=redis://redis:6379
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - AWS_STORAGE_BUCKET_NAME=${AWS_STORAGE_BUCKET_NAME:-voiceboard}
-      - AWS_S3_ENDPOINT_URL=http://minio:9000
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.web.rule=Host(`${DOMAIN}`)"
-      - "traefik.http.routers.web.entrypoints=websecure"
-      - "traefik.http.routers.web.tls=true"
-      - "traefik.http.routers.web.tls.certresolver=letsencrypt"
-      - "traefik.http.services.web.loadbalancer.server.port=8000"
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-
-  channels:
-    image: ghcr.io/didouye/voiceboard-backend:latest
-    command: uv run daphne config.asgi:application --bind 0.0.0.0:8001
-    environment:
-      - DJANGO_SETTINGS_MODULE=config.settings.production
-      - DJANGO_SECRET_KEY=${SECRET_KEY}
-      - DJANGO_ALLOWED_HOSTS=${DOMAIN}
-      - DATABASE_URL=postgres://${POSTGRES_USER:-voiceboard}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-voiceboard}
-      - REDIS_URL=redis://redis:6379
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.channels.rule=Host(`${DOMAIN}`) && PathPrefix(`/ws/`)"
-      - "traefik.http.routers.channels.entrypoints=websecure"
-      - "traefik.http.routers.channels.tls=true"
-      - "traefik.http.routers.channels.tls.certresolver=letsencrypt"
-      - "traefik.http.services.channels.loadbalancer.server.port=8001"
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-
-  db:
-    image: postgres:16-alpine
-    volumes:
-      - ${DATA_PATH:-./data}/postgres:/var/lib/postgresql/data
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-voiceboard}
-      POSTGRES_USER: ${POSTGRES_USER:-voiceboard}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-voiceboard}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    volumes:
-      - ${DATA_PATH:-./data}/redis:/data
-    command: redis-server --appendonly yes
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
-  minio:
-    image: minio/minio
-    command: server /data --console-address ":9001"
-    volumes:
-      - ${DATA_PATH:-./data}/minio:/data
-    environment:
-      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID}
-      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY}
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-```
-
-**3. Create `.env` file with your configuration:**
+**2. Configure `.env`:**
 
 ```bash
 # Domain
 DOMAIN=voiceboard.example.com
 
-# Let's Encrypt email (comment traefik ACME lines if using Cloudflare)
-LETSENCRYPT_EMAIL=admin@example.com
+# Django
+SECRET_KEY=your-secure-random-key    # Generate with: openssl rand -hex 32
+DEBUG=false
+ALLOWED_HOSTS=${DOMAIN}
 
-# Django secret key (generate with: openssl rand -hex 32)
-SECRET_KEY=your-secure-random-key-here
-
-# PostgreSQL
+# PostgreSQL (required if using embedded db)
 POSTGRES_PASSWORD=your-secure-db-password
 
-# MinIO/S3
+# MinIO/S3 (required if using embedded s3)
 AWS_ACCESS_KEY_ID=minioadmin
 AWS_SECRET_ACCESS_KEY=your-secure-minio-password
 
-# Data path (optional, default: ./data)
-# DATA_PATH=/var/lib/voiceboard
+# Let's Encrypt (only for docker-compose.letsencrypt.yml)
+LETSENCRYPT_EMAIL=admin@example.com
 ```
 
-**4. Start the stack:**
+**3. Start the stack:**
+
+```bash
+# All embedded services (PostgreSQL, Redis, MinIO) + Let's Encrypt SSL
+COMPOSE_PROFILES=db,redis,s3 docker compose -f docker-compose.yml -f docker-compose.letsencrypt.yml up -d
+
+# Or behind Cloudflare (no Let's Encrypt needed)
+COMPOSE_PROFILES=db,redis,s3 docker compose up -d
+```
+
+**4. Initialize database:**
+
+```bash
+docker compose exec web uv run python manage.py migrate
+docker compose exec web uv run python manage.py createsuperuser
+```
+
+**5. Access your app at `https://your-domain.com`**
+
+---
+
+## Service Profiles
+
+The embedded services (PostgreSQL, Redis, MinIO) are controlled via **Docker Compose profiles**. Only services whose profiles are activated will start.
+
+| Profile | Service    | Description                     |
+|---------|------------|---------------------------------|
+| `db`    | PostgreSQL | Database                        |
+| `redis` | Redis      | Cache and Channels backend      |
+| `s3`    | MinIO      | S3-compatible file storage      |
+
+### Usage Examples
+
+```bash
+# All embedded services
+COMPOSE_PROFILES=db,redis,s3 docker compose up -d
+
+# External PostgreSQL, embedded Redis and MinIO
+COMPOSE_PROFILES=redis,s3 docker compose up -d
+
+# Only embedded PostgreSQL
+COMPOSE_PROFILES=db docker compose up -d
+
+# All external services (no profiles needed)
+docker compose up -d
+```
+
+You can also set `COMPOSE_PROFILES` in your `.env` file:
+
+```bash
+# .env
+COMPOSE_PROFILES=db,redis,s3
+```
+
+Then simply run:
 
 ```bash
 docker compose up -d
 ```
 
-**5. Initialize database:**
+---
+
+## External Services Configuration
+
+When **not** activating a profile, configure the external service URL in `.env`:
+
+### External PostgreSQL (no `db` profile)
 
 ```bash
-# Run migrations
-docker compose exec web uv run python manage.py migrate
-
-# Create admin user
-docker compose exec web uv run python manage.py createsuperuser
+DATABASE_URL=postgres://user:password@your-postgres-host:5432/voiceboard
 ```
 
-**6. Access your app at `https://your-domain.com`**
+### External Redis (no `redis` profile)
+
+```bash
+REDIS_URL=redis://your-redis-host:6379
+```
+
+### External S3 (no `s3` profile)
+
+```bash
+AWS_S3_ENDPOINT_URL=https://s3.amazonaws.com
+AWS_S3_REGION_NAME=us-east-1
+AWS_ACCESS_KEY_ID=your-access-key
+AWS_SECRET_ACCESS_KEY=your-secret-key
+AWS_STORAGE_BUCKET_NAME=your-bucket
+```
 
 ---
 
-## Configuration
+## SSL Configuration
 
-### Behind Cloudflare (no Let's Encrypt)
+### With Let's Encrypt
 
-If your server is behind Cloudflare proxy, remove the Let's Encrypt configuration from Traefik:
+Use the overlay file for automatic SSL certificates:
 
-```yaml
-traefik:
-  command:
-    - "--providers.docker=true"
-    - "--providers.docker.exposedbydefault=false"
-    - "--entrypoints.web.address=:80"
-    - "--entrypoints.websecure.address=:443"
-    - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
-    # Remove the certificatesresolvers lines
+```bash
+COMPOSE_PROFILES=db,redis,s3 docker compose -f docker-compose.yml -f docker-compose.letsencrypt.yml up -d
 ```
 
-And remove `tls.certresolver=letsencrypt` from web/channels labels.
+Requires `LETSENCRYPT_EMAIL` in `.env`.
 
-### Using External Services
+### Behind Cloudflare
 
-**External PostgreSQL:**
+If Cloudflare handles SSL (orange cloud enabled), use the base compose file only:
 
-Remove the `db` service and update web/channels environment:
-
-```yaml
-environment:
-  - DATABASE_URL=postgres://user:password@your-postgres-host:5432/voiceboard
+```bash
+COMPOSE_PROFILES=db,redis,s3 docker compose up -d
 ```
 
-**External Redis:**
-
-Remove the `redis` service and update:
-
-```yaml
-environment:
-  - REDIS_URL=redis://your-redis-host:6379
-```
-
-**External S3 (AWS, Cloudflare R2, etc.):**
-
-Remove the `minio` service and update:
-
-```yaml
-environment:
-  - AWS_S3_ENDPOINT_URL=https://s3.amazonaws.com
-  - AWS_S3_REGION_NAME=us-east-1
-```
+Cloudflare terminates SSL and forwards HTTP to your server.
 
 ---
 
@@ -247,6 +180,7 @@ docker image prune -f
 ```bash
 docker compose logs -f          # All services
 docker compose logs -f web      # Django API only
+docker compose logs -f traefik  # Reverse proxy
 ```
 
 ### Backup
@@ -267,30 +201,31 @@ docker compose up -d
 
 ## Data Persistence
 
-All data stored in `./data/` (or `${DATA_PATH}`):
+All data stored in `${DATA_PATH:-./data}/`:
 
-| Directory | Content |
-|-----------|---------|
-| `data/postgres/` | PostgreSQL database |
-| `data/redis/` | Redis persistence |
-| `data/minio/` | File storage |
-| `data/traefik/` | SSL certificates |
+| Directory | Content | Profile |
+|-----------|---------|---------|
+| `data/postgres/` | PostgreSQL database | `db` |
+| `data/redis/` | Redis persistence | `redis` |
+| `data/minio/` | File storage | `s3` |
+| `data/traefik/` | SSL certificates | always |
 
 ---
 
 ## Portainer Deployment
 
-1. In Portainer, go to **Stacks** → **Add stack**
+1. Go to **Stacks** → **Add stack**
 2. Name: `voiceboard`
-3. Paste the docker-compose.yml content above
-4. Add environment variables in the **Environment variables** section
-5. Click **Deploy the stack**
+3. **Web editor**: paste content from `docker-compose.yml` (and merge `docker-compose.letsencrypt.yml` if needed)
+4. **Environment variables**: add your configuration
+5. **Advanced**: set `COMPOSE_PROFILES` to `db,redis,s3` (or as needed)
+6. Click **Deploy the stack**
 
 ---
 
 ## Development
 
-For local development without Docker:
+For local development:
 
 ```bash
 git clone https://github.com/didouye/voiceboard.git
