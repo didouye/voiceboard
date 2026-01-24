@@ -19,4 +19,4 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["django-debug-toolbar", "ruff", "pytest", "pytest-django"]
-prod = ["gunicorn", "daphne", "sentry-sdk[django]"]
+prod = ["gunicorn", "daphne", "sentry-sdk[django]", "whitenoise"]
