@@ -23,8 +23,15 @@ RUN DJANGO_SECRET_KEY=build-secret \
     DJANGO_ALLOWED_HOSTS=localhost \
     uv run python manage.py collectstatic --noinput
 
+# Copy and prepare entrypoint script
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
 # Expose port
 EXPOSE 8000
+
+# Entrypoint runs migrations, then executes the command
+ENTRYPOINT ["/docker-entrypoint.sh"]
 
 # Default command (overridden in docker-compose)
 CMD ["uv", "run", "gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000"]
