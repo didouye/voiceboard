@@ -179,11 +179,10 @@
   - Audio file storage (S3-compatible)
   - JWT Authentication
 
-- [ ] **Auto-Deploy Pipeline**
-  - GitHub Action triggered after backend-release.yml succeeds
-  - SSH to production server
-  - Pull new image and restart containers
-  - Requires: SERVER_HOST, SERVER_USER, SERVER_SSH_KEY secrets
+- [x] **Auto-Deploy Pipeline**
+  - GitHub Action triggered after image push (deploy job in backend-release.yml)
+  - Portainer API to update stack with latest image and docker-compose.yml
+  - Requires: PORTAINER_URL, PORTAINER_ACCESS_TOKEN, PORTAINER_STACK_ID, PORTAINER_ENDPOINT_ID secrets
 
 - [ ] **User Management**
   - Super admin creation at first connection on the backend
