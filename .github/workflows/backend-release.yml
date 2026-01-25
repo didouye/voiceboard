@@ -70,6 +70,14 @@ jobs:
             -H "X-API-Key: ${{ secrets.PORTAINER_ACCESS_TOKEN }}" \
             | jq '.Env' > /tmp/stack_env.json
 
+          # Mask sensitive values in logs
+          SENSITIVE_KEYS="SECRET_KEY|PASSWORD|ACCESS_KEY|TOKEN|SENTRY_DSN"
+          jq -r '.[] | select(.name | test("'"$SENSITIVE_KEYS"'")) | .value' /tmp/stack_env.json | while read -r value; do
+            if [ -n "$value" ]; then
+              echo "::add-mask::$value"
+            fi
+          done
+
       - name: Redeploy stack
         run: |
           # Build JSON payload using jq to avoid shell expansion issues with $ in env values
