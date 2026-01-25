@@ -64,30 +64,30 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Get current stack env
-        id: stack
         run: |
-          RESPONSE=$(curl -s -X GET \
+          curl -s -X GET \
             "${{ secrets.PORTAINER_URL }}/api/stacks/${{ secrets.PORTAINER_STACK_ID }}" \
-            -H "X-API-Key: ${{ secrets.PORTAINER_ACCESS_TOKEN }}")
-          echo "env=$(echo $RESPONSE | jq -c '.Env')" >> $GITHUB_OUTPUT
+            -H "X-API-Key: ${{ secrets.PORTAINER_ACCESS_TOKEN }}" \
+            | jq '.Env' > /tmp/stack_env.json
 
       - name: Redeploy stack
         run: |
-          STACK_FILE=$(cat backend/docker-compose.yml)
+          # Build JSON payload using jq to avoid shell expansion issues with $ in env values
+          jq -n \
+            --rawfile stackFile backend/docker-compose.yml \
+            --slurpfile env /tmp/stack_env.json \
+            '{
+              StackFileContent: $stackFile,
+              Env: $env[0],
+              Prune: false,
+              PullImage: true
+            }' > /tmp/payload.json
 
           RESPONSE=$(curl -s -w "\n%{http_code}" -X PUT \
             "${{ secrets.PORTAINER_URL }}/api/stacks/${{ secrets.PORTAINER_STACK_ID }}?endpointId=${{ secrets.PORTAINER_ENDPOINT_ID }}" \
             -H "X-API-Key: ${{ secrets.PORTAINER_ACCESS_TOKEN }}" \
             -H "Content-Type: application/json" \
-            --data-binary @- <<EOF
-          {
-            "StackFileContent": $(echo "$STACK_FILE" | jq -Rs .),
-            "Env": ${{ steps.stack.outputs.env }},
-            "Prune": false,
-            "PullImage": true
-          }
-          EOF
-          )
+            -d @/tmp/payload.json)
 
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
           BODY=$(echo "$RESPONSE" | sed '$d')
