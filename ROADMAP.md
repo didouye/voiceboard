@@ -5,6 +5,7 @@
 ## Phase 1 - Core Application (MVP) - 100% Complete
 
 ### Done
+
 - [x] Hexagonal architecture (DDD, Ports & Adapters)
 - [x] AudioEngine with real-time mixing (microphone + sounds)
 - [x] Audio device management (input/output) via CPAL
@@ -25,6 +26,7 @@
   - Setup wizard guides user through installation
 
 ### To Do
+
 - [x] Mic monitoring on preview output - Hear your own microphone in preview
 - [x] Unit tests - 284 tests covering domain layer (100%), adapters, and application layer
 - [x] Individual volume control per pad in UI (0-200% with popup slider)
@@ -40,6 +42,7 @@
 ## Phase 2 - Distribution & CI/CD - 95% Complete
 
 ### Done
+
 - [x] **GitHub Actions CI**
   - Automated build and compilation
   - Clippy linting
@@ -73,7 +76,7 @@
   - Release tracking with version tags (CI)
   - Breadcrumbs: send logs as Sentry breadcrumbs for error context
 
-- [x] **Landing Page** *(see docs/plans/2026-01-04-landing-page-design.md)*
+- [x] **Landing Page** _(see docs/plans/2026-01-04-landing-page-design.md)_
   - Product presentation with features overview
   - Download section with OS detection
   - Tailwind CSS, dark theme, responsive
@@ -99,10 +102,12 @@
 ## Phase 3 - UI/UX Redesign - 85% Complete
 
 ### Stack
+
 - **Tailwind CSS** (Tailwind Plus account available)
 
 ### Done
-- [x] **Tailwind CSS Migration** *(see docs/plans/2026-01-05-ui-redesign-tailwind-design.md)*
+
+- [x] **Tailwind CSS Migration** _(see docs/plans/2026-01-05-ui-redesign-tailwind-design.md)_
   - Complete rewrite from inline CSS to Tailwind utilities
   - Gaming/Pro audio visual style (Elgato/GoXLR inspired)
   - Violet/Magenta neon color palette
@@ -136,18 +141,19 @@
   - Original filename displayed smaller below custom name
   - Fallback to filename if no custom name set
 
-- [x] **Pad Images** *(see docs/plans/archive/2026-01-05-pad-images-design.md)*
+- [x] **Pad Images** _(see docs/plans/archive/2026-01-05-pad-images-design.md)_
   - Upload, URL, and DuckDuckGo search
   - Local image storage
   - Auto-suggestion on import
 
 ### To Do
+
 - [ ] **Interface Enhancements**
   - Compact / extended mode
   - Customizable themes (dark/light/custom)
   - Drag & drop to reorganize pads
 
-- [x] **Sound Organization** *(see docs/plans/2026-01-10-folder-management-design.md)*
+- [x] **Sound Organization** _(see docs/plans/2026-01-10-folder-management-design.md)_
   - Folders/categories to organize sounds
   - Drag & drop sounds into folders
   - Folder navigation in UI
@@ -157,6 +163,7 @@
 ## Phase 4 - Cloud & Collaboration
 
 ### Stack
+
 - **Backend**: Django + Django REST Framework (DRF)
 - **Database**: PostgreSQL
 - **Cache**: Redis
@@ -165,6 +172,7 @@
 - **Payments**: Stripe
 
 ### Backend Cloud
+
 - [x] **Infrastructure**
   - REST API with DRF
   - PostgreSQL database
@@ -178,6 +186,7 @@
   - Requires: SERVER_HOST, SERVER_USER, SERVER_SSH_KEY secrets
 
 - [ ] **User Management**
+  - Super admin creation at first connection on the backend
   - Account creation
   - User profile
   - License management
@@ -191,6 +200,7 @@
   - Shared soundboard per team
 
 ### Cloud Features
+
 - [ ] **Synchronization**
   - Soundboard sync between devices
   - Real-time modification sync
@@ -205,7 +215,7 @@
   - AI sound effect generation
   - Generation history
 
-- [ ] **Remote Live Logging** *(see docs/plans/2026-01-04-remote-live-logging-design.md)*
+- [ ] **Remote Live Logging** _(see docs/plans/2026-01-04-remote-live-logging-design.md)_
   - Stream logs to server when debug mode is active (with user consent)
   - Dashboard for developer to view logs in real-time
   - Email notification when user starts debug session
@@ -234,10 +244,12 @@
 ## Phase 5 - Discord Bot
 
 ### Stack
+
 - **Preferred**: Rust with [serenity](https://github.com/serenity-rs/serenity) + [songbird](https://github.com/serenity-rs/songbird) for voice
 - **Fallback**: Python with discord.py if Rust voice support is insufficient
 
 ### To Do
+
 - [ ] **Discord Bot**
   - Bot creation (serenity/songbird or discord.py)
   - Voice channel connection
@@ -254,6 +266,7 @@
 ## Phase 6 - Mobile Remote Control
 
 ### Stack
+
 - **Framework**: Flutter (iOS + Android)
 - **mDNS**: bonsoir package
 - **QR Scanner**: mobile_scanner package
@@ -261,6 +274,7 @@
 - **Local Storage**: Hive
 
 ### Desktop App Extensions
+
 - [ ] **Local WebSocket Server**
   - Expose WS server on configurable port
   - HMAC-SHA256 signature validation
@@ -283,6 +297,7 @@
   - Revocation management
 
 ### Mobile App (Flutter)
+
 - [ ] **Discovery & Pairing**
   - mDNS scanner for local desktops
   - QR code scanner for secure pairing
@@ -311,6 +326,7 @@
 ## Phase 7 - Code Signing & Security - 33% Complete
 
 ### Done
+
 - [x] **Signed Update Manifests**
   - Generated signing keypair
   - Sign artifacts during CI build
@@ -318,6 +334,7 @@
   - Updater pubkey verification configured
 
 ### To Do
+
 - [ ] **Windows Code Signing**
   - Obtain code signing certificate (EV recommended)
   - Sign executables and installers
@@ -334,12 +351,14 @@
 ## Phase 8 - Improvements & Compatibility
 
 ### Audio Engine
+
 - [ ] **Sample Rate Resampling**
   - Support microphones with different sample rates (44.1kHz, 48kHz, 96kHz)
   - Automatic resampling when input and output devices have different sample rates
   - Currently requires matching sample rates between input device and VB-Cable
 
 ### Code Quality
+
 - [ ] **Test Coverage 95%**
   - Increase coverage from 26% to 95%
   - Mock cpal traits for hardware-independent tests
@@ -353,6 +372,7 @@
   - Visual regression testing
 
 ### Quality of Life
+
 - [ ] **Launch at Startup**
   - Option to start Voiceboard automatically when Windows/macOS boots
   - Configurable from application settings
@@ -372,6 +392,7 @@
   - Optimize ring buffer size based on latency requirements
 
 ### Hardware Integration
+
 - [ ] **Stream Deck Support**
   - Official Elgato Stream Deck plugin
   - Trigger sounds from physical buttons
@@ -381,6 +402,7 @@
   - Multi-action support (play multiple sounds)
 
 ### Advanced Features
+
 - [ ] **Team Synchronized Sound Playback**
   - Alternative to sending sounds through virtual microphone
   - Avoids issues with noise/echo cancellation systems (Krisp, Discord, etc.)
@@ -389,13 +411,14 @@
   - Sound plays locally on each member's device
   - Benefits: better audio quality (no voice codec compression), bypasses noise gates
 
-- [x] **Noise Suppression** *(completed 2026-01-23)*
+- [x] **Noise Suppression** _(completed 2026-01-23)_
   - Real-time noise reduction using nnnoiseless (RNNoise port)
   - On/Off toggle in settings (enabled by default)
   - Processes mic input in 480-sample frames (~10ms latency)
   - Future: Echo cancellation, intensity slider
 
 ### Local AI Features
+
 - [ ] **Auto Sound Naming (Speech-to-Text)**
   - Integrate local speech-to-text model (Whisper, etc.)
   - Automatically extract/suggest name from audio content
