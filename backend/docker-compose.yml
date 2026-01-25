@@ -12,8 +12,8 @@ services:
       - "--log.level=DEBUG"
       - "--accesslog=true"
     ports:
-      - "80:80"
-      - "443:443"
+      - "${EXTERNAL_IP:-0.0.0.0}:80:80"
+      - "${EXTERNAL_IP:-0.0.0.0}:443:443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ${DATA_PATH:-./data}/traefik:/letsencrypt
@@ -108,7 +108,11 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-voiceboard}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-voiceboard} -d ${POSTGRES_DB:-voiceboard}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-voiceboard} -d ${POSTGRES_DB:-voiceboard}",
+        ]
       interval: 5s
       timeout: 5s
       retries: 5
