@@ -33,5 +33,8 @@ fi
 echo "Running migrations..."
 uv run python manage.py migrate --noinput
 
+echo "Setting up super admin..."
+uv run python manage.py setup_superadmin
+
 echo "Starting application..."
 exec "$@"
