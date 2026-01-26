@@ -184,19 +184,21 @@
   - Portainer API to update stack with latest image and docker-compose.yml
   - Requires: PORTAINER_URL, PORTAINER_ACCESS_TOKEN, PORTAINER_STACK_ID, PORTAINER_ENDPOINT_ID secrets
 
-- [ ] **User Management**
-  - Super admin creation at first connection on the backend
-  - Account creation
-  - User profile
-  - License management
-  - Billing (Stripe)
+- [x] **User Management** _(see docs/plans/2026-01-26-user-management-design.md)_
+  - Super admin creation via SUPER_ADMIN_EMAIL env var
+  - OAuth-only authentication (Google, Discord)
+  - User profile (display_name, timezone, language)
+  - Subscription management (Free, Premium 0.99€/mo, Teams 3.99€/mo)
+  - Stripe Checkout + Customer Portal
+  - Feature permissions (cloud_sync, sound_search, ai_generation, etc.)
 
-- [ ] **Teams**
-  - Team creation
-  - Member invitations
-  - Roles and permissions
-  - Personal soundboard per user
-  - Shared soundboard per team
+- [x] **Teams** (API only, UI pending)
+  - Team CRUD endpoints
+  - Member invitations (direct add or email invitation)
+  - Owner + Member roles
+  - Max 8 members base + extra seats
+  - [ ] Personal soundboard per user (pending)
+  - [ ] Shared soundboard per team (pending)
 
 ### Cloud Features
 
