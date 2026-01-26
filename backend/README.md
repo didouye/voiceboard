@@ -39,6 +39,9 @@ SECRET_KEY=your-secure-random-key    # Generate with: openssl rand -hex 32
 DEBUG=false
 ALLOWED_HOSTS=${DOMAIN}
 
+# Super Admin (auto-created on first startup)
+SUPER_ADMIN_EMAIL=admin@example.com
+
 # PostgreSQL (required if using embedded db)
 POSTGRES_PASSWORD=your-secure-db-password
 
@@ -64,8 +67,12 @@ COMPOSE_PROFILES=db,redis,s3 docker compose up -d
 
 ```bash
 docker compose exec web uv run python manage.py migrate
-docker compose exec web uv run python manage.py createsuperuser
 ```
+
+> **Note:** If `SUPER_ADMIN_EMAIL` is set in `.env`, a super admin account is created automatically on first startup. Otherwise, create one manually:
+> ```bash
+> docker compose exec web uv run python manage.py createsuperuser
+> ```
 
 **5. Access your app at `https://your-domain.com`**
 
@@ -226,6 +233,7 @@ All data stored in `${DATA_PATH:-./data}/`:
    | `DOMAIN`                | `voiceboard.example.com` |
    | `EXTERNAL_IP`           | `0.0.0.0`                |
    | `SECRET_KEY`            | `your-random-secret-key` |
+   | `SUPER_ADMIN_EMAIL`     | `admin@example.com`      |
    | `POSTGRES_PASSWORD`     | `your-db-password`       |
    | `AWS_ACCESS_KEY_ID`     | `minioadmin`             |
    | `AWS_SECRET_ACCESS_KEY` | `your-minio-password`    |
