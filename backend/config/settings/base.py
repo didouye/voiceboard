@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     "apps.core",
     "apps.users",
     "apps.billing",
+    "apps.teams",
 ]
 
 MIDDLEWARE = [
