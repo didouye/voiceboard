@@ -15,6 +15,7 @@ dependencies = [
     "python-dotenv>=1.0",
     "django-cors-headers>=4.0",
     "requests>=2.32",
+    "stripe>=7.0.0",
 ]
 
 [project.optional-dependencies]
