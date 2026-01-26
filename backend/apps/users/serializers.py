@@ -11,8 +11,28 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["id", "email", "first_name", "last_name", "avatar_url", "date_joined"]
-        read_only_fields = ["id", "email", "date_joined"]
+        fields = [
+            "id",
+            "email",
+            "first_name",
+            "last_name",
+            "avatar_url",
+            "display_name",
+            "timezone",
+            "language",
+            "subscription_tier",
+            "subscription_status",
+            "subscription_ends_at",
+            "date_joined",
+        ]
+        read_only_fields = [
+            "id",
+            "email",
+            "subscription_tier",
+            "subscription_status",
+            "subscription_ends_at",
+            "date_joined",
+        ]
 
 
 class UserPublicSerializer(serializers.ModelSerializer):
@@ -20,5 +40,5 @@ class UserPublicSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["id", "first_name", "last_name", "avatar_url"]
+        fields = ["id", "display_name", "avatar_url"]
         read_only_fields = fields

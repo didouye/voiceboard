@@ -3,6 +3,8 @@
 import pytest
 from django.contrib.auth import get_user_model
 
+from apps.users.serializers import UserSerializer
+
 User = get_user_model()
 
 
@@ -36,3 +38,50 @@ class TestUserModel:
         """Subscription end date should be None by default."""
         user = User.objects.create_user(email="test@example.com", password="testpass123")
         assert user.subscription_ends_at is None
+
+
+@pytest.mark.django_db
+class TestUserSerializer:
+    """Tests for UserSerializer."""
+
+    def test_serializer_includes_subscription_fields(self):
+        """Serializer should include subscription fields."""
+        user = User.objects.create_user(email="test@example.com", password="testpass123")
+        serializer = UserSerializer(user)
+        data = serializer.data
+
+        assert "subscription_tier" in data
+        assert "subscription_status" in data
+        assert "display_name" in data
+        assert "timezone" in data
+        assert "language" in data
+
+    def test_serializer_subscription_fields_are_readonly(self):
+        """Subscription tier/status should be read-only."""
+        user = User.objects.create_user(email="test@example.com", password="testpass123")
+        serializer = UserSerializer(
+            user,
+            data={"subscription_tier": "premium", "subscription_status": "active"},
+            partial=True,
+        )
+        assert serializer.is_valid()
+        serializer.save()
+        user.refresh_from_db()
+        # Should not have changed
+        assert user.subscription_tier == "free"
+        assert user.subscription_status == "none"
+
+    def test_serializer_allows_profile_updates(self):
+        """Should allow updating profile fields."""
+        user = User.objects.create_user(email="test@example.com", password="testpass123")
+        serializer = UserSerializer(
+            user,
+            data={"display_name": "Test User", "timezone": "Europe/Paris", "language": "fr"},
+            partial=True,
+        )
+        assert serializer.is_valid()
+        serializer.save()
+        user.refresh_from_db()
+        assert user.display_name == "Test User"
+        assert user.timezone == "Europe/Paris"
+        assert user.language == "fr"
