@@ -174,3 +174,21 @@ CHANNEL_LAYERS = {
 # CORS
 CORS_ALLOWED_ORIGINS = os.environ.get("CORS_ALLOWED_ORIGINS", "http://localhost:4200").split(",")
 CORS_ALLOW_CREDENTIALS = True
+
+# Stripe
+STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
+STRIPE_PUBLISHABLE_KEY = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
+STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+
+# Stripe Price IDs
+STRIPE_PRICES = {
+    "premium_monthly": os.environ.get("STRIPE_PRICE_PREMIUM_MONTHLY", ""),
+    "premium_yearly": os.environ.get("STRIPE_PRICE_PREMIUM_YEARLY", ""),
+    "teams_monthly": os.environ.get("STRIPE_PRICE_TEAMS_MONTHLY", ""),
+    "teams_yearly": os.environ.get("STRIPE_PRICE_TEAMS_YEARLY", ""),
+    "extra_seat_monthly": os.environ.get("STRIPE_PRICE_EXTRA_SEAT_MONTHLY", ""),
+    "extra_seat_yearly": os.environ.get("STRIPE_PRICE_EXTRA_SEAT_YEARLY", ""),
+}
+
+# Super Admin
+SUPER_ADMIN_EMAIL = os.environ.get("SUPER_ADMIN_EMAIL", "")
