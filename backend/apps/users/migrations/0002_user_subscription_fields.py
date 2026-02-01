@@ -4,45 +4,57 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('users', '0001_initial'),
+        ("users", "0001_initial"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='user',
-            name='display_name',
-            field=models.CharField(blank=True, default='', max_length=50),
+            model_name="user",
+            name="display_name",
+            field=models.CharField(blank=True, default="", max_length=50),
         ),
         migrations.AddField(
-            model_name='user',
-            name='language',
-            field=models.CharField(default='en', max_length=10),
+            model_name="user",
+            name="language",
+            field=models.CharField(default="en", max_length=10),
         ),
         migrations.AddField(
-            model_name='user',
-            name='stripe_customer_id',
-            field=models.CharField(blank=True, default='', max_length=255),
+            model_name="user",
+            name="stripe_customer_id",
+            field=models.CharField(blank=True, default="", max_length=255),
         ),
         migrations.AddField(
-            model_name='user',
-            name='subscription_ends_at',
+            model_name="user",
+            name="subscription_ends_at",
             field=models.DateTimeField(blank=True, null=True),
         ),
         migrations.AddField(
-            model_name='user',
-            name='subscription_status',
-            field=models.CharField(choices=[('none', 'None'), ('active', 'Active'), ('past_due', 'Past Due'), ('cancelled', 'Cancelled')], default='none', max_length=20),
+            model_name="user",
+            name="subscription_status",
+            field=models.CharField(
+                choices=[
+                    ("none", "None"),
+                    ("active", "Active"),
+                    ("past_due", "Past Due"),
+                    ("cancelled", "Cancelled"),
+                ],
+                default="none",
+                max_length=20,
+            ),
         ),
         migrations.AddField(
-            model_name='user',
-            name='subscription_tier',
-            field=models.CharField(choices=[('free', 'Free'), ('premium', 'Premium'), ('teams', 'Teams')], default='free', max_length=20),
+            model_name="user",
+            name="subscription_tier",
+            field=models.CharField(
+                choices=[("free", "Free"), ("premium", "Premium"), ("teams", "Teams")],
+                default="free",
+                max_length=20,
+            ),
         ),
         migrations.AddField(
-            model_name='user',
-            name='timezone',
-            field=models.CharField(default='UTC', max_length=50),
+            model_name="user",
+            name="timezone",
+            field=models.CharField(default="UTC", max_length=50),
         ),
     ]

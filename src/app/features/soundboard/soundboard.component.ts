@@ -90,11 +90,15 @@ import { SearchBarComponent } from "./search-bar/search-bar.component";
               <app-sound-pad
                 [pad]="pad"
                 [loading]="soundboard.loading()"
-                [isPreviewing]="soundboard.previewingSoundId() === pad.sound?.id"
+                [isPreviewing]="
+                  soundboard.previewingSoundId() === pad.sound?.id
+                "
                 (play)="soundboard.playSound(pad.sound!.id)"
                 (preview)="soundboard.previewSound(pad.sound!.id)"
                 (import)="onImportSound()"
-                (volumeChange)="soundboard.setSoundVolume(pad.sound!.id, $event)"
+                (volumeChange)="
+                  soundboard.setSoundVolume(pad.sound!.id, $event)
+                "
                 (speedChange)="soundboard.setSoundSpeed(pad.sound!.id, $event)"
                 (shortcutChange)="onShortcutChange(pad.sound!.id, $event)"
                 (customNameChange)="
