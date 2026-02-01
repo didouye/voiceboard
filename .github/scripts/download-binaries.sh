@@ -37,7 +37,7 @@ download_ytdlp() {
 
     if [ ! -f "$output" ]; then
         echo "Downloading yt-dlp for $target..."
-        curl -L "https://github.com/yt-dlp/yt-dlp/releases/latest/download/${ytdlp_name}" -o "$output"
+        curl -fL "https://github.com/yt-dlp/yt-dlp/releases/latest/download/${ytdlp_name}" -o "$output"
         chmod +x "$output"
     else
         echo "yt-dlp for $target already exists"
@@ -52,14 +52,14 @@ download_ffmpeg() {
         x86_64-pc-windows-msvc)
             ext=".exe"
             echo "Downloading ffmpeg for Windows..."
-            curl -L "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" -o /tmp/ffmpeg.zip
+            curl -fL "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" -o /tmp/ffmpeg.zip
             unzip -o /tmp/ffmpeg.zip -d /tmp/ffmpeg
             cp /tmp/ffmpeg/ffmpeg-master-latest-win64-gpl/bin/ffmpeg.exe "$BINARIES_DIR/ffmpeg-${target}.exe"
             rm -rf /tmp/ffmpeg /tmp/ffmpeg.zip
             ;;
         x86_64-apple-darwin)
             echo "Downloading ffmpeg for macOS x64..."
-            curl -L "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip" -o /tmp/ffmpeg.zip
+            curl -fL "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip" -o /tmp/ffmpeg.zip
             unzip -o /tmp/ffmpeg.zip -d /tmp/ffmpeg
             cp /tmp/ffmpeg/ffmpeg "$BINARIES_DIR/ffmpeg-${target}"
             chmod +x "$BINARIES_DIR/ffmpeg-${target}"
@@ -67,7 +67,7 @@ download_ffmpeg() {
             ;;
         aarch64-apple-darwin)
             echo "Downloading ffmpeg for macOS ARM..."
-            curl -L "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip" -o /tmp/ffmpeg.zip
+            curl -fL "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip" -o /tmp/ffmpeg.zip
             unzip -o /tmp/ffmpeg.zip -d /tmp/ffmpeg
             cp /tmp/ffmpeg/ffmpeg "$BINARIES_DIR/ffmpeg-${target}"
             chmod +x "$BINARIES_DIR/ffmpeg-${target}"
@@ -75,7 +75,7 @@ download_ffmpeg() {
             ;;
         x86_64-unknown-linux-gnu)
             echo "Downloading ffmpeg for Linux..."
-            curl -L "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz" -o /tmp/ffmpeg.tar.xz
+            curl -fL "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz" -o /tmp/ffmpeg.tar.xz
             tar -xf /tmp/ffmpeg.tar.xz -C /tmp
             cp /tmp/ffmpeg-*-amd64-static/ffmpeg "$BINARIES_DIR/ffmpeg-${target}"
             chmod +x "$BINARIES_DIR/ffmpeg-${target}"
