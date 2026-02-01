@@ -101,6 +101,11 @@ jobs:
             libssl-dev \
             libasound2-dev
 
+      - name: Download external binaries
+        run: |
+          chmod +x .github/scripts/download-binaries.sh
+          .github/scripts/download-binaries.sh ${{ matrix.target }}
+
       - name: Install npm dependencies
         run: npm ci
 
