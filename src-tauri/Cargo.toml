@@ -24,6 +24,7 @@ tauri-plugin-os = "2"                   # Platform detection
 tauri-plugin-process = "2"              # Process control (relaunch)
 tauri-plugin-global-shortcut = "2"     # Global keyboard shortcuts
 tauri-plugin-http = { version = "2", features = ["unsafe-headers"] }  # HTTP client for image search
+tauri-plugin-shell = "2"               # Shell commands for external binaries (yt-dlp, ffmpeg)
 
 # Serialization
 serde = { version = "1", features = ["derive"] }
@@ -48,6 +49,7 @@ anyhow = "1"
 # Utilities
 uuid = { version = "1", features = ["v4"] }
 sha2 = "0.10"
+regex = "1"                          # URL validation for YouTube import
 
 # VB-Cable installer download
 reqwest = { version = "0.12", features = ["stream"] }

@@ -94,6 +94,8 @@ use application::{
         stop_preview,
         stop_sound,
         toggle_channel_mute,
+        // YouTube audio import
+        youtube_download,
     },
     shortcut_commands::{
         get_global_hotkeys_enabled, register_global_shortcut, set_global_hotkeys_enabled,
@@ -124,6 +126,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_shell::init())
         .setup(|app| {
             let state = AppState::new();
             app.manage(state);
@@ -335,6 +338,8 @@ pub fn run() {
             unregister_all_shortcuts,
             set_global_hotkeys_enabled,
             get_global_hotkeys_enabled,
+            // YouTube audio import
+            youtube_download,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

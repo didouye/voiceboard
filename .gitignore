@@ -52,3 +52,6 @@ backend/static/
 backend/__pycache__/
 backend/**/__pycache__/
 backend/*.pyc
+
+# Tauri external binaries (downloaded by CI or manually)
+src-tauri/binaries/

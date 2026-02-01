@@ -2231,6 +2231,146 @@ pub fn set_voice_gate(
     Ok(())
 }
 
+// ============================================================================
+// YouTube Audio Import Commands
+// ============================================================================
+
+/// Download audio from a YouTube URL using yt-dlp
+#[tauri::command]
+pub async fn youtube_download(
+    app: tauri::AppHandle,
+    url: String,
+) -> Result<YouTubeAudioDto, String> {
+    use regex::Regex;
+    use tauri_plugin_shell::ShellExt;
+
+    // Validate YouTube URL and extract video ID
+    let video_id_regex =
+        Regex::new(r"(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/)([a-zA-Z0-9_-]{11})")
+            .map_err(|e| format!("Regex error: {}", e))?;
+
+    let video_id = video_id_regex
+        .captures(&url)
+        .and_then(|c| c.get(1))
+        .map(|m| m.as_str().to_string())
+        .ok_or("Invalid YouTube URL")?;
+
+    // Get temp directory
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+    let temp_dir = app_data_dir.join("temp").join("youtube");
+    std::fs::create_dir_all(&temp_dir)
+        .map_err(|e| format!("Failed to create temp directory: {}", e))?;
+
+    let output_path = temp_dir.join(format!("{}.mp3", video_id));
+
+    // Get ffmpeg binary path for yt-dlp
+    let ffmpeg_sidecar = app
+        .shell()
+        .sidecar("ffmpeg")
+        .map_err(|e| format!("Failed to create ffmpeg command: {}", e))?;
+
+    // Get the ffmpeg path from the sidecar command
+    // We need to extract the program path from the command
+    let ffmpeg_path = {
+        // Build a temp command just to get the path
+        let output = ffmpeg_sidecar.args(["-version"]).output().await;
+        match output {
+            Ok(_) => {
+                // ffmpeg is available, we'll pass its location to yt-dlp
+                // For sidecar binaries, Tauri resolves the path automatically
+                // We need to get the resource dir path
+                let resource_dir = app
+                    .path()
+                    .resource_dir()
+                    .map_err(|e| format!("Failed to get resource dir: {}", e))?;
+                let ffmpeg_name = if cfg!(windows) {
+                    "ffmpeg.exe"
+                } else {
+                    "ffmpeg"
+                };
+                resource_dir.join("binaries").join(ffmpeg_name)
+            }
+            Err(e) => {
+                tracing::warn!("ffmpeg sidecar not available: {}", e);
+                // Fall back to system ffmpeg
+                std::path::PathBuf::from("ffmpeg")
+            }
+        }
+    };
+
+    tracing::info!(
+        "Downloading YouTube audio: {} -> {:?}",
+        video_id,
+        output_path
+    );
+
+    // Run yt-dlp to download and convert to MP3
+    let output = app
+        .shell()
+        .sidecar("yt-dlp")
+        .map_err(|e| format!("Failed to create yt-dlp command: {}", e))?
+        .args([
+            "-x", // Extract audio
+            "--audio-format",
+            "mp3", // Convert to MP3
+            "--audio-quality",
+            "0", // Best quality
+            "--ffmpeg-location",
+            ffmpeg_path.to_str().unwrap_or("ffmpeg"),
+            "--no-playlist", // Don't download playlists
+            "--print",
+            "title", // Print title to stdout
+            "--print",
+            "duration", // Print duration to stdout
+            "-o",
+            output_path.to_str().unwrap_or("output.mp3"),
+            &url,
+        ])
+        .output()
+        .await
+        .map_err(|e| format!("Failed to run yt-dlp: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        tracing::error!("yt-dlp failed: {}", stderr);
+
+        // Parse common errors
+        if stderr.contains("Video unavailable") || stderr.contains("Private video") {
+            return Err("Video not accessible (private or deleted)".to_string());
+        }
+        if stderr.contains("geo restriction") || stderr.contains("not available in your country") {
+            return Err("Video not available in your region".to_string());
+        }
+        if stderr.contains("is a live event") || stderr.contains("live stream") {
+            return Err("Live streams are not supported".to_string());
+        }
+
+        return Err(format!(
+            "Failed to download: {}",
+            stderr.lines().last().unwrap_or("Unknown error")
+        ));
+    }
+
+    // Parse output (title and duration)
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+
+    let title = lines.first().unwrap_or(&"Unknown").to_string();
+    let duration: f64 = lines.get(1).and_then(|s| s.parse().ok()).unwrap_or(0.0);
+
+    tracing::info!("Downloaded: {} ({:.1}s)", title, duration);
+
+    Ok(YouTubeAudioDto {
+        temp_path: output_path.to_string_lossy().to_string(),
+        title,
+        duration,
+        video_id,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
