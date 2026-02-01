@@ -153,6 +153,12 @@
   - Customizable themes (dark/light/custom)
   - Drag & drop to reorganize pads
 
+- [ ] **YouTube Audio Import**
+  - Enter YouTube URL to extract audio from video
+  - Audio trimming editor (cut start/end points)
+  - Preview trimmed audio before import
+  - Import trimmed audio as sound pad
+
 - [x] **Sound Organization** _(see docs/plans/2026-01-10-folder-management-design.md)_
   - Folders/categories to organize sounds
   - Drag & drop sounds into folders
