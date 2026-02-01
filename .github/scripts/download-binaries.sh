@@ -5,6 +5,9 @@ set -e
 BINARIES_DIR="src-tauri/binaries"
 mkdir -p "$BINARIES_DIR"
 
+# Use RUNNER_TEMP if available (GitHub Actions), otherwise /tmp
+TEMP_DIR="${RUNNER_TEMP:-/tmp}"
+
 # Get target from argument or detect
 TARGET="${1:-}"
 
@@ -52,34 +55,34 @@ download_ffmpeg() {
         x86_64-pc-windows-msvc)
             ext=".exe"
             echo "Downloading ffmpeg for Windows..."
-            curl -fL "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" -o /tmp/ffmpeg.zip
-            unzip -o /tmp/ffmpeg.zip -d /tmp/ffmpeg
-            cp /tmp/ffmpeg/ffmpeg-master-latest-win64-gpl/bin/ffmpeg.exe "$BINARIES_DIR/ffmpeg-${target}.exe"
-            rm -rf /tmp/ffmpeg /tmp/ffmpeg.zip
+            curl -fL "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" -o "$TEMP_DIR/ffmpeg.zip"
+            unzip -o "$TEMP_DIR/ffmpeg.zip" -d "$TEMP_DIR/ffmpeg"
+            cp "$TEMP_DIR/ffmpeg/ffmpeg-master-latest-win64-gpl/bin/ffmpeg.exe" "$BINARIES_DIR/ffmpeg-${target}.exe"
+            rm -rf "$TEMP_DIR/ffmpeg" "$TEMP_DIR/ffmpeg.zip"
             ;;
         x86_64-apple-darwin)
             echo "Downloading ffmpeg for macOS x64..."
-            curl -fL "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip" -o /tmp/ffmpeg.zip
-            unzip -o /tmp/ffmpeg.zip -d /tmp/ffmpeg
-            cp /tmp/ffmpeg/ffmpeg "$BINARIES_DIR/ffmpeg-${target}"
+            curl -fL "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip" -o "$TEMP_DIR/ffmpeg.zip"
+            unzip -o "$TEMP_DIR/ffmpeg.zip" -d "$TEMP_DIR/ffmpeg"
+            cp "$TEMP_DIR/ffmpeg/ffmpeg" "$BINARIES_DIR/ffmpeg-${target}"
             chmod +x "$BINARIES_DIR/ffmpeg-${target}"
-            rm -rf /tmp/ffmpeg /tmp/ffmpeg.zip
+            rm -rf "$TEMP_DIR/ffmpeg" "$TEMP_DIR/ffmpeg.zip"
             ;;
         aarch64-apple-darwin)
             echo "Downloading ffmpeg for macOS ARM..."
-            curl -fL "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip" -o /tmp/ffmpeg.zip
-            unzip -o /tmp/ffmpeg.zip -d /tmp/ffmpeg
-            cp /tmp/ffmpeg/ffmpeg "$BINARIES_DIR/ffmpeg-${target}"
+            curl -fL "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip" -o "$TEMP_DIR/ffmpeg.zip"
+            unzip -o "$TEMP_DIR/ffmpeg.zip" -d "$TEMP_DIR/ffmpeg"
+            cp "$TEMP_DIR/ffmpeg/ffmpeg" "$BINARIES_DIR/ffmpeg-${target}"
             chmod +x "$BINARIES_DIR/ffmpeg-${target}"
-            rm -rf /tmp/ffmpeg /tmp/ffmpeg.zip
+            rm -rf "$TEMP_DIR/ffmpeg" "$TEMP_DIR/ffmpeg.zip"
             ;;
         x86_64-unknown-linux-gnu)
             echo "Downloading ffmpeg for Linux..."
-            curl -fL "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz" -o /tmp/ffmpeg.tar.xz
-            tar -xf /tmp/ffmpeg.tar.xz -C /tmp
-            cp /tmp/ffmpeg-*-amd64-static/ffmpeg "$BINARIES_DIR/ffmpeg-${target}"
+            curl -fL "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz" -o "$TEMP_DIR/ffmpeg.tar.xz"
+            tar -xf "$TEMP_DIR/ffmpeg.tar.xz" -C "$TEMP_DIR"
+            cp "$TEMP_DIR"/ffmpeg-*-amd64-static/ffmpeg "$BINARIES_DIR/ffmpeg-${target}"
             chmod +x "$BINARIES_DIR/ffmpeg-${target}"
-            rm -rf /tmp/ffmpeg-* /tmp/ffmpeg.tar.xz
+            rm -rf "$TEMP_DIR"/ffmpeg-* "$TEMP_DIR/ffmpeg.tar.xz"
             ;;
     esac
 }

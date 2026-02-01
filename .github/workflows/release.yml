@@ -102,6 +102,7 @@ jobs:
             libasound2-dev
 
       - name: Download external binaries
+        shell: bash
         run: |
           chmod +x .github/scripts/download-binaries.sh
           .github/scripts/download-binaries.sh ${{ matrix.target }}
