@@ -209,6 +209,15 @@ impl From<AppSettingsDto> for AppSettings {
     }
 }
 
+/// DTO for YouTube audio extraction result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct YouTubeAudioDto {
+    pub temp_path: String,
+    pub title: String,
+    pub duration: f64,
+    pub video_id: String,
+}
+
 // ============================================================================
 // Device Commands
 // ============================================================================
