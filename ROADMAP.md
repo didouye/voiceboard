@@ -99,7 +99,7 @@
 
 ---
 
-## Phase 3 - UI/UX Redesign - 85% Complete
+## Phase 3 - UI/UX Redesign - 90% Complete
 
 ### Stack
 
@@ -146,18 +146,18 @@
   - Local image storage
   - Auto-suggestion on import
 
+- [x] **YouTube Audio Import** _(see docs/plans/2026-02-02-youtube-audio-import-design.md)_
+  - Enter YouTube URL to extract audio from video
+  - Audio trimming editor with waveform (wavesurfer.js)
+  - Preview trimmed audio before import
+  - Bundled yt-dlp and ffmpeg binaries
+
 ### To Do
 
 - [ ] **Interface Enhancements**
   - Compact / extended mode
   - Customizable themes (dark/light/custom)
   - Drag & drop to reorganize pads
-
-- [ ] **YouTube Audio Import**
-  - Enter YouTube URL to extract audio from video
-  - Audio trimming editor (cut start/end points)
-  - Preview trimmed audio before import
-  - Import trimmed audio as sound pad
 
 - [x] **Sound Organization** _(see docs/plans/2026-01-10-folder-management-design.md)_
   - Folders/categories to organize sounds
