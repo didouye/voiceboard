@@ -2457,6 +2457,17 @@ pub async fn youtube_trim_and_import(
     })
 }
 
+/// Cancel YouTube import and cleanup temp file
+#[tauri::command]
+pub async fn youtube_cancel(temp_path: String) -> Result<(), String> {
+    if !temp_path.is_empty() && std::path::Path::new(&temp_path).exists() {
+        std::fs::remove_file(&temp_path)
+            .map_err(|e| format!("Failed to delete temp file: {}", e))?;
+        tracing::info!("Cleaned up temp file: {}", temp_path);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

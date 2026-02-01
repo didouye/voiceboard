@@ -95,6 +95,7 @@ use application::{
         stop_sound,
         toggle_channel_mute,
         // YouTube audio import
+        youtube_cancel,
         youtube_download,
         youtube_trim_and_import,
     },
@@ -241,6 +242,33 @@ pub fn run() {
                 std::thread::sleep(std::time::Duration::from_millis(16));
             });
 
+            // Cleanup old YouTube temp files (>24h)
+            if let Ok(app_data_dir) = app.path().app_data_dir() {
+                let temp_dir = app_data_dir.join("temp").join("youtube");
+                if temp_dir.exists() {
+                    let now = std::time::SystemTime::now();
+                    if let Ok(entries) = std::fs::read_dir(&temp_dir) {
+                        for entry in entries.flatten() {
+                            if let Ok(metadata) = entry.metadata() {
+                                if let Ok(modified) = metadata.modified() {
+                                    if let Ok(age) = now.duration_since(modified) {
+                                        if age.as_secs() > 24 * 60 * 60 {
+                                            let path = entry.path();
+                                            if std::fs::remove_file(&path).is_ok() {
+                                                tracing::info!(
+                                                    "Cleaned up old YouTube temp file: {:?}",
+                                                    path
+                                                );
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             Ok(())
         })
         .on_menu_event(|app, event| {
@@ -340,6 +368,7 @@ pub fn run() {
             set_global_hotkeys_enabled,
             get_global_hotkeys_enabled,
             // YouTube audio import
+            youtube_cancel,
             youtube_download,
             youtube_trim_and_import,
         ])
