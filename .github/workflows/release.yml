@@ -107,6 +107,15 @@ jobs:
           chmod +x .github/scripts/download-binaries.sh
           .github/scripts/download-binaries.sh ${{ matrix.target }}
 
+      - name: Verify binaries exist
+        shell: bash
+        run: |
+          echo "=== Binaries directory content ==="
+          ls -la src-tauri/binaries/
+          echo "=== Checking expected files ==="
+          test -f "src-tauri/binaries/yt-dlp-${{ matrix.target }}${{ matrix.platform == 'windows' && '.exe' || '' }}" && echo "yt-dlp: OK" || echo "yt-dlp: MISSING"
+          test -f "src-tauri/binaries/ffmpeg-${{ matrix.target }}${{ matrix.platform == 'windows' && '.exe' || '' }}" && echo "ffmpeg: OK" || echo "ffmpeg: MISSING"
+
       - name: Install npm dependencies
         run: npm ci
 
