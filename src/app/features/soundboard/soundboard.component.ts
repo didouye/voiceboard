@@ -22,6 +22,7 @@ import {
   ImageSearchResult,
 } from "../../core/services/image-search.service";
 import { SearchBarComponent } from "./search-bar/search-bar.component";
+import { YouTubeImportModalComponent } from "./youtube-import/youtube-import-modal.component";
 
 @Component({
   selector: "app-soundboard",
@@ -32,6 +33,7 @@ import { SearchBarComponent } from "./search-bar/search-bar.component";
     ImageSuggestionToastComponent,
     BulkImageWizardComponent,
     SearchBarComponent,
+    YouTubeImportModalComponent,
   ],
   template: `
     <div class="h-full flex flex-col">
@@ -145,7 +147,7 @@ import { SearchBarComponent } from "./search-bar/search-bar.component";
         </div>
 
         <!-- Footer -->
-        <div class="mt-4 pb-4 flex justify-center">
+        <div class="mt-4 pb-4 flex justify-center gap-3">
           <button
             class="px-6 py-3 bg-surface-hover border border-dashed border-border hover:border-accent text-text-secondary hover:text-text-primary rounded-lg text-sm transition-all flex items-center gap-2"
             [class.opacity-50]="soundboard.loading()"
@@ -155,6 +157,16 @@ import { SearchBarComponent } from "./search-bar/search-bar.component";
           >
             <span>&#128193;</span>
             Import Multiple
+          </button>
+          <button
+            class="px-6 py-3 bg-surface-hover border border-dashed border-border hover:border-red-500 text-text-secondary hover:text-red-400 rounded-lg text-sm transition-all flex items-center gap-2"
+            [class.opacity-50]="soundboard.loading()"
+            [class.cursor-not-allowed]="soundboard.loading()"
+            [disabled]="soundboard.loading()"
+            (click)="showYouTubeModal.set(true)"
+          >
+            <span>&#9654;</span>
+            YouTube
           </button>
         </div>
       </div>
@@ -205,6 +217,14 @@ import { SearchBarComponent } from "./search-bar/search-bar.component";
         (close)="onBulkWizardClose()"
       />
     }
+
+    <!-- YouTube Import Modal -->
+    @if (showYouTubeModal()) {
+      <app-youtube-import-modal
+        (close)="showYouTubeModal.set(false)"
+        (imported)="onYouTubeImported($event)"
+      />
+    }
   `,
   styles: [],
 })
@@ -218,6 +238,7 @@ export class SoundboardComponent implements OnInit, OnDestroy {
 
   isDragging = signal(false);
   dragFileCount = signal(0);
+  showYouTubeModal = signal(false);
 
   // State for auto-suggestion
   showImageSuggestion = signal(false);
@@ -538,6 +559,20 @@ export class SoundboardComponent implements OnInit, OnDestroy {
     this.showBulkWizard.set(false);
     this.bulkWizardPads.set([]);
     this.pendingBulkPads.set([]);
+  }
+
+  /**
+   * Handle YouTube import completion
+   */
+  onYouTubeImported(result: {
+    hash: string;
+    name: string;
+    path: string;
+    duration: number;
+  }): void {
+    // Add the imported sound to the soundboard
+    this.soundboard.addImportedSound(result);
+    this.showYouTubeModal.set(false);
   }
 
   /**

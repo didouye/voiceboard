@@ -451,6 +451,40 @@ export class SoundboardService {
   }
 
   /**
+   * Add a sound that was imported externally (e.g., from YouTube)
+   */
+  addImportedSound(imported: {
+    hash: string;
+    name: string;
+    path: string;
+    duration: number;
+  }): void {
+    // Check for duplicate
+    if (this._sounds().has(imported.hash)) {
+      console.warn("Sound already exists:", imported.name);
+      return;
+    }
+
+    const sound: Sound = {
+      id: imported.hash,
+      name: imported.name,
+      path: imported.path,
+      duration: imported.duration,
+      volume: 1.0,
+      speed: 1.0,
+      folderIds: [this._activeFolderId()],
+      isPlaying: false,
+      addedAt: Date.now(),
+    };
+
+    const sounds = new Map(this._sounds());
+    sounds.set(sound.id, sound);
+    this._sounds.set(sounds);
+
+    this.saveState();
+  }
+
+  /**
    * Import sounds from file paths (for drag & drop)
    */
   async importSoundsFromPaths(paths: string[]): Promise<{
