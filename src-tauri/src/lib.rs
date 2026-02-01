@@ -96,6 +96,7 @@ use application::{
         toggle_channel_mute,
         // YouTube audio import
         youtube_download,
+        youtube_trim_and_import,
     },
     shortcut_commands::{
         get_global_hotkeys_enabled, register_global_shortcut, set_global_hotkeys_enabled,
@@ -340,6 +341,7 @@ pub fn run() {
             get_global_hotkeys_enabled,
             // YouTube audio import
             youtube_download,
+            youtube_trim_and_import,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -2371,6 +2371,92 @@ pub async fn youtube_download(
     })
 }
 
+/// Trim audio using ffmpeg and import to soundboard
+#[tauri::command]
+pub async fn youtube_trim_and_import(
+    app: tauri::AppHandle,
+    temp_path: String,
+    start_seconds: f64,
+    end_seconds: f64,
+    name: String,
+) -> Result<ImportedSoundDto, String> {
+    use tauri_plugin_shell::ShellExt;
+
+    // Validate inputs
+    if start_seconds < 0.0 || end_seconds <= start_seconds {
+        return Err("Invalid trim range".to_string());
+    }
+
+    let duration = end_seconds - start_seconds;
+    if duration < 0.5 {
+        return Err("Selection must be at least 0.5 seconds".to_string());
+    }
+    if duration > 300.0 {
+        return Err("Selection must be at most 5 minutes".to_string());
+    }
+
+    // Get temp directory for trimmed file
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+    let temp_dir = app_data_dir.join("temp").join("youtube");
+    let trimmed_path = temp_dir.join(format!("trimmed_{}.mp3", uuid::Uuid::new_v4()));
+
+    tracing::info!(
+        "Trimming audio: {:.2}s - {:.2}s -> {:?}",
+        start_seconds,
+        end_seconds,
+        trimmed_path
+    );
+
+    // Run ffmpeg to trim using sidecar
+    let output = app
+        .shell()
+        .sidecar("ffmpeg")
+        .map_err(|e| format!("Failed to create ffmpeg command: {}", e))?
+        .args([
+            "-y", // Overwrite output
+            "-i",
+            &temp_path, // Input file
+            "-ss",
+            &format!("{:.3}", start_seconds), // Start time
+            "-to",
+            &format!("{:.3}", end_seconds), // End time
+            "-c",
+            "copy", // Stream copy (fast, no re-encode)
+            trimmed_path.to_str().unwrap_or("output.mp3"),
+        ])
+        .output()
+        .await
+        .map_err(|e| format!("Failed to run ffmpeg: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        tracing::error!("ffmpeg failed: {}", stderr);
+        return Err(format!(
+            "Failed to trim audio: {}",
+            stderr.lines().last().unwrap_or("Unknown error")
+        ));
+    }
+
+    // Import the trimmed file using existing normalization pipeline
+    let result =
+        import_and_normalize_sound(app.clone(), trimmed_path.to_string_lossy().to_string()).await?;
+
+    // Clean up temp files
+    let _ = std::fs::remove_file(&temp_path);
+    let _ = std::fs::remove_file(&trimmed_path);
+
+    // Return with custom name
+    Ok(ImportedSoundDto {
+        hash: result.hash,
+        name: if name.is_empty() { result.name } else { name },
+        path: result.path,
+        duration: result.duration,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
