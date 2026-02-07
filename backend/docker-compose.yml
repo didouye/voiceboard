@@ -66,7 +66,7 @@ services:
   # === Django WebSocket (Channels) ===
   channels:
     image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-didouye}/voiceboard-backend:${IMAGE_TAG:-latest}
-    command: uv run daphne config.asgi:application --bind 0.0.0.0:8001
+    command: uv run daphne config.asgi:application -b 0.0.0.0 -p 8001
     environment:
       # Django core
       - DJANGO_SETTINGS_MODULE=config.settings.production
