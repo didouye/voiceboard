@@ -285,8 +285,11 @@ pub fn run() {
             }
 
             // Non-blocking yt-dlp update check at launch (5s delay)
+            // Use tauri::async_runtime::spawn (not tokio::spawn) because the
+            // setup closure runs on the main thread which may not have the
+            // tokio runtime context entered (causes panic on Windows).
             let update_app_handle = app.handle().clone();
-            tokio::spawn(async move {
+            tauri::async_runtime::spawn(async move {
                 tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                 match application::binary_manager::check_ytdlp_update(&update_app_handle).await {
                     Ok(Some(new_version)) => {
