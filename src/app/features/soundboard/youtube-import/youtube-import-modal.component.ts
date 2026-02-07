@@ -207,7 +207,7 @@ export class YouTubeImportModalComponent implements OnInit {
 
   url = '';
   soundName = '';
-  selection = { start: 0, end: 30 };
+  selection = { start: 0, end: 0 };
 
   async ngOnInit(): Promise<void> {
     try {
@@ -267,7 +267,7 @@ export class YouTubeImportModalComponent implements OnInit {
       this.audioData.set(data);
       this.audioUrl.set(this.youtube.getAudioUrl(data.temp_path));
       this.soundName = data.title;
-      this.selection.end = Math.min(data.duration, 30);
+      this.selection.end = data.duration;
       this.state.set('editing');
     } catch (err: any) {
       this.error.set(err?.message || err || 'Download failed');

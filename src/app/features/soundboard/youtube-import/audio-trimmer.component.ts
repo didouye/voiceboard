@@ -98,7 +98,7 @@ export class AudioTrimmerComponent implements OnInit, OnDestroy {
   private activeRegion: any = null;
 
   ngOnInit(): void {
-    this.endTime.set(Math.min(this.duration, 30)); // Default 30s or full duration
+    this.endTime.set(this.duration);
     this.initWavesurfer();
   }
 
@@ -199,7 +199,7 @@ export class AudioTrimmerComponent implements OnInit, OnDestroy {
 
   resetSelection(): void {
     this.startTime.set(0);
-    this.endTime.set(Math.min(this.duration, 30));
+    this.endTime.set(this.duration);
     this.updateRegion();
     this.emitSelection();
   }
