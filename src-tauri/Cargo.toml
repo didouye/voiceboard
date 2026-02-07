@@ -60,8 +60,8 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Error tracking
-sentry = { version = "0.38", default-features = false, features = ["backtrace", "contexts", "panic", "reqwest", "rustls"] }
-sentry-tracing = "0.38"
+sentry = { version = "0.46", default-features = false, features = ["backtrace", "contexts", "panic", "reqwest", "rustls", "logs"] }
+sentry-tracing = "0.46"
 
 # Windows-specific
 [target.'cfg(windows)'.dependencies]

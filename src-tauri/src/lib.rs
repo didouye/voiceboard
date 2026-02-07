@@ -107,6 +107,7 @@ use application::{
 };
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{Emitter, Manager};
+use tauri_plugin_store::StoreExt;
 
 /// Run the Tauri application
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -133,6 +134,16 @@ pub fn run() {
             let state = AppState::new();
             app.manage(state);
             app.manage(ShortcutRegistry::default());
+
+            // Initialize Sentry Logs debug mode gate from persisted setting
+            if let Ok(store) = app.store("debug.json") {
+                if let Some(value) = store.get("debug_mode") {
+                    if let Some(enabled) = value.as_bool() {
+                        infrastructure::DEBUG_MODE_ENABLED
+                            .store(enabled, std::sync::atomic::Ordering::Relaxed);
+                    }
+                }
+            }
 
             // Create application menu with Debug toggle
             let toggle_debug =

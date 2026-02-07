@@ -2,6 +2,11 @@
 
 use sentry::ClientInitGuard;
 use std::env;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+
+/// Global flag to control Sentry Logs emission based on debug mode
+pub static DEBUG_MODE_ENABLED: AtomicBool = AtomicBool::new(false);
 
 /// Initialize Sentry error tracking
 /// Returns a guard that must be kept alive for the duration of the application
@@ -27,6 +32,13 @@ pub fn init_sentry() -> Option<ClientInitGuard> {
                 }),
                 attach_stacktrace: true,
                 send_default_pii: false,
+                before_send_log: Some(Arc::new(|log| {
+                    if DEBUG_MODE_ENABLED.load(Ordering::Relaxed) {
+                        Some(log)
+                    } else {
+                        None
+                    }
+                })),
                 ..Default::default()
             },
         ));

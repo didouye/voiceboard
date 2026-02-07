@@ -1913,6 +1913,10 @@ pub fn set_debug_mode(app: tauri::AppHandle, enabled: bool) -> Result<(), String
     store.set(DEBUG_MODE_KEY, serde_json::json!(enabled));
     store.save().map_err(|e| e.to_string())?;
 
+    // Sync Sentry Logs gate
+    crate::infrastructure::DEBUG_MODE_ENABLED
+        .store(enabled, std::sync::atomic::Ordering::Relaxed);
+
     // Emit event to update frontend UI
     let _ = app.emit("debug-mode-changed", enabled);
 

@@ -1,6 +1,9 @@
 """Production settings."""
 
+import logging
+
 import sentry_sdk
+from sentry_sdk.integrations.logging import LoggingIntegration
 
 from .base import *  # noqa: F401, F403
 
@@ -29,6 +32,14 @@ SENTRY_DSN = os.environ.get("SENTRY_DSN")  # noqa: F405
 if SENTRY_DSN:
     sentry_sdk.init(
         dsn=SENTRY_DSN,
+        enable_logs=True,
         traces_sample_rate=0.1,
         profiles_sample_rate=0.1,
+        integrations=[
+            LoggingIntegration(
+                level=logging.DEBUG,
+                event_level=logging.ERROR,
+                sentry_logs_level=logging.DEBUG,
+            ),
+        ],
     )
