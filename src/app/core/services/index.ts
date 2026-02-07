@@ -8,3 +8,4 @@ export * from "./image-search.service";
 export { FuzzySearchService } from "./fuzzy-search.service";
 export type { SearchResult } from "./fuzzy-search.service";
 export * from "./youtube.service";
+export * from "./binary-manager.service";

@@ -4,6 +4,7 @@
 //! the application's use cases.
 
 pub mod audio_engine;
+pub mod binary_manager;
 pub mod commands;
 pub mod noise_filter;
 pub mod preview_engine;

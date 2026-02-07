@@ -25,11 +25,14 @@ use application::{
         add_audio_file_channel,
         // Channel management
         add_microphone_channel,
+        // Binary manager
+        check_binaries_status,
         // Updates
         check_for_update,
         // VB-Cable setup
         check_vb_cable_installed,
         check_virtual_driver,
+        check_ytdlp_update,
         cleanup_orphaned_images,
         delete_pad_image,
         download_and_install_vb_cable,
@@ -56,6 +59,7 @@ use application::{
         import_and_normalize_sound,
         import_multiple_sounds_with_hash,
         import_sound_with_hash,
+        install_binaries,
         install_update,
         is_mixing,
         load_folders,
@@ -94,6 +98,7 @@ use application::{
         stop_preview,
         stop_sound,
         toggle_channel_mute,
+        update_ytdlp,
         // YouTube audio import
         youtube_cancel,
         youtube_download,
@@ -129,7 +134,6 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_http::init())
-        .plugin(tauri_plugin_shell::init())
         .setup(|app| {
             let state = AppState::new();
             app.manage(state);
@@ -280,6 +284,24 @@ pub fn run() {
                 }
             }
 
+            // Non-blocking yt-dlp update check at launch (5s delay)
+            let update_app_handle = app.handle().clone();
+            tokio::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                match application::binary_manager::check_ytdlp_update(&update_app_handle).await {
+                    Ok(Some(new_version)) => {
+                        tracing::info!(version = %new_version, "yt-dlp update available");
+                        let _ = update_app_handle.emit("ytdlp-update-available", &new_version);
+                    }
+                    Ok(None) => {
+                        tracing::debug!("yt-dlp is up to date");
+                    }
+                    Err(e) => {
+                        tracing::debug!(error = %e, "yt-dlp update check failed (non-critical)");
+                    }
+                }
+            });
+
             Ok(())
         })
         .on_menu_event(|app, event| {
@@ -382,6 +404,11 @@ pub fn run() {
             youtube_cancel,
             youtube_download,
             youtube_trim_and_import,
+            // Binary manager
+            check_binaries_status,
+            install_binaries,
+            check_ytdlp_update,
+            update_ytdlp,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

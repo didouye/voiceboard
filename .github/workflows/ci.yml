@@ -36,12 +36,6 @@ jobs:
         with:
           workspaces: src-tauri -> target
 
-      - name: Create dummy binaries for CI
-        run: |
-          mkdir -p binaries
-          touch binaries/yt-dlp-x86_64-unknown-linux-gnu
-          touch binaries/ffmpeg-x86_64-unknown-linux-gnu
-
       - name: Build
         run: cargo build --release
 

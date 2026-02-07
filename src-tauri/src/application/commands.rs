@@ -1914,8 +1914,7 @@ pub fn set_debug_mode(app: tauri::AppHandle, enabled: bool) -> Result<(), String
     store.save().map_err(|e| e.to_string())?;
 
     // Sync Sentry Logs gate
-    crate::infrastructure::DEBUG_MODE_ENABLED
-        .store(enabled, std::sync::atomic::Ordering::Relaxed);
+    crate::infrastructure::DEBUG_MODE_ENABLED.store(enabled, std::sync::atomic::Ordering::Relaxed);
 
     // Emit event to update frontend UI
     let _ = app.emit("debug-mode-changed", enabled);
@@ -2236,6 +2235,36 @@ pub fn set_voice_gate(
 }
 
 // ============================================================================
+// Binary Manager Commands
+// ============================================================================
+
+/// Check if yt-dlp and ffmpeg binaries are installed
+#[tauri::command]
+pub fn check_binaries_status(
+    app: tauri::AppHandle,
+) -> Result<super::binary_manager::BinaryStatus, String> {
+    super::binary_manager::check_binaries_installed(&app)
+}
+
+/// Download and install yt-dlp and ffmpeg binaries
+#[tauri::command]
+pub async fn install_binaries(app: tauri::AppHandle) -> Result<(), String> {
+    super::binary_manager::download_all_binaries(&app).await
+}
+
+/// Check if a yt-dlp update is available
+#[tauri::command]
+pub async fn check_ytdlp_update(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    super::binary_manager::check_ytdlp_update(&app).await
+}
+
+/// Update yt-dlp to the latest version
+#[tauri::command]
+pub async fn update_ytdlp(app: tauri::AppHandle) -> Result<(), String> {
+    super::binary_manager::update_ytdlp(&app).await
+}
+
+// ============================================================================
 // YouTube Audio Import Commands
 // ============================================================================
 
@@ -2246,7 +2275,6 @@ pub async fn youtube_download(
     url: String,
 ) -> Result<YouTubeAudioDto, String> {
     use regex::Regex;
-    use tauri_plugin_shell::ShellExt;
 
     // Validate YouTube URL and extract video ID
     let video_id_regex =
@@ -2270,52 +2298,18 @@ pub async fn youtube_download(
 
     let output_path = temp_dir.join(format!("{}.mp3", video_id));
 
-    // Get ffmpeg binary path for yt-dlp
-    // Resolve the path the same way Tauri resolves sidecar binaries:
-    // - Dev mode: CARGO_MANIFEST_DIR/binaries/ffmpeg-<target_triple>
-    // - Production: resource_dir/binaries/ffmpeg-<target_triple>
-    let ffmpeg_path = {
-        let target_triple = {
-            #[cfg(all(target_arch = "x86_64", target_os = "windows"))]
-            { "x86_64-pc-windows-msvc" }
-            #[cfg(all(target_arch = "x86_64", target_os = "macos"))]
-            { "x86_64-apple-darwin" }
-            #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
-            { "aarch64-apple-darwin" }
-            #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
-            { "x86_64-unknown-linux-gnu" }
-            #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
-            { "aarch64-unknown-linux-gnu" }
-        };
-        let ffmpeg_name = if cfg!(windows) {
-            format!("ffmpeg-{}.exe", target_triple)
-        } else {
-            format!("ffmpeg-{}", target_triple)
-        };
+    // Get binary paths from binary manager
+    let ytdlp_bin = super::binary_manager::ytdlp_path(&app)?;
+    let ffmpeg_bin = super::binary_manager::ffmpeg_path(&app)?;
 
-        // In dev mode, use CARGO_MANIFEST_DIR (set at compile time)
-        let dev_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("binaries")
-            .join(&ffmpeg_name);
-        if dev_path.exists() {
-            dev_path
-        } else {
-            // Production: binaries are in resource_dir
-            let resource_dir = app
-                .path()
-                .resource_dir()
-                .map_err(|e| format!("Failed to get resource dir: {}", e))?;
-            let prod_path = resource_dir.join("binaries").join(&ffmpeg_name);
-            if prod_path.exists() {
-                prod_path
-            } else {
-                tracing::warn!("ffmpeg binary not found, falling back to system ffmpeg");
-                std::path::PathBuf::from("ffmpeg")
-            }
-        }
-    };
+    if !ytdlp_bin.exists() {
+        return Err("yt-dlp is not installed. Please install binaries first.".to_string());
+    }
+    if !ffmpeg_bin.exists() {
+        return Err("ffmpeg is not installed. Please install binaries first.".to_string());
+    }
 
-    let ffmpeg_location = ffmpeg_path.to_str().unwrap_or("ffmpeg");
+    let ffmpeg_location = ffmpeg_bin.to_str().unwrap_or("ffmpeg");
 
     tracing::info!(
         video_id = %video_id,
@@ -2325,10 +2319,7 @@ pub async fn youtube_download(
     );
 
     // Step 1: Fetch metadata (title and duration) without downloading
-    let meta_output = app
-        .shell()
-        .sidecar("yt-dlp")
-        .map_err(|e| format!("Failed to create yt-dlp command: {}", e))?
+    let meta_output = tokio::process::Command::new(&ytdlp_bin)
         .args([
             "--no-download",
             "--no-playlist",
@@ -2359,13 +2350,13 @@ pub async fn youtube_download(
         .collect();
 
     let title = meta_lines.first().unwrap_or(&"Unknown").to_string();
-    let duration: f64 = meta_lines.get(1).and_then(|s| s.parse().ok()).unwrap_or(0.0);
+    let duration: f64 = meta_lines
+        .get(1)
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0.0);
 
     // Step 2: Download and convert to MP3
-    let output = app
-        .shell()
-        .sidecar("yt-dlp")
-        .map_err(|e| format!("Failed to create yt-dlp command: {}", e))?
+    let output = tokio::process::Command::new(&ytdlp_bin)
         .args([
             "-x",
             "--audio-format",
@@ -2427,8 +2418,6 @@ pub async fn youtube_trim_and_import(
     end_seconds: f64,
     name: String,
 ) -> Result<ImportedSoundDto, String> {
-    use tauri_plugin_shell::ShellExt;
-
     // Validate inputs
     if start_seconds < 0.0 || end_seconds <= start_seconds {
         return Err("Invalid trim range".to_string());
@@ -2440,6 +2429,12 @@ pub async fn youtube_trim_and_import(
     }
     if duration > 300.0 {
         return Err("Selection must be at most 5 minutes".to_string());
+    }
+
+    // Get ffmpeg path from binary manager
+    let ffmpeg_bin = super::binary_manager::ffmpeg_path(&app)?;
+    if !ffmpeg_bin.exists() {
+        return Err("ffmpeg is not installed. Please install binaries first.".to_string());
     }
 
     // Get temp directory for trimmed file
@@ -2457,11 +2452,8 @@ pub async fn youtube_trim_and_import(
         trimmed_path
     );
 
-    // Run ffmpeg to trim using sidecar
-    let output = app
-        .shell()
-        .sidecar("ffmpeg")
-        .map_err(|e| format!("Failed to create ffmpeg command: {}", e))?
+    // Run ffmpeg to trim using tokio::process::Command
+    let output = tokio::process::Command::new(&ffmpeg_bin)
         .args([
             "-y", // Overwrite output
             "-i",

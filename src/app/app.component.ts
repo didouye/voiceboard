@@ -9,6 +9,7 @@ import { ToastService } from "./core/services/toast.service";
 import { DebugConsoleService } from "./core/services/debug-console.service";
 import { SetupWizardService } from "./core/services/setup-wizard.service";
 import { TauriService } from "./core/services/tauri.service";
+import { BinaryManagerService } from "./core/services/binary-manager.service";
 
 interface UpdateInfo {
   available: boolean;
@@ -50,6 +51,7 @@ export class AppComponent implements OnInit {
   private debugConsole = inject(DebugConsoleService);
   private setupWizard = inject(SetupWizardService);
   private tauri = inject(TauriService);
+  private binaryManager = inject(BinaryManagerService);
 
   showSetupWizard = signal(false);
 
@@ -83,6 +85,9 @@ export class AppComponent implements OnInit {
     } else {
       this.debugConsole.log("info", "Skipping VB-Cable check (not Windows)");
     }
+
+    // Listen for yt-dlp update notifications from backend
+    this.binaryManager.listenForUpdateNotification();
 
     // Continue normal startup
     await this.checkForUpdate();

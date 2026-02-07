@@ -4,13 +4,16 @@ import {
   EventEmitter,
   signal,
   inject,
+  OnInit,
+  computed,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { YouTubeService, YouTubeAudioDto } from '../../../core/services/youtube.service';
+import { BinaryManagerService } from '../../../core/services/binary-manager.service';
 import { AudioTrimmerComponent } from './audio-trimmer.component';
 
-type ModalState = 'idle' | 'downloading' | 'editing' | 'importing';
+type ModalState = 'installing' | 'idle' | 'downloading' | 'editing' | 'importing';
 
 @Component({
   selector: 'app-youtube-import-modal',
@@ -43,9 +46,61 @@ type ModalState = 'idle' | 'downloading' | 'editing' | 'importing';
         <!-- Content -->
         <div class="p-6">
           @switch (state()) {
+            @case ('installing') {
+              <!-- Binary Installation -->
+              <div class="text-center py-8 space-y-4">
+                @if (binaryManager.error()) {
+                  <div class="text-status-error mb-4">
+                    <p class="font-medium">Installation failed</p>
+                    <p class="text-sm mt-1">{{ binaryManager.error() }}</p>
+                  </div>
+                  <button
+                    class="px-6 py-3 bg-accent hover:bg-accent/80 text-white rounded-lg font-medium transition-colors"
+                    (click)="onRetryInstall()"
+                  >
+                    Retry
+                  </button>
+                } @else {
+                  <div class="animate-spin w-12 h-12 border-4 border-accent border-t-transparent rounded-full mx-auto"></div>
+                  <p class="text-text-primary">Installing required tools...</p>
+                  @if (binaryManager.progress(); as progress) {
+                    <div class="space-y-2">
+                      <p class="text-sm text-text-muted">
+                        Downloading {{ progress.binary }}...
+                        @if (progress.total) {
+                          {{ formatBytes(progress.downloaded) }} / {{ formatBytes(progress.total) }}
+                        } @else {
+                          {{ formatBytes(progress.downloaded) }}
+                        }
+                      </p>
+                      @if (progress.total) {
+                        <div class="w-full bg-surface-hover rounded-full h-2">
+                          <div
+                            class="bg-accent h-2 rounded-full transition-all"
+                            [style.width.%]="downloadPercent()"
+                          ></div>
+                        </div>
+                      }
+                    </div>
+                  }
+                }
+              </div>
+            }
+
             @case ('idle') {
               <!-- URL Input -->
               <div class="space-y-4">
+                @if (binaryManager.updateAvailable(); as version) {
+                  <div class="flex items-center justify-between p-3 bg-accent/10 border border-accent/30 rounded-lg">
+                    <span class="text-sm text-text-primary">yt-dlp update available: {{ version }}</span>
+                    <button
+                      class="px-3 py-1 text-sm bg-accent hover:bg-accent/80 text-white rounded font-medium transition-colors"
+                      (click)="onUpdateYtdlp()"
+                    >
+                      Update
+                    </button>
+                  </div>
+                }
                 <div>
                   <label class="text-sm text-text-muted block mb-2">YouTube URL</label>
                   <input
@@ -138,8 +193,9 @@ type ModalState = 'idle' | 'downloading' | 'editing' | 'importing';
     </div>
   `,
 })
-export class YouTubeImportModalComponent {
+export class YouTubeImportModalComponent implements OnInit {
   private youtube = inject(YouTubeService);
+  binaryManager = inject(BinaryManagerService);
 
   @Output() close = new EventEmitter<void>();
   @Output() imported = new EventEmitter<{ hash: string; name: string; path: string; duration: number }>();
@@ -153,8 +209,51 @@ export class YouTubeImportModalComponent {
   soundName = '';
   selection = { start: 0, end: 30 };
 
+  async ngOnInit(): Promise<void> {
+    try {
+      const status = await this.binaryManager.checkStatus();
+      if (!status.all_installed) {
+        this.state.set('installing');
+        await this.binaryManager.install();
+        this.state.set('idle');
+      }
+    } catch {
+      // Error is already set in binaryManager.error signal
+    }
+  }
+
   isValidUrl(): boolean {
     return this.youtube.isValidUrl(this.url);
+  }
+
+  downloadPercent(): number {
+    const p = this.binaryManager.progress();
+    if (!p || !p.total) return 0;
+    return Math.round((p.downloaded / p.total) * 100);
+  }
+
+  formatBytes(bytes: number): string {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  async onRetryInstall(): Promise<void> {
+    this.binaryManager.error.set(null);
+    try {
+      await this.binaryManager.install();
+      this.state.set('idle');
+    } catch {
+      // Error is already set in binaryManager.error signal
+    }
+  }
+
+  async onUpdateYtdlp(): Promise<void> {
+    try {
+      await this.binaryManager.updateYtdlp();
+    } catch (err: any) {
+      this.error.set(err?.message || err || 'Update failed');
+    }
   }
 
   async onDownload(): Promise<void> {
