@@ -2315,13 +2315,14 @@ pub async fn youtube_download(
         }
     };
 
-    tracing::info!(
-        "Downloading YouTube audio: {} -> {:?}",
-        video_id,
-        output_path
-    );
-
     let ffmpeg_location = ffmpeg_path.to_str().unwrap_or("ffmpeg");
+
+    tracing::info!(
+        video_id = %video_id,
+        output_path = %output_path.display(),
+        ffmpeg_location = %ffmpeg_location,
+        "Downloading YouTube audio"
+    );
 
     // Step 1: Fetch metadata (title and duration) without downloading
     let meta_output = app
@@ -2340,6 +2341,15 @@ pub async fn youtube_download(
         .output()
         .await
         .map_err(|e| format!("Failed to run yt-dlp metadata: {}", e))?;
+
+    if !meta_output.status.success() {
+        let stderr = String::from_utf8_lossy(&meta_output.stderr);
+        tracing::error!(stderr = %stderr, "yt-dlp metadata fetch failed");
+        return Err(format!(
+            "Failed to fetch video metadata: {}",
+            stderr.lines().last().unwrap_or("Unknown error")
+        ));
+    }
 
     let meta_stdout = String::from_utf8_lossy(&meta_output.stdout);
     let meta_lines: Vec<&str> = meta_stdout
