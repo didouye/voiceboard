@@ -15,7 +15,7 @@ export class YouTubeService {
    * Validate YouTube URL format
    */
   isValidUrl(url: string): boolean {
-    const pattern = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/;
+    const pattern = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/;
     return pattern.test(url);
   }
 

@@ -2250,7 +2250,7 @@ pub async fn youtube_download(
 
     // Validate YouTube URL and extract video ID
     let video_id_regex =
-        Regex::new(r"(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/)([a-zA-Z0-9_-]{11})")
+        Regex::new(r"(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/|youtube\.com/shorts/)([a-zA-Z0-9_-]{11})")
             .map_err(|e| format!("Regex error: {}", e))?;
 
     let video_id = video_id_regex
@@ -2271,35 +2271,45 @@ pub async fn youtube_download(
     let output_path = temp_dir.join(format!("{}.mp3", video_id));
 
     // Get ffmpeg binary path for yt-dlp
-    let ffmpeg_sidecar = app
-        .shell()
-        .sidecar("ffmpeg")
-        .map_err(|e| format!("Failed to create ffmpeg command: {}", e))?;
-
-    // Get the ffmpeg path from the sidecar command
-    // We need to extract the program path from the command
+    // Resolve the path the same way Tauri resolves sidecar binaries:
+    // - Dev mode: CARGO_MANIFEST_DIR/binaries/ffmpeg-<target_triple>
+    // - Production: resource_dir/binaries/ffmpeg-<target_triple>
     let ffmpeg_path = {
-        // Build a temp command just to get the path
-        let output = ffmpeg_sidecar.args(["-version"]).output().await;
-        match output {
-            Ok(_) => {
-                // ffmpeg is available, we'll pass its location to yt-dlp
-                // For sidecar binaries, Tauri resolves the path automatically
-                // We need to get the resource dir path
-                let resource_dir = app
-                    .path()
-                    .resource_dir()
-                    .map_err(|e| format!("Failed to get resource dir: {}", e))?;
-                let ffmpeg_name = if cfg!(windows) {
-                    "ffmpeg.exe"
-                } else {
-                    "ffmpeg"
-                };
-                resource_dir.join("binaries").join(ffmpeg_name)
-            }
-            Err(e) => {
-                tracing::warn!("ffmpeg sidecar not available: {}", e);
-                // Fall back to system ffmpeg
+        let target_triple = {
+            #[cfg(all(target_arch = "x86_64", target_os = "windows"))]
+            { "x86_64-pc-windows-msvc" }
+            #[cfg(all(target_arch = "x86_64", target_os = "macos"))]
+            { "x86_64-apple-darwin" }
+            #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
+            { "aarch64-apple-darwin" }
+            #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+            { "x86_64-unknown-linux-gnu" }
+            #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
+            { "aarch64-unknown-linux-gnu" }
+        };
+        let ffmpeg_name = if cfg!(windows) {
+            format!("ffmpeg-{}.exe", target_triple)
+        } else {
+            format!("ffmpeg-{}", target_triple)
+        };
+
+        // In dev mode, use CARGO_MANIFEST_DIR (set at compile time)
+        let dev_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("binaries")
+            .join(&ffmpeg_name);
+        if dev_path.exists() {
+            dev_path
+        } else {
+            // Production: binaries are in resource_dir
+            let resource_dir = app
+                .path()
+                .resource_dir()
+                .map_err(|e| format!("Failed to get resource dir: {}", e))?;
+            let prod_path = resource_dir.join("binaries").join(&ffmpeg_name);
+            if prod_path.exists() {
+                prod_path
+            } else {
+                tracing::warn!("ffmpeg binary not found, falling back to system ffmpeg");
                 std::path::PathBuf::from("ffmpeg")
             }
         }
@@ -2311,24 +2321,50 @@ pub async fn youtube_download(
         output_path
     );
 
-    // Run yt-dlp to download and convert to MP3
+    let ffmpeg_location = ffmpeg_path.to_str().unwrap_or("ffmpeg");
+
+    // Step 1: Fetch metadata (title and duration) without downloading
+    let meta_output = app
+        .shell()
+        .sidecar("yt-dlp")
+        .map_err(|e| format!("Failed to create yt-dlp command: {}", e))?
+        .args([
+            "--no-download",
+            "--no-playlist",
+            "--print",
+            "title",
+            "--print",
+            "duration",
+            &url,
+        ])
+        .output()
+        .await
+        .map_err(|e| format!("Failed to run yt-dlp metadata: {}", e))?;
+
+    let meta_stdout = String::from_utf8_lossy(&meta_output.stdout);
+    let meta_lines: Vec<&str> = meta_stdout
+        .trim()
+        .lines()
+        .filter(|l| !l.is_empty())
+        .collect();
+
+    let title = meta_lines.first().unwrap_or(&"Unknown").to_string();
+    let duration: f64 = meta_lines.get(1).and_then(|s| s.parse().ok()).unwrap_or(0.0);
+
+    // Step 2: Download and convert to MP3
     let output = app
         .shell()
         .sidecar("yt-dlp")
         .map_err(|e| format!("Failed to create yt-dlp command: {}", e))?
         .args([
-            "-x", // Extract audio
+            "-x",
             "--audio-format",
-            "mp3", // Convert to MP3
+            "mp3",
             "--audio-quality",
-            "0", // Best quality
+            "0",
             "--ffmpeg-location",
-            ffmpeg_path.to_str().unwrap_or("ffmpeg"),
-            "--no-playlist", // Don't download playlists
-            "--print",
-            "title", // Print title to stdout
-            "--print",
-            "duration", // Print duration to stdout
+            ffmpeg_location,
+            "--no-playlist",
             "-o",
             output_path.to_str().unwrap_or("output.mp3"),
             &url,
@@ -2341,7 +2377,6 @@ pub async fn youtube_download(
         let stderr = String::from_utf8_lossy(&output.stderr);
         tracing::error!("yt-dlp failed: {}", stderr);
 
-        // Parse common errors
         if stderr.contains("Video unavailable") || stderr.contains("Private video") {
             return Err("Video not accessible (private or deleted)".to_string());
         }
@@ -2358,12 +2393,10 @@ pub async fn youtube_download(
         ));
     }
 
-    // Parse output (title and duration)
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let lines: Vec<&str> = stdout.trim().lines().collect();
-
-    let title = lines.first().unwrap_or(&"Unknown").to_string();
-    let duration: f64 = lines.get(1).and_then(|s| s.parse().ok()).unwrap_or(0.0);
+    // Verify the mp3 file was created
+    if !output_path.exists() {
+        return Err("Download completed but audio file was not created".to_string());
+    }
 
     tracing::info!("Downloaded: {} ({:.1}s)", title, duration);
 
