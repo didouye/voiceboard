@@ -2411,6 +2411,12 @@ pub async fn youtube_download(
     let mut meta_args: Vec<String> = vec![
         "--no-download".into(),
         "--no-playlist".into(),
+        "--js-runtimes".into(),
+        "node".into(),
+        "--js-runtimes".into(),
+        "deno".into(),
+        "--js-runtimes".into(),
+        "bun".into(),
         "-f".into(),
         "bestaudio/best".into(),
         "--print".into(),
@@ -2470,6 +2476,12 @@ pub async fn youtube_download(
         "--ffmpeg-location".into(),
         ffmpeg_location.to_string(),
         "--no-playlist".into(),
+        "--js-runtimes".into(),
+        "node".into(),
+        "--js-runtimes".into(),
+        "deno".into(),
+        "--js-runtimes".into(),
+        "bun".into(),
         "-o".into(),
         output_path.to_str().unwrap_or("output.mp3").to_string(),
     ];
@@ -2569,18 +2581,20 @@ pub async fn youtube_trim_and_import(
         trimmed_path
     );
 
-    // Run ffmpeg to trim (hidden console window on Windows)
+    // Run ffmpeg to trim (re-encode to avoid MP3 bit reservoir corruption)
     let output = hidden_command(&ffmpeg_bin)
         .args([
-            "-y", // Overwrite output
+            "-y",  // Overwrite output
+            "-ss",
+            &format!("{:.3}", start_seconds), // Start time (before -i for fast seek)
             "-i",
             &temp_path, // Input file
-            "-ss",
-            &format!("{:.3}", start_seconds), // Start time
             "-to",
-            &format!("{:.3}", end_seconds), // End time
-            "-c",
-            "copy", // Stream copy (fast, no re-encode)
+            &format!("{:.3}", end_seconds - start_seconds), // Duration relative to -ss
+            "-c:a",
+            "libmp3lame", // Re-encode to valid MP3
+            "-q:a",
+            "0", // Best quality
             trimmed_path.to_str().unwrap_or("output.mp3"),
         ])
         .output()
