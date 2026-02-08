@@ -112,6 +112,8 @@ jobs:
 
       - name: Build Tauri app
         run: npm run tauri build -- --target ${{ matrix.target }}
+        env:
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
 
       - name: Rename artifacts (Windows)
         if: matrix.platform == 'windows'

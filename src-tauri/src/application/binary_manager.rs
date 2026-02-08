@@ -17,6 +17,8 @@ use tauri::{AppHandle, Emitter, Manager};
 pub struct BinaryManifest {
     pub ytdlp_version: Option<String>,
     pub ffmpeg_installed: bool,
+    #[serde(default)]
+    pub deno_installed: bool,
 }
 
 /// Status check result sent to the frontend
@@ -24,6 +26,7 @@ pub struct BinaryManifest {
 pub struct BinaryStatus {
     pub ytdlp_installed: bool,
     pub ffmpeg_installed: bool,
+    pub deno_installed: bool,
     pub all_installed: bool,
 }
 
@@ -71,6 +74,16 @@ pub fn ffmpeg_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(binaries_dir(app)?.join(name))
 }
 
+/// Path to the deno binary (JS runtime for yt-dlp)
+pub fn deno_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let name = if cfg!(windows) {
+        "deno.exe"
+    } else {
+        "deno"
+    };
+    Ok(binaries_dir(app)?.join(name))
+}
+
 fn manifest_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(binaries_dir(app)?.join("manifest.json"))
 }
@@ -103,10 +116,12 @@ pub fn save_manifest(app: &AppHandle, manifest: &BinaryManifest) -> Result<(), S
 pub fn check_binaries_installed(app: &AppHandle) -> Result<BinaryStatus, String> {
     let ytdlp = ytdlp_path(app)?.exists();
     let ffmpeg = ffmpeg_path(app)?.exists();
+    let deno = deno_path(app)?.exists();
     Ok(BinaryStatus {
         ytdlp_installed: ytdlp,
         ffmpeg_installed: ffmpeg,
-        all_installed: ytdlp && ffmpeg,
+        deno_installed: deno,
+        all_installed: ytdlp && ffmpeg && deno,
     })
 }
 
@@ -126,6 +141,25 @@ fn ytdlp_download_url() -> &'static str {
     #[cfg(target_os = "linux")]
     {
         "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux"
+    }
+}
+
+fn deno_download_url() -> &'static str {
+    #[cfg(target_os = "windows")]
+    {
+        "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip"
+    }
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    {
+        "https://github.com/denoland/deno/releases/latest/download/deno-aarch64-apple-darwin.zip"
+    }
+    #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+    {
+        "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-apple-darwin.zip"
+    }
+    #[cfg(target_os = "linux")]
+    {
+        "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip"
     }
 }
 
@@ -361,12 +395,60 @@ fn extract_ffmpeg_tar_xz(archive_data: &[u8], dest: &PathBuf) -> Result<(), Stri
     Err("ffmpeg binary not found in tar.xz archive".to_string())
 }
 
-/// Download both yt-dlp and ffmpeg in parallel
+/// Download deno JS runtime (required by yt-dlp for YouTube extraction)
+pub async fn download_deno(app: &AppHandle) -> Result<(), String> {
+    let url = deno_download_url();
+    let dest = deno_path(app)?;
+
+    tracing::info!(url = url, dest = ?dest, "Downloading deno");
+
+    let data = download_with_progress(app, url, "deno").await?;
+    extract_deno(&data, &dest)?;
+    set_executable(&dest)?;
+
+    let mut manifest = load_manifest(app)?;
+    manifest.deno_installed = true;
+    save_manifest(app, &manifest)?;
+
+    tracing::info!("deno downloaded successfully");
+    Ok(())
+}
+
+/// Extract deno binary from ZIP archive
+fn extract_deno(archive_data: &[u8], dest: &PathBuf) -> Result<(), String> {
+    use std::io::{Cursor, Read};
+
+    let cursor = Cursor::new(archive_data);
+    let mut archive =
+        zip::ZipArchive::new(cursor).map_err(|e| format!("Failed to open deno ZIP: {}", e))?;
+
+    let deno_name = if cfg!(windows) { "deno.exe" } else { "deno" };
+
+    for i in 0..archive.len() {
+        let mut file = archive
+            .by_index(i)
+            .map_err(|e| format!("ZIP entry error: {}", e))?;
+
+        if file.name().ends_with(deno_name) {
+            let mut data = Vec::new();
+            file.read_to_end(&mut data)
+                .map_err(|e| format!("Failed to read deno from ZIP: {}", e))?;
+            atomic_write(dest, &data)?;
+            return Ok(());
+        }
+    }
+
+    Err("deno binary not found in ZIP archive".to_string())
+}
+
+/// Download yt-dlp, ffmpeg, and deno in parallel
 pub async fn download_all_binaries(app: &AppHandle) -> Result<(), String> {
-    let (ytdlp_result, ffmpeg_result) = tokio::join!(download_ytdlp(app), download_ffmpeg(app));
+    let (ytdlp_result, ffmpeg_result, deno_result) =
+        tokio::join!(download_ytdlp(app), download_ffmpeg(app), download_deno(app));
 
     ytdlp_result?;
     ffmpeg_result?;
+    deno_result?;
 
     Ok(())
 }
@@ -456,6 +538,7 @@ mod tests {
         let manifest = BinaryManifest {
             ytdlp_version: Some("2024.01.01".to_string()),
             ffmpeg_installed: true,
+            deno_installed: true,
         };
 
         let json = serde_json::to_string(&manifest).unwrap();

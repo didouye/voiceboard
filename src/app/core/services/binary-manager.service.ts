@@ -5,6 +5,7 @@ import { listen, UnlistenFn } from '@tauri-apps/api/event';
 export interface BinaryStatus {
   ytdlp_installed: boolean;
   ffmpeg_installed: boolean;
+  deno_installed: boolean;
   all_installed: boolean;
 }
 

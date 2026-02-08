@@ -1935,10 +1935,13 @@ pub fn set_debug_mode(app: tauri::AppHandle, enabled: bool) -> Result<(), String
     Ok(())
 }
 
-/// Get Sentry DSN (runtime env var)
+/// Get Sentry DSN (compile-time or runtime)
 #[tauri::command]
 pub fn get_sentry_dsn() -> Option<String> {
-    std::env::var("SENTRY_DSN").ok().filter(|s| !s.is_empty())
+    option_env!("SENTRY_DSN")
+        .filter(|s| !s.is_empty())
+        .map(String::from)
+        .or_else(|| std::env::var("SENTRY_DSN").ok().filter(|s| !s.is_empty()))
 }
 
 // ============================================================================
@@ -2384,6 +2387,7 @@ pub async fn youtube_download(
     // Get binary paths from binary manager
     let ytdlp_bin = super::binary_manager::ytdlp_path(&app)?;
     let ffmpeg_bin = super::binary_manager::ffmpeg_path(&app)?;
+    let deno_bin = super::binary_manager::deno_path(&app)?;
 
     if !ytdlp_bin.exists() {
         return Err("yt-dlp is not installed. Please install binaries first.".to_string());
@@ -2393,6 +2397,12 @@ pub async fn youtube_download(
     }
 
     let ffmpeg_location = ffmpeg_bin.to_str().unwrap_or("ffmpeg");
+    // Build deno runtime arg with explicit path (avoids PATH lookup issues on Windows)
+    let deno_runtime = if deno_bin.exists() {
+        format!("deno:{}", deno_bin.display())
+    } else {
+        "deno".to_string()
+    };
 
     tracing::info!(
         video_id = %video_id,
@@ -2412,11 +2422,7 @@ pub async fn youtube_download(
         "--no-download".into(),
         "--no-playlist".into(),
         "--js-runtimes".into(),
-        "node".into(),
-        "--js-runtimes".into(),
-        "deno".into(),
-        "--js-runtimes".into(),
-        "bun".into(),
+        deno_runtime.clone(),
         "-f".into(),
         "bestaudio/best".into(),
         "--print".into(),
@@ -2477,11 +2483,7 @@ pub async fn youtube_download(
         ffmpeg_location.to_string(),
         "--no-playlist".into(),
         "--js-runtimes".into(),
-        "node".into(),
-        "--js-runtimes".into(),
-        "deno".into(),
-        "--js-runtimes".into(),
-        "bun".into(),
+        deno_runtime.clone(),
         "-o".into(),
         output_path.to_str().unwrap_or("output.mp3").to_string(),
     ];
