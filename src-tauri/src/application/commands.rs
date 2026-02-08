@@ -15,6 +15,18 @@ use tauri_plugin_store::StoreExt;
 const SETTINGS_STORE: &str = "settings.json";
 const SETTINGS_KEY: &str = "app_settings";
 
+/// Create a `tokio::process::Command` that hides the console window on Windows.
+fn hidden_command<S: AsRef<std::ffi::OsStr>>(program: S) -> tokio::process::Command {
+    #[allow(unused_mut)]
+    let mut cmd = tokio::process::Command::new(program);
+    #[cfg(target_os = "windows")]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    cmd
+}
+
 /// Response wrapper for API calls
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiResponse<T> {
@@ -2410,7 +2422,7 @@ pub async fn youtube_download(
     }
     meta_args.push(url.clone());
 
-    let meta_output = tokio::process::Command::new(&ytdlp_bin)
+    let meta_output = hidden_command(&ytdlp_bin)
         .args(&meta_args)
         .output()
         .await
@@ -2465,7 +2477,7 @@ pub async fn youtube_download(
     }
     dl_args.push(url.clone());
 
-    let output = tokio::process::Command::new(&ytdlp_bin)
+    let output = hidden_command(&ytdlp_bin)
         .args(&dl_args)
         .output()
         .await
@@ -2555,8 +2567,8 @@ pub async fn youtube_trim_and_import(
         trimmed_path
     );
 
-    // Run ffmpeg to trim using tokio::process::Command
-    let output = tokio::process::Command::new(&ffmpeg_bin)
+    // Run ffmpeg to trim (hidden console window on Windows)
+    let output = hidden_command(&ffmpeg_bin)
         .args([
             "-y", // Overwrite output
             "-i",
