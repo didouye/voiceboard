@@ -53,5 +53,8 @@ backend/__pycache__/
 backend/**/__pycache__/
 backend/*.pyc
 
+# Git worktrees
+.worktrees/
+
 # Tauri external binaries (downloaded by CI or manually)
 src-tauri/binaries/
