@@ -2268,6 +2268,77 @@ pub async fn update_ytdlp(app: tauri::AppHandle) -> Result<(), String> {
 // YouTube Audio Import Commands
 // ============================================================================
 
+/// Detect an installed browser for yt-dlp cookie extraction.
+/// Returns the browser name (e.g. "chrome", "firefox") if found, or None.
+fn detect_cookie_browser() -> Option<&'static str> {
+    #[cfg(target_os = "macos")]
+    {
+        let browsers: &[(&str, &str)] = &[
+            ("chrome", "/Applications/Google Chrome.app"),
+            ("firefox", "/Applications/Firefox.app"),
+            ("brave", "/Applications/Brave Browser.app"),
+            ("edge", "/Applications/Microsoft Edge.app"),
+            ("chromium", "/Applications/Chromium.app"),
+        ];
+        for (name, path) in browsers {
+            if std::path::Path::new(path).exists() {
+                return Some(name);
+            }
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let browsers: &[(&str, &str)] = &[
+            (
+                "chrome",
+                r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+            ),
+            (
+                "chrome",
+                r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+            ),
+            ("firefox", r"C:\Program Files\Mozilla Firefox\firefox.exe"),
+            (
+                "firefox",
+                r"C:\Program Files (x86)\Mozilla Firefox\firefox.exe",
+            ),
+            (
+                "brave",
+                r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe",
+            ),
+            (
+                "edge",
+                r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+            ),
+        ];
+        for (name, path) in browsers {
+            if std::path::Path::new(path).exists() {
+                return Some(name);
+            }
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let browsers: &[(&str, &str)] = &[
+            ("chrome", "/usr/bin/google-chrome"),
+            ("chrome", "/usr/bin/google-chrome-stable"),
+            ("chromium", "/usr/bin/chromium"),
+            ("chromium", "/usr/bin/chromium-browser"),
+            ("firefox", "/usr/bin/firefox"),
+            ("brave", "/usr/bin/brave-browser"),
+        ];
+        for (name, path) in browsers {
+            if std::path::Path::new(path).exists() {
+                return Some(name);
+            }
+        }
+    }
+
+    None
+}
+
 /// Download audio from a YouTube URL using yt-dlp
 #[tauri::command]
 pub async fn youtube_download(
@@ -2318,17 +2389,29 @@ pub async fn youtube_download(
         "Downloading YouTube audio"
     );
 
+    // Detect browser for cookie-based authentication (age-restricted videos)
+    let cookie_browser = detect_cookie_browser();
+    if let Some(browser) = cookie_browser {
+        tracing::info!(browser = %browser, "Using browser cookies for yt-dlp authentication");
+    }
+
     // Step 1: Fetch metadata (title and duration) without downloading
+    let mut meta_args: Vec<String> = vec![
+        "--no-download".into(),
+        "--no-playlist".into(),
+        "--print".into(),
+        "title".into(),
+        "--print".into(),
+        "duration".into(),
+    ];
+    if let Some(browser) = cookie_browser {
+        meta_args.push("--cookies-from-browser".into());
+        meta_args.push(browser.into());
+    }
+    meta_args.push(url.clone());
+
     let meta_output = tokio::process::Command::new(&ytdlp_bin)
-        .args([
-            "--no-download",
-            "--no-playlist",
-            "--print",
-            "title",
-            "--print",
-            "duration",
-            &url,
-        ])
+        .args(&meta_args)
         .output()
         .await
         .map_err(|e| format!("Failed to run yt-dlp metadata: {}", e))?;
@@ -2336,6 +2419,14 @@ pub async fn youtube_download(
     if !meta_output.status.success() {
         let stderr = String::from_utf8_lossy(&meta_output.stderr);
         tracing::error!(stderr = %stderr, "yt-dlp metadata fetch failed");
+
+        if stderr.contains("Sign in to confirm your age") {
+            return Err(
+                "This video is age-restricted. Please sign in to YouTube in your browser and try again."
+                    .to_string(),
+            );
+        }
+
         return Err(format!(
             "Failed to fetch video metadata: {}",
             stderr.lines().last().unwrap_or("Unknown error")
@@ -2356,20 +2447,26 @@ pub async fn youtube_download(
         .unwrap_or(0.0);
 
     // Step 2: Download and convert to MP3
+    let mut dl_args: Vec<String> = vec![
+        "-x".into(),
+        "--audio-format".into(),
+        "mp3".into(),
+        "--audio-quality".into(),
+        "0".into(),
+        "--ffmpeg-location".into(),
+        ffmpeg_location.to_string(),
+        "--no-playlist".into(),
+        "-o".into(),
+        output_path.to_str().unwrap_or("output.mp3").to_string(),
+    ];
+    if let Some(browser) = cookie_browser {
+        dl_args.push("--cookies-from-browser".into());
+        dl_args.push(browser.into());
+    }
+    dl_args.push(url.clone());
+
     let output = tokio::process::Command::new(&ytdlp_bin)
-        .args([
-            "-x",
-            "--audio-format",
-            "mp3",
-            "--audio-quality",
-            "0",
-            "--ffmpeg-location",
-            ffmpeg_location,
-            "--no-playlist",
-            "-o",
-            output_path.to_str().unwrap_or("output.mp3"),
-            &url,
-        ])
+        .args(&dl_args)
         .output()
         .await
         .map_err(|e| format!("Failed to run yt-dlp: {}", e))?;
@@ -2378,6 +2475,12 @@ pub async fn youtube_download(
         let stderr = String::from_utf8_lossy(&output.stderr);
         tracing::error!("yt-dlp failed: {}", stderr);
 
+        if stderr.contains("Sign in to confirm your age") {
+            return Err(
+                "This video is age-restricted. Please sign in to YouTube in your browser and try again."
+                    .to_string(),
+            );
+        }
         if stderr.contains("Video unavailable") || stderr.contains("Private video") {
             return Err("Video not accessible (private or deleted)".to_string());
         }
