@@ -2411,6 +2411,8 @@ pub async fn youtube_download(
     let mut meta_args: Vec<String> = vec![
         "--no-download".into(),
         "--no-playlist".into(),
+        "-f".into(),
+        "bestaudio/best".into(),
         "--print".into(),
         "title".into(),
         "--print".into(),
