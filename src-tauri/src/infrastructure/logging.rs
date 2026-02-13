@@ -1,5 +1,6 @@
 //! Logging configuration with Sentry integration
 
+use sentry_tracing::EventFilter;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 /// Initialize the logging system with optional Sentry integration
@@ -14,7 +15,13 @@ pub fn init_logging() {
             .is_some_and(|s| !s.is_empty());
 
     let sentry_layer = if has_dsn {
-        Some(sentry_tracing::layer())
+        Some(
+            sentry_tracing::layer().event_filter(|md| match *md.level() {
+                tracing::Level::ERROR => EventFilter::Event | EventFilter::Log,
+                tracing::Level::TRACE => EventFilter::Ignore,
+                _ => EventFilter::Breadcrumb | EventFilter::Log,
+            }),
+        )
     } else {
         None
     };

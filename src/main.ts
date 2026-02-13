@@ -36,7 +36,11 @@ async function initSentry(): Promise<void> {
         release: version,
         environment: "production",
         enableLogs: true,
-        integrations: [consoleLoggingIntegration()],
+        integrations: [
+        consoleLoggingIntegration({
+          levels: ["log", "info", "warn", "error", "debug"],
+        }),
+      ],
         beforeSendLog(log) {
           return debugModeEnabled ? log : null;
         },
