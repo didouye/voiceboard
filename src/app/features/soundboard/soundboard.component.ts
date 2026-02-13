@@ -146,29 +146,30 @@ import { YouTubeImportModalComponent } from "./youtube-import/youtube-import-mod
           }
         </div>
 
-        <!-- Footer -->
-        <div class="mt-4 pb-4 flex justify-center gap-3">
-          <button
-            class="px-6 py-3 bg-surface-hover border border-dashed border-border hover:border-accent text-text-secondary hover:text-text-primary rounded-lg text-sm transition-all flex items-center gap-2"
-            [class.opacity-50]="soundboard.loading()"
-            [class.cursor-not-allowed]="soundboard.loading()"
-            [disabled]="soundboard.loading()"
-            (click)="importMultiple()"
-          >
-            <span>&#128193;</span>
-            Import Multiple
-          </button>
-          <button
-            class="px-6 py-3 bg-surface-hover border border-dashed border-border hover:border-red-500 text-text-secondary hover:text-red-400 rounded-lg text-sm transition-all flex items-center gap-2"
-            [class.opacity-50]="soundboard.loading()"
-            [class.cursor-not-allowed]="soundboard.loading()"
-            [disabled]="soundboard.loading()"
-            (click)="showYouTubeModal.set(true)"
-          >
-            <span>&#9654;</span>
-            YouTube
-          </button>
-        </div>
+      </div>
+
+      <!-- Footer (sticky bottom) -->
+      <div class="flex-shrink-0 py-2 flex justify-center gap-3">
+        <button
+          class="px-4 py-2 bg-surface-hover border border-dashed border-border hover:border-accent text-text-secondary hover:text-text-primary rounded-lg text-sm transition-all flex items-center gap-2"
+          [class.opacity-50]="soundboard.loading()"
+          [class.cursor-not-allowed]="soundboard.loading()"
+          [disabled]="soundboard.loading()"
+          (click)="importMultiple()"
+        >
+          <span>&#128193;</span>
+          Import Multiple
+        </button>
+        <button
+          class="px-4 py-2 bg-surface-hover border border-dashed border-border hover:border-red-500 text-text-secondary hover:text-red-400 rounded-lg text-sm transition-all flex items-center gap-2"
+          [class.opacity-50]="soundboard.loading()"
+          [class.cursor-not-allowed]="soundboard.loading()"
+          [disabled]="soundboard.loading()"
+          (click)="showYouTubeModal.set(true)"
+        >
+          <span>&#9654;</span>
+          YouTube
+        </button>
       </div>
     </div>
 
