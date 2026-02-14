@@ -164,6 +164,14 @@ SOCIALACCOUNT_PROVIDERS = {
 # Redis (for Channels and cache)
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 
+# Cache (for GitHub API rate limiting)
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "voiceboard-cache",
+    }
+}
+
 # Channels
 CHANNEL_LAYERS = {
     "default": {
