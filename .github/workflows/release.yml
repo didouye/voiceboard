@@ -2,7 +2,7 @@ name: Release
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
 
 env:
   CARGO_TERM_COLOR: always
@@ -14,6 +14,10 @@ jobs:
     outputs:
       app_version: ${{ steps.version.outputs.app_version }}
       release_tag: ${{ steps.version.outputs.release_tag }}
+      is_beta: ${{ steps.channel.outputs.is_beta }}
+      tag_suffix: ${{ steps.channel.outputs.tag_suffix }}
+      release_name_suffix: ${{ steps.channel.outputs.release_name_suffix }}
+      sentry_env: ${{ steps.channel.outputs.sentry_env }}
     steps:
       - name: Checkout for version
         uses: actions/checkout@v4
@@ -34,6 +38,21 @@ jobs:
           echo "Base version: $BASE_VERSION"
           echo "App version: $APP_VERSION"
           echo "Release tag: $RELEASE_TAG"
+
+      - name: Detect channel
+        id: channel
+        run: |
+          if [ "${{ github.ref_name }}" = "develop" ]; then
+            echo "is_beta=true" >> $GITHUB_OUTPUT
+            echo "tag_suffix=-beta" >> $GITHUB_OUTPUT
+            echo "release_name_suffix= (Beta)" >> $GITHUB_OUTPUT
+            echo "sentry_env=beta" >> $GITHUB_OUTPUT
+          else
+            echo "is_beta=false" >> $GITHUB_OUTPUT
+            echo "tag_suffix=" >> $GITHUB_OUTPUT
+            echo "release_name_suffix=" >> $GITHUB_OUTPUT
+            echo "sentry_env=production" >> $GITHUB_OUTPUT
+          fi
 
   # Build for all platforms
   build:
@@ -263,6 +282,10 @@ jobs:
       - name: Finalize Sentry release
         run: sentry-cli releases finalize "$APP_VERSION"
 
+      - name: Deploy to environment
+        run: |
+          sentry-cli releases deploys "$APP_VERSION" new -e "${{ needs.version.outputs.sentry_env }}"
+
   # Create GitHub Release
   release:
     needs: [version, build]
@@ -285,89 +308,30 @@ jobs:
           sha256sum voiceboard-* > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
-      - name: Generate update manifest
-        run: |
-          VERSION="${{ needs.version.outputs.release_tag }}"
-          APP_VERSION="${{ needs.version.outputs.app_version }}"
-
-          cd artifacts
-
-          # Read signatures from .sig files (they contain base64-encoded signatures)
-          read_sig() {
-            local sigfile="$1"
-            if [ -f "$sigfile" ]; then
-              cat "$sigfile"
-            else
-              echo ""
-            fi
-          }
-
-          # Get signatures for each platform
-          SIG_MACOS_ARM64=$(read_sig "voiceboard-$VERSION-macos-arm64.tar.gz.sig")
-          SIG_MACOS_X64=$(read_sig "voiceboard-$VERSION-macos-x64.tar.gz.sig")
-          SIG_LINUX_X64=$(read_sig "voiceboard-$VERSION-linux-x64.tar.gz.sig")
-          # Windows uses NSIS zip for updater if available, otherwise MSI
-          if [ -f "voiceboard-$VERSION-windows-x64.nsis.zip.sig" ]; then
-            SIG_WINDOWS_X64=$(read_sig "voiceboard-$VERSION-windows-x64.nsis.zip.sig")
-            WINDOWS_URL="https://github.com/${{ github.repository }}/releases/download/v$VERSION/voiceboard-$VERSION-windows-x64.nsis.zip"
-          else
-            SIG_WINDOWS_X64=$(read_sig "voiceboard-$VERSION-windows-x64.msi.sig")
-            WINDOWS_URL="https://github.com/${{ github.repository }}/releases/download/v$VERSION/voiceboard-$VERSION-windows-x64.msi"
-          fi
-
-          cat > latest.json << EOF
-          {
-            "version": "$APP_VERSION",
-            "notes": "Voiceboard $VERSION - Automated release",
-            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-            "platforms": {
-              "darwin-aarch64": {
-                "url": "https://github.com/${{ github.repository }}/releases/download/v$VERSION/voiceboard-$VERSION-macos-arm64.tar.gz",
-                "signature": "$SIG_MACOS_ARM64"
-              },
-              "darwin-x86_64": {
-                "url": "https://github.com/${{ github.repository }}/releases/download/v$VERSION/voiceboard-$VERSION-macos-x64.tar.gz",
-                "signature": "$SIG_MACOS_X64"
-              },
-              "linux-x86_64": {
-                "url": "https://github.com/${{ github.repository }}/releases/download/v$VERSION/voiceboard-$VERSION-linux-x64.tar.gz",
-                "signature": "$SIG_LINUX_X64"
-              },
-              "windows-x86_64": {
-                "url": "$WINDOWS_URL",
-                "signature": "$SIG_WINDOWS_X64"
-              }
-            }
-          }
-          EOF
-
-          echo "=== Generated latest.json ==="
-          cat latest.json
-          cd ..
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ needs.version.outputs.release_tag }}
+          tag_name: v${{ needs.version.outputs.release_tag }}${{ needs.version.outputs.tag_suffix }}
           target_commitish: ${{ github.sha }}
-          name: Voiceboard ${{ needs.version.outputs.release_tag }}
+          name: Voiceboard ${{ needs.version.outputs.release_tag }}${{ needs.version.outputs.release_name_suffix }}
           draft: false
-          prerelease: false
+          prerelease: ${{ needs.version.outputs.is_beta == 'true' }}
           body: |
-            ## Voiceboard ${{ needs.version.outputs.release_tag }}
+            ## Voiceboard ${{ needs.version.outputs.release_tag }}${{ needs.version.outputs.release_name_suffix }}
 
-            Automated release from main branch.
+            Automated release from `${{ github.ref_name }}` branch.
 
             **App Version:** ${{ needs.version.outputs.app_version }}
+            **Channel:** ${{ needs.version.outputs.is_beta == 'true' && 'Beta' || 'Stable' }}
 
             ### Downloads
 
             | Platform | Installer | Archive |
             |----------|-----------|---------|
-            | Windows x64 | [.msi](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.release_tag }}/voiceboard-${{ needs.version.outputs.release_tag }}-windows-x64.msi) | [.zip](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.release_tag }}/voiceboard-${{ needs.version.outputs.release_tag }}-windows-x64.zip) |
-            | macOS Apple Silicon | [.dmg](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.release_tag }}/voiceboard-${{ needs.version.outputs.release_tag }}-macos-arm64.dmg) | [.tar.gz](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.release_tag }}/voiceboard-${{ needs.version.outputs.release_tag }}-macos-arm64.tar.gz) |
-            | macOS Intel | [.dmg](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.release_tag }}/voiceboard-${{ needs.version.outputs.release_tag }}-macos-x64.dmg) | [.tar.gz](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.release_tag }}/voiceboard-${{ needs.version.outputs.release_tag }}-macos-x64.tar.gz) |
-            | Linux x64 | [.AppImage](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.release_tag }}/voiceboard-${{ needs.version.outputs.release_tag }}-linux-x64.AppImage) | [.tar.gz](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.release_tag }}/voiceboard-${{ needs.version.outputs.release_tag }}-linux-x64.tar.gz) |
+            | Windows x64 | [.msi](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.release_tag }}${{ needs.version.outputs.tag_suffix }}/voiceboard-${{ needs.version.outputs.release_tag }}-windows-x64.msi) | [.zip](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.release_tag }}${{ needs.version.outputs.tag_suffix }}/voiceboard-${{ needs.version.outputs.release_tag }}-windows-x64.zip) |
+            | macOS Apple Silicon | [.dmg](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.release_tag }}${{ needs.version.outputs.tag_suffix }}/voiceboard-${{ needs.version.outputs.release_tag }}-macos-arm64.dmg) | [.tar.gz](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.release_tag }}${{ needs.version.outputs.tag_suffix }}/voiceboard-${{ needs.version.outputs.release_tag }}-macos-arm64.tar.gz) |
+            | macOS Intel | [.dmg](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.release_tag }}${{ needs.version.outputs.tag_suffix }}/voiceboard-${{ needs.version.outputs.release_tag }}-macos-x64.dmg) | [.tar.gz](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.release_tag }}${{ needs.version.outputs.tag_suffix }}/voiceboard-${{ needs.version.outputs.release_tag }}-macos-x64.tar.gz) |
+            | Linux x64 | [.AppImage](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.release_tag }}${{ needs.version.outputs.tag_suffix }}/voiceboard-${{ needs.version.outputs.release_tag }}-linux-x64.AppImage) | [.tar.gz](https://github.com/${{ github.repository }}/releases/download/v${{ needs.version.outputs.release_tag }}${{ needs.version.outputs.tag_suffix }}/voiceboard-${{ needs.version.outputs.release_tag }}-linux-x64.tar.gz) |
 
             ### Verification
 
@@ -384,4 +348,3 @@ jobs:
           files: |
             artifacts/voiceboard-*
             artifacts/SHA256SUMS.txt
-            artifacts/latest.json
