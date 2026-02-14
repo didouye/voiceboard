@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "apps.users",
     "apps.billing",
     "apps.teams",
+    "apps.updates",
 ]
 
 MIDDLEWARE = [
@@ -194,3 +195,6 @@ STRIPE_PRICES = {
 
 # Super Admin
 SUPER_ADMIN_EMAIL = os.environ.get("SUPER_ADMIN_EMAIL", "")
+
+# GitHub (for update manifest proxy)
+GITHUB_REPO = os.environ.get("GITHUB_REPO", "didouye/voiceboard")

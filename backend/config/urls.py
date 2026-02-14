@@ -9,6 +9,7 @@ urlpatterns = [
     path("api/auth/", include("apps.users.urls")),
     path("api/billing/", include("apps.billing.urls")),
     path("api/teams/", include("apps.teams.urls")),
+    path("api/updates/", include("apps.updates.urls")),
 ]
 
 # Debug toolbar (development only)
