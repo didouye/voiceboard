@@ -750,19 +750,18 @@ pub async fn start_mixing(state: State<'_, AppState>) -> Result<(), String> {
         if let Some(event) = engine.try_recv_event() {
             match event {
                 AudioEngineEvent::Info(msg) => {
-                    // Parse "Input config: Xch, YHz | Output config: Zch, YHz"
-                    if msg.contains("Input config:") && msg.contains("Hz") {
-                        // Extract sample rate from the message
-                        // Format: "Input config: 1ch, 24000Hz | Output config: 16ch, 24000Hz"
-                        if let Some(hz_pos) = msg.find("Hz") {
-                            // Find the number before Hz
+                    // Parse "Input config: Xch, YHz | Output config: Zch, WHzz"
+                    // Extract the OUTPUT sample rate (last Hz value) since the ring buffer
+                    // and sound playback operate at the output rate
+                    if msg.contains("Output config:") && msg.contains("Hz") {
+                        if let Some(hz_pos) = msg.rfind("Hz") {
                             let before_hz = &msg[..hz_pos];
                             if let Some(comma_pos) = before_hz.rfind(", ") {
                                 let rate_str = &before_hz[comma_pos + 2..];
                                 if let Ok(rate) = rate_str.parse::<u32>() {
                                     actual_sample_rate = rate;
                                     tracing::info!(
-                                        "Extracted actual engine sample rate: {}Hz",
+                                        "Extracted actual engine sample rate (output): {}Hz",
                                         actual_sample_rate
                                     );
                                 }
@@ -2586,7 +2585,7 @@ pub async fn youtube_trim_and_import(
     // Run ffmpeg to trim (re-encode to avoid MP3 bit reservoir corruption)
     let output = hidden_command(&ffmpeg_bin)
         .args([
-            "-y",  // Overwrite output
+            "-y", // Overwrite output
             "-ss",
             &format!("{:.3}", start_seconds), // Start time (before -i for fast seek)
             "-i",

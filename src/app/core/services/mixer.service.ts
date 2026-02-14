@@ -37,6 +37,12 @@ export class MixerService {
 
   constructor(private tauri: TauriService) {}
 
+  private errorMessage(err: unknown): string {
+    if (err instanceof Error) return err.message;
+    if (typeof err === "string") return err;
+    return String(err);
+  }
+
   /**
    * Initialize the mixer service and auto-start if config is valid
    */
@@ -83,7 +89,7 @@ export class MixerService {
       }
     } catch (err) {
       this._error.set(
-        err instanceof Error ? err.message : "Initialization failed",
+        this.errorMessage(err),
       );
       console.error("Failed to initialize mixer:", err);
     } finally {
@@ -100,7 +106,7 @@ export class MixerService {
       this._devices.set(devices);
     } catch (err) {
       this._error.set(
-        err instanceof Error ? err.message : "Failed to refresh devices",
+        this.errorMessage(err),
       );
     }
   }
@@ -117,7 +123,7 @@ export class MixerService {
       }
     } catch (err) {
       this._error.set(
-        err instanceof Error ? err.message : "Failed to set master volume",
+        this.errorMessage(err),
       );
     }
   }
@@ -131,7 +137,7 @@ export class MixerService {
       this._soundboardVolume.set(volume);
     } catch (err) {
       this._error.set(
-        err instanceof Error ? err.message : "Failed to set soundboard volume",
+        this.errorMessage(err),
       );
     }
   }
@@ -147,7 +153,7 @@ export class MixerService {
       return channel;
     } catch (err) {
       this._error.set(
-        err instanceof Error ? err.message : "Failed to add microphone channel",
+        this.errorMessage(err),
       );
       return null;
     }
@@ -164,7 +170,7 @@ export class MixerService {
       return channel;
     } catch (err) {
       this._error.set(
-        err instanceof Error ? err.message : "Failed to add audio file channel",
+        this.errorMessage(err),
       );
       return null;
     }
@@ -179,7 +185,7 @@ export class MixerService {
       await this.refreshConfig();
     } catch (err) {
       this._error.set(
-        err instanceof Error ? err.message : "Failed to remove channel",
+        this.errorMessage(err),
       );
     }
   }
@@ -193,7 +199,7 @@ export class MixerService {
       await this.refreshConfig();
     } catch (err) {
       this._error.set(
-        err instanceof Error ? err.message : "Failed to set channel volume",
+        this.errorMessage(err),
       );
     }
   }
@@ -207,7 +213,7 @@ export class MixerService {
       await this.refreshConfig();
     } catch (err) {
       this._error.set(
-        err instanceof Error ? err.message : "Failed to toggle mute",
+        this.errorMessage(err),
       );
     }
   }
@@ -221,7 +227,7 @@ export class MixerService {
       this._isRunning.set(true);
     } catch (err) {
       this._error.set(
-        err instanceof Error ? err.message : "Failed to start mixing",
+        this.errorMessage(err),
       );
     }
   }
@@ -235,7 +241,7 @@ export class MixerService {
       this._isRunning.set(false);
     } catch (err) {
       this._error.set(
-        err instanceof Error ? err.message : "Failed to stop mixing",
+        this.errorMessage(err),
       );
     }
   }
@@ -253,7 +259,7 @@ export class MixerService {
         console.log("[MixerService] Mixer restarted successfully");
       } catch (err) {
         this._error.set(
-          err instanceof Error ? err.message : "Failed to restart mixer",
+          this.errorMessage(err),
         );
         this._isRunning.set(false);
       }
@@ -293,7 +299,7 @@ export class MixerService {
       console.log("[MixerService] Mixer started successfully");
     } catch (err) {
       this._error.set(
-        err instanceof Error ? err.message : "Failed to start/restart mixer",
+        this.errorMessage(err),
       );
       this._isRunning.set(false);
     }

@@ -17,9 +17,7 @@ fn resolve_dsn() -> Option<String> {
         }
     }
     // 2. Runtime fallback: for local `cargo run` / `npm run tauri dev`
-    std::env::var("SENTRY_DSN")
-        .ok()
-        .filter(|s| !s.is_empty())
+    std::env::var("SENTRY_DSN").ok().filter(|s| !s.is_empty())
 }
 
 /// Initialize Sentry error tracking

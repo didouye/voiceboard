@@ -267,6 +267,7 @@ fn run_engine_thread(
                         let input_dev = match find_device(&host, &input_device, true) {
                             Some(d) => d,
                             None => {
+                                tracing::error!("Input device not found: {}", input_device);
                                 let _ = event_tx.send(AudioEngineEvent::Error(format!(
                                     "Input device not found: {}",
                                     input_device
@@ -278,6 +279,7 @@ fn run_engine_thread(
                         let output_dev = match find_device(&host, &output_device, false) {
                             Some(d) => d,
                             None => {
+                                tracing::error!("Output device not found: {}", output_device);
                                 let _ = event_tx.send(AudioEngineEvent::Error(format!(
                                     "Output device not found: {}",
                                     output_device
@@ -327,114 +329,57 @@ fn run_engine_thread(
                             }
                         };
 
-                        // Find a common configuration supported by both devices
-                        // Try to find a sample rate that works for both
-                        let common_sample_rates = [48000u32, 44100, 96000, 22050, 16000];
+                        // Use each device's native/default sample rate
+                        // On Windows WASAPI shared mode, only the system-configured rate works reliably
+                        // If rates differ, we resample in the input callback
+                        let input_sample_rate = input_default.sample_rate();
+                        let output_sample_rate = output_default.sample_rate();
+                        let needs_resample = input_sample_rate != output_sample_rate;
 
-                        let mut found_config: Option<cpal::SampleRate> = None;
-
-                        // Get supported configs for input
-                        let input_configs: Vec<_> = input_dev
-                            .supported_input_configs()
-                            .map(|c| c.collect())
-                            .unwrap_or_default();
-
-                        // Get supported configs for output
-                        let output_configs: Vec<_> = output_dev
-                            .supported_output_configs()
-                            .map(|c| c.collect())
-                            .unwrap_or_default();
-
-                        // Log supported configs
-                        let _ = event_tx.send(AudioEngineEvent::Info(format!(
-                            "Input supported: {} configs",
-                            input_configs.len()
-                        )));
-                        for cfg in &input_configs {
+                        if needs_resample {
+                            tracing::info!(
+                                "Sample rate mismatch: input {}Hz, output {}Hz - resampling enabled",
+                                input_sample_rate.0,
+                                output_sample_rate.0
+                            );
                             let _ = event_tx.send(AudioEngineEvent::Info(format!(
-                                "  Input: {}ch, {}Hz-{}Hz, {:?}",
-                                cfg.channels(),
-                                cfg.min_sample_rate().0,
-                                cfg.max_sample_rate().0,
-                                cfg.sample_format()
+                                "Resampling: input {}Hz -> output {}Hz",
+                                input_sample_rate.0, output_sample_rate.0
+                            )));
+                        } else {
+                            let _ = event_tx.send(AudioEngineEvent::Info(format!(
+                                "Common sample rate: {}Hz",
+                                input_sample_rate.0
                             )));
                         }
 
-                        let _ = event_tx.send(AudioEngineEvent::Info(format!(
-                            "Output supported: {} configs",
-                            output_configs.len()
-                        )));
-                        for cfg in &output_configs {
-                            let _ = event_tx.send(AudioEngineEvent::Info(format!(
-                                "  Output: {}ch, {}Hz-{}Hz, {:?}",
-                                cfg.channels(),
-                                cfg.min_sample_rate().0,
-                                cfg.max_sample_rate().0,
-                                cfg.sample_format()
-                            )));
-                        }
-
-                        // Find common sample rate
-                        'outer: for &rate in &common_sample_rates {
-                            let sr = cpal::SampleRate(rate);
-
-                            // Check if input supports this rate with 2 channels
-                            let input_supports = input_configs.iter().any(|c| {
-                                c.channels() >= 1
-                                    && sr >= c.min_sample_rate()
-                                    && sr <= c.max_sample_rate()
-                            });
-
-                            // Check if output supports this rate
-                            let output_supports = output_configs.iter().any(|c| {
-                                c.channels() >= 1
-                                    && sr >= c.min_sample_rate()
-                                    && sr <= c.max_sample_rate()
-                            });
-
-                            if input_supports && output_supports {
-                                // Use common sample rate, but allow different channel counts
-                                found_config = Some(sr);
-
-                                let _ = event_tx.send(AudioEngineEvent::Info(format!(
-                                    "Found common sample rate: {}Hz",
-                                    rate
-                                )));
-                                break 'outer;
-                            }
-                        }
-
-                        // Get sample rate (common or from input default)
-                        let sample_rate = match found_config {
-                            Some(sr) => sr,
-                            None => {
-                                let _ = event_tx.send(AudioEngineEvent::Info(
-                                    "No common sample rate found, trying input default".to_string(),
-                                ));
-                                input_default.sample_rate()
-                            }
-                        };
-
-                        // Create separate configs for input and output
-                        // Input: use native channel count (may be mono)
+                        // Create separate configs for input and output using their native rates
+                        // Input: use native channel count (may be mono) and native sample rate
                         let input_channels = input_default.channels();
                         let input_config = cpal::StreamConfig {
                             channels: input_channels,
-                            sample_rate,
+                            sample_rate: input_sample_rate,
                             buffer_size: cpal::BufferSize::Default,
                         };
 
-                        // Output: use native channel count (usually stereo for VB-Cable)
+                        // Output: use native channel count (usually stereo for VB-Cable) and native sample rate
                         let output_channels = output_default.channels();
                         let output_config = cpal::StreamConfig {
                             channels: output_channels,
-                            sample_rate,
+                            sample_rate: output_sample_rate,
                             buffer_size: cpal::BufferSize::Default,
                         };
 
+                        // The ring buffer carries samples at the output rate
+                        // Noise filter also operates at the output rate (post-resampling)
+                        let sample_rate = output_sample_rate;
+
                         let _ = event_tx.send(AudioEngineEvent::Info(format!(
                             "Input config: {}ch, {}Hz | Output config: {}ch, {}Hz",
-                            input_channels, sample_rate.0, output_channels, sample_rate.0
+                            input_channels,
+                            input_sample_rate.0,
+                            output_channels,
+                            output_sample_rate.0
                         )));
 
                         // Create ring buffer for audio pass-through
@@ -467,6 +412,15 @@ fn run_engine_thread(
                         let input_callback_count = Arc::new(AtomicU32::new(0));
                         let input_callback_count_clone = input_callback_count.clone();
                         let input_ch = input_channels;
+
+                        // Resampling state for input callback (when input rate != output rate)
+                        // resample_step = input_rate / output_rate (input samples consumed per output sample)
+                        let resample_step =
+                            input_sample_rate.0 as f64 / output_sample_rate.0 as f64;
+                        // State: (fractional_position, previous_sample)
+                        let input_resample_state = Arc::new(Mutex::new((0.0f64, 0.0f32)));
+                        let input_resample_state_clone = input_resample_state.clone();
+                        let needs_resample_clone = needs_resample;
 
                         // Create noise suppression filter
                         // IMPORTANT: nnnoiseless only works at 48kHz - disable if sample rate differs
@@ -566,6 +520,13 @@ fn run_engine_thread(
                                         let voice_gate_on = voice_gate_enabled_clone.load(Ordering::Relaxed);
                                         let filter_enabled = filter.is_enabled();
 
+                                        // Lock resample state if resampling is needed
+                                        let mut resample_guard = if needs_resample_clone {
+                                            input_resample_state_clone.try_lock().ok()
+                                        } else {
+                                            None
+                                        };
+
                                         for frame in 0..num_frames {
                                             // Average all channels to produce mono sample
                                             let mut sum = 0.0f32;
@@ -575,40 +536,59 @@ fn run_engine_thread(
                                             }
                                             let mono_sample = sum / input_ch as f32;
 
-                                            // Process through noise filter and collect samples
-                                            // (must collect to end the mutable borrow before calling last_vad)
-                                            let filtered_samples: Vec<f32> = filter.process_sample(mono_sample).to_vec();
+                                            // Generate output-rate samples and process through noise filter
+                                            // With resampling: interpolate to produce samples at output rate
+                                            // Without: process mono sample directly
+                                            if let Some(ref mut state) = resample_guard {
+                                                let (ref mut frac_pos, ref mut prev) = **state;
+                                                let curr = mono_sample;
+                                                while *frac_pos < 1.0 {
+                                                    let t = *frac_pos as f32;
+                                                    let resampled = *prev + (curr - *prev) * t;
 
-                                            // Voice gate: check VAD and apply muting
-                                            // Only effective when noise suppression is enabled (VAD requires it)
-                                            let voice_gate_muted = if voice_gate_on && filter_enabled && !filtered_samples.is_empty() {
-                                                let vad = filter.last_vad();
-                                                let now_ms = engine_start_time.elapsed().as_millis() as u64;
+                                                    let filtered_samples: Vec<f32> = filter.process_sample(resampled).to_vec();
+                                                    let voice_gate_muted = if voice_gate_on && filter_enabled && !filtered_samples.is_empty() {
+                                                        let vad = filter.last_vad();
+                                                        let now_ms = engine_start_time.elapsed().as_millis() as u64;
+                                                        if vad >= VAD_THRESHOLD {
+                                                            voice_detected_until_clone.store(now_ms + VOICE_HOLDOFF_MS, Ordering::Relaxed);
+                                                            false
+                                                        } else {
+                                                            now_ms > voice_detected_until_clone.load(Ordering::Relaxed)
+                                                        }
+                                                    } else {
+                                                        false
+                                                    };
+                                                    for sample in filtered_samples {
+                                                        let processed = if muted || voice_gate_muted { 0.0 } else { sample * volume };
+                                                        sum_squares += processed * processed;
+                                                        let _ = prod.try_push(processed);
+                                                    }
 
-                                                if vad >= VAD_THRESHOLD {
-                                                    // Voice detected - extend hold-off
-                                                    voice_detected_until_clone.store(
-                                                        now_ms + VOICE_HOLDOFF_MS,
-                                                        Ordering::Relaxed
-                                                    );
-                                                    false // Not muted
-                                                } else {
-                                                    // Check if hold-off has expired
-                                                    now_ms > voice_detected_until_clone.load(Ordering::Relaxed)
+                                                    *frac_pos += resample_step;
                                                 }
+                                                *frac_pos -= 1.0;
+                                                *prev = curr;
                                             } else {
-                                                false // Voice gate not active
-                                            };
-
-                                            // Push filtered samples to ring buffer
-                                            for sample in filtered_samples {
-                                                let processed = if muted || voice_gate_muted {
-                                                    0.0
+                                                // No resampling - process directly at native rate
+                                                let filtered_samples: Vec<f32> = filter.process_sample(mono_sample).to_vec();
+                                                let voice_gate_muted = if voice_gate_on && filter_enabled && !filtered_samples.is_empty() {
+                                                    let vad = filter.last_vad();
+                                                    let now_ms = engine_start_time.elapsed().as_millis() as u64;
+                                                    if vad >= VAD_THRESHOLD {
+                                                        voice_detected_until_clone.store(now_ms + VOICE_HOLDOFF_MS, Ordering::Relaxed);
+                                                        false
+                                                    } else {
+                                                        now_ms > voice_detected_until_clone.load(Ordering::Relaxed)
+                                                    }
                                                 } else {
-                                                    sample * volume
+                                                    false
                                                 };
-                                                sum_squares += processed * processed;
-                                                let _ = prod.try_push(processed);
+                                                for sample in filtered_samples {
+                                                    let processed = if muted || voice_gate_muted { 0.0 } else { sample * volume };
+                                                    sum_squares += processed * processed;
+                                                    let _ = prod.try_push(processed);
+                                                }
                                             }
                                         }
                                     }
@@ -629,6 +609,7 @@ fn run_engine_thread(
                         let input_s = match input_result {
                             Ok(s) => s,
                             Err(e) => {
+                                tracing::error!("Failed to create input stream: {}", e);
                                 let _ = event_tx.send(AudioEngineEvent::Error(format!(
                                     "Failed to create input stream: {}",
                                     e
@@ -859,6 +840,7 @@ fn run_engine_thread(
                         let output_s = match output_result {
                             Ok(s) => s,
                             Err(e) => {
+                                tracing::error!("Failed to create output stream: {}", e);
                                 let _ = event_tx.send(AudioEngineEvent::Error(format!(
                                     "Failed to create output stream: {}",
                                     e
@@ -1044,6 +1026,7 @@ fn run_engine_thread(
 
                         // Start streams
                         if let Err(e) = input_s.play() {
+                            tracing::error!("Failed to start input stream: {}", e);
                             let _ = event_tx.send(AudioEngineEvent::Error(format!(
                                 "Failed to start input: {}",
                                 e
@@ -1052,6 +1035,7 @@ fn run_engine_thread(
                         }
 
                         if let Err(e) = output_s.play() {
+                            tracing::error!("Failed to start output stream: {}", e);
                             let _ = event_tx.send(AudioEngineEvent::Error(format!(
                                 "Failed to start output: {}",
                                 e

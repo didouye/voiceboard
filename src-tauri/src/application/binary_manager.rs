@@ -76,11 +76,7 @@ pub fn ffmpeg_path(app: &AppHandle) -> Result<PathBuf, String> {
 
 /// Path to the deno binary (JS runtime for yt-dlp)
 pub fn deno_path(app: &AppHandle) -> Result<PathBuf, String> {
-    let name = if cfg!(windows) {
-        "deno.exe"
-    } else {
-        "deno"
-    };
+    let name = if cfg!(windows) { "deno.exe" } else { "deno" };
     Ok(binaries_dir(app)?.join(name))
 }
 
@@ -443,8 +439,11 @@ fn extract_deno(archive_data: &[u8], dest: &PathBuf) -> Result<(), String> {
 
 /// Download yt-dlp, ffmpeg, and deno in parallel
 pub async fn download_all_binaries(app: &AppHandle) -> Result<(), String> {
-    let (ytdlp_result, ffmpeg_result, deno_result) =
-        tokio::join!(download_ytdlp(app), download_ffmpeg(app), download_deno(app));
+    let (ytdlp_result, ffmpeg_result, deno_result) = tokio::join!(
+        download_ytdlp(app),
+        download_ffmpeg(app),
+        download_deno(app)
+    );
 
     ytdlp_result?;
     ffmpeg_result?;
