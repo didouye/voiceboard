@@ -18,6 +18,19 @@ fn default_voice_gate() -> bool {
     false
 }
 
+/// Update distribution channel
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum UpdateChannel {
+    #[default]
+    Stable,
+    Beta,
+}
+
+fn default_update_channel() -> UpdateChannel {
+    UpdateChannel::default()
+}
+
 /// User preferences for audio devices
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AudioSettings {
@@ -82,6 +95,9 @@ pub struct AppSettings {
     pub start_minimized: bool,
     /// Auto-start mixing when app launches
     pub auto_start_mixing: bool,
+    /// Update distribution channel (stable or beta)
+    #[serde(default = "default_update_channel")]
+    pub update_channel: UpdateChannel,
 }
 
 impl AppSettings {
@@ -90,6 +106,7 @@ impl AppSettings {
             audio: AudioSettings::new(),
             start_minimized: false,
             auto_start_mixing: false,
+            update_channel: UpdateChannel::Stable,
         }
     }
 }
@@ -285,5 +302,29 @@ mod tests {
         let json = r#"{"input_device_id":null,"output_device_id":null,"preview_device_id":null,"master_volume":1.0,"sample_rate":48000,"buffer_size":1024,"mic_monitoring":false}"#;
         let settings: AudioSettings = serde_json::from_str(json).unwrap();
         assert!(settings.noise_suppression_enabled);
+    }
+
+    #[test]
+    fn test_update_channel_default_is_stable() {
+        let settings = AppSettings::new();
+        assert_eq!(settings.update_channel, UpdateChannel::Stable);
+    }
+
+    #[test]
+    fn test_update_channel_serialization() {
+        let mut settings = AppSettings::new();
+        settings.update_channel = UpdateChannel::Beta;
+        let json = serde_json::to_string(&settings).unwrap();
+        assert!(json.contains("\"update_channel\":\"beta\""));
+        let deserialized: AppSettings = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.update_channel, UpdateChannel::Beta);
+    }
+
+    #[test]
+    fn test_update_channel_default_on_missing_field() {
+        // Old settings JSON without update_channel should default to Stable
+        let json = r#"{"audio":{"input_device_id":null,"output_device_id":null,"preview_device_id":null,"master_volume":1.0,"sample_rate":48000,"buffer_size":1024,"mic_monitoring":false},"start_minimized":false,"auto_start_mixing":false}"#;
+        let settings: AppSettings = serde_json::from_str(json).unwrap();
+        assert_eq!(settings.update_channel, UpdateChannel::Stable);
     }
 }

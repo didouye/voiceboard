@@ -110,6 +110,7 @@ mod tests {
             },
             start_minimized: true,
             auto_start_mixing: false,
+            update_channel: crate::domain::UpdateChannel::Stable,
         };
 
         let state = AppState::with_settings(settings);

@@ -199,6 +199,8 @@ pub struct AppSettingsDto {
     pub audio: AudioSettingsDto,
     pub start_minimized: bool,
     pub auto_start_mixing: bool,
+    #[serde(default)]
+    pub update_channel: String,
 }
 
 impl From<&AppSettings> for AppSettingsDto {
@@ -207,6 +209,7 @@ impl From<&AppSettings> for AppSettingsDto {
             audio: AudioSettingsDto::from(&settings.audio),
             start_minimized: settings.start_minimized,
             auto_start_mixing: settings.auto_start_mixing,
+            update_channel: format!("{:?}", settings.update_channel).to_lowercase(),
         }
     }
 }
@@ -217,6 +220,10 @@ impl From<AppSettingsDto> for AppSettings {
             audio: AudioSettings::from(dto.audio),
             start_minimized: dto.start_minimized,
             auto_start_mixing: dto.auto_start_mixing,
+            update_channel: match dto.update_channel.as_str() {
+                "beta" => crate::domain::UpdateChannel::Beta,
+                _ => crate::domain::UpdateChannel::Stable,
+            },
         }
     }
 }
@@ -2870,6 +2877,7 @@ mod tests {
             audio: AudioSettings::default(),
             start_minimized: true,
             auto_start_mixing: false,
+            update_channel: crate::domain::UpdateChannel::Stable,
         };
 
         let dto = AppSettingsDto::from(&settings);
@@ -2897,6 +2905,7 @@ mod tests {
             },
             start_minimized: false,
             auto_start_mixing: true,
+            update_channel: "stable".to_string(),
         };
 
         let settings = AppSettings::from(dto);
@@ -2924,6 +2933,7 @@ mod tests {
             },
             start_minimized: true,
             auto_start_mixing: true,
+            update_channel: crate::domain::UpdateChannel::Stable,
         };
 
         let dto = AppSettingsDto::from(&original);
