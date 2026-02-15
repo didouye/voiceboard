@@ -45,6 +45,7 @@ export interface AppSettings {
   audio: AudioSettings;
   startMinimized: boolean;
   autoStartMixing: boolean;
+  updateChannel: 'stable' | 'beta';
 }
 
 export interface ApiResponse<T> {

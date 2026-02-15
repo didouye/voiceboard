@@ -228,6 +228,7 @@ export class TauriService {
       },
       startMinimized: s.start_minimized,
       autoStartMixing: s.auto_start_mixing,
+      updateChannel: s.update_channel ?? 'stable',
     };
   }
 
@@ -252,6 +253,7 @@ export class TauriService {
       },
       start_minimized: s.startMinimized,
       auto_start_mixing: s.autoStartMixing,
+      update_channel: s.updateChannel,
     };
   }
 

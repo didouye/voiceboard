@@ -369,6 +369,36 @@ import { AudioDevice, AppSettings } from "../../../core/models";
                 ></div>
               </button>
             </div>
+
+            <!-- Update Channel -->
+            <div
+              class="flex items-center justify-between py-3 px-4 bg-background rounded-lg mt-3"
+            >
+              <div>
+                <span class="text-sm text-text-primary">Update Channel</span>
+                <p class="text-xs text-text-muted mt-0.5">
+                  @if (updateChannel() === 'beta') {
+                    Beta — Test upcoming features (may contain bugs)
+                  } @else {
+                    Stable — Tested and validated releases
+                  }
+                </p>
+              </div>
+              <button
+                class="w-12 h-6 rounded-full transition-colors relative"
+                [class]="
+                  updateChannel() === 'beta' ? 'bg-amber-500' : 'bg-surface'
+                "
+                (click)="toggleUpdateChannel()"
+              >
+                <div
+                  class="absolute top-1 w-4 h-4 bg-white rounded-full transition-transform"
+                  [class]="
+                    updateChannel() === 'beta' ? 'left-7' : 'left-1'
+                  "
+                ></div>
+              </button>
+            </div>
           </div>
         }
       </div>
@@ -435,6 +465,10 @@ export class SettingsPopupComponent implements OnInit {
   private _voiceGate = signal(false);
   readonly voiceGate = this._voiceGate.asReadonly();
 
+  // Update channel state
+  protected readonly _updateChannel = signal<'stable' | 'beta'>('stable');
+  protected readonly updateChannel = this._updateChannel.asReadonly();
+
   Math = Math;
 
   constructor(
@@ -467,6 +501,9 @@ export class SettingsPopupComponent implements OnInit {
       // Load volume values
       this._micVolume.set(settings.audio.micVolume ?? 1.0);
       this._soundboardVolume.set(settings.audio.soundboardVolume ?? 1.0);
+
+      // Load update channel
+      this._updateChannel.set(settings.updateChannel);
 
       // Load noise suppression and voice gate states
       const noiseSuppressionEnabled = await this.tauri.getNoiseSuppression();
@@ -583,6 +620,17 @@ export class SettingsPopupComponent implements OnInit {
       await this.mixer.startOrRestartWithDevices();
     } catch (err) {
       console.error("Failed to toggle voice gate:", err);
+    }
+  }
+
+  async toggleUpdateChannel(): Promise<void> {
+    const newChannel =
+      this._updateChannel() === "stable" ? "beta" : "stable";
+    try {
+      await invoke("set_update_channel", { channel: newChannel });
+      this._updateChannel.set(newChannel);
+    } catch (err) {
+      console.error("Failed to set update channel:", err);
     }
   }
 

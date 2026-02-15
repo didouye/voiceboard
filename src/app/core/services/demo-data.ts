@@ -72,6 +72,7 @@ export const DEMO_SETTINGS: AppSettings = {
   },
   startMinimized: false,
   autoStartMixing: true,
+  updateChannel: 'stable',
 };
 
 export const DEMO_MIXER_CONFIG: MixerConfig = {
