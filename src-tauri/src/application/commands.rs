@@ -1916,6 +1916,46 @@ pub async fn install_update(
     }
 }
 
+/// Set the update distribution channel
+#[tauri::command]
+pub async fn set_update_channel(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    channel: String,
+) -> Result<(), String> {
+    let update_channel = match channel.as_str() {
+        "beta" => crate::domain::UpdateChannel::Beta,
+        "stable" => crate::domain::UpdateChannel::Stable,
+        _ => {
+            return Err(format!(
+                "Invalid channel: {}. Must be 'stable' or 'beta'",
+                channel
+            ))
+        }
+    };
+
+    tracing::info!(channel = %channel, "Setting update channel");
+
+    {
+        let mut settings = state.settings.write().await;
+        settings.update_channel = update_channel;
+    }
+
+    // Persist to store
+    let settings = state.settings.read().await;
+    let dto = AppSettingsDto::from(&*settings);
+    drop(settings);
+
+    let store = app.store(SETTINGS_STORE).map_err(|e| e.to_string())?;
+    store.set(
+        SETTINGS_KEY,
+        serde_json::to_value(&dto).map_err(|e| e.to_string())?,
+    );
+    store.save().map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
 // ============================================================================
 // Debug Configuration
 // ============================================================================

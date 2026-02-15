@@ -90,6 +90,7 @@ use application::{
         set_output_device,
         set_preview_device,
         set_soundboard_volume,
+        set_update_channel,
         set_voice_gate,
         // Mixing control
         start_mixing,
@@ -384,6 +385,7 @@ pub fn run() {
             // Updates
             check_for_update,
             install_update,
+            set_update_channel,
             // Debug
             get_debug_mode,
             set_debug_mode,
