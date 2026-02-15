@@ -1771,29 +1771,43 @@ pub struct UpdateInfo {
     pub body: Option<String>,
 }
 
-/// Check if an update is available
+/// Check if an update is available (uses channel from settings)
 #[tauri::command]
-pub async fn check_for_update(app: tauri::AppHandle) -> Result<UpdateInfo, String> {
-    tracing::info!("Starting update check");
-
-    let updater = match app.updater() {
-        Ok(u) => {
-            tracing::debug!("Updater instance created successfully");
-            u
-        }
-        Err(e) => {
-            tracing::error!(error = %e, "Failed to create updater instance");
-            return Err(e.to_string());
-        }
+pub async fn check_for_update(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<UpdateInfo, String> {
+    let channel = {
+        let settings = state.settings.read().await;
+        format!("{:?}", settings.update_channel).to_lowercase()
     };
 
-    tracing::debug!("Checking for updates from remote endpoint");
+    tracing::info!(channel = %channel, "Starting update check");
+
+    let api_url = option_env!("VOICEBOARD_API_URL").unwrap_or("http://localhost:8000/api");
+    let endpoint = format!("{}/updates/latest?channel={}", api_url, channel);
+
+    let updater = app
+        .updater_builder()
+        .endpoints(vec![endpoint
+            .parse()
+            .map_err(|e: url::ParseError| e.to_string())?])
+        .map_err(|e: tauri_plugin_updater::Error| {
+            tracing::error!(error = %e, "Failed to set updater endpoints");
+            e.to_string()
+        })?
+        .build()
+        .map_err(|e: tauri_plugin_updater::Error| {
+            tracing::error!(error = %e, "Failed to create updater instance");
+            e.to_string()
+        })?;
 
     match updater.check().await {
         Ok(Some(update)) => {
             tracing::info!(
                 version = %update.version,
                 current_version = env!("CARGO_PKG_VERSION"),
+                channel = %channel,
                 "Update available"
             );
             Ok(UpdateInfo {
@@ -1805,7 +1819,8 @@ pub async fn check_for_update(app: tauri::AppHandle) -> Result<UpdateInfo, Strin
         Ok(None) => {
             tracing::info!(
                 current_version = env!("CARGO_PKG_VERSION"),
-                "No update available - already on latest version"
+                channel = %channel,
+                "No update available"
             );
             Ok(UpdateInfo {
                 available: false,
@@ -1814,13 +1829,7 @@ pub async fn check_for_update(app: tauri::AppHandle) -> Result<UpdateInfo, Strin
             })
         }
         Err(e) => {
-            tracing::error!(
-                error = %e,
-                error_debug = ?e,
-                current_version = env!("CARGO_PKG_VERSION"),
-                "Update check failed"
-            );
-            // Return error instead of silently failing
+            tracing::error!(error = %e, channel = %channel, "Update check failed");
             Err(format!("Update check failed: {}", e))
         }
     }
@@ -1828,21 +1837,34 @@ pub async fn check_for_update(app: tauri::AppHandle) -> Result<UpdateInfo, Strin
 
 /// Download and install an available update, then restart
 #[tauri::command]
-pub async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
-    tracing::info!("Starting update installation");
-
-    let updater = match app.updater() {
-        Ok(u) => {
-            tracing::debug!("Updater instance created for installation");
-            u
-        }
-        Err(e) => {
-            tracing::error!(error = %e, "Failed to create updater instance for installation");
-            return Err(format!("Failed to initialize updater: {}", e));
-        }
+pub async fn install_update(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let channel = {
+        let settings = state.settings.read().await;
+        format!("{:?}", settings.update_channel).to_lowercase()
     };
 
-    tracing::debug!("Checking for update before installation");
+    tracing::info!(channel = %channel, "Starting update installation");
+
+    let api_url = option_env!("VOICEBOARD_API_URL").unwrap_or("http://localhost:8000/api");
+    let endpoint = format!("{}/updates/latest?channel={}", api_url, channel);
+
+    let updater = app
+        .updater_builder()
+        .endpoints(vec![endpoint
+            .parse()
+            .map_err(|e: url::ParseError| e.to_string())?])
+        .map_err(|e: tauri_plugin_updater::Error| {
+            tracing::error!(error = %e, "Failed to set updater endpoints");
+            e.to_string()
+        })?
+        .build()
+        .map_err(|e: tauri_plugin_updater::Error| {
+            tracing::error!(error = %e, "Failed to create updater instance");
+            e.to_string()
+        })?;
 
     let update = match updater.check().await {
         Ok(Some(update)) => {
@@ -1888,11 +1910,7 @@ pub async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
             app.restart();
         }
         Err(e) => {
-            tracing::error!(
-                error = %e,
-                error_debug = ?e,
-                "Failed to download and install update"
-            );
+            tracing::error!(error = %e, "Failed to download and install update");
             Err(format!("Failed to install update: {}", e))
         }
     }
