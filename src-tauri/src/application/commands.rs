@@ -2347,75 +2347,179 @@ pub async fn update_ytdlp(app: tauri::AppHandle) -> Result<(), String> {
 // YouTube Audio Import Commands
 // ============================================================================
 
-/// Detect an installed browser for yt-dlp cookie extraction.
-/// Returns the browser name (e.g. "chrome", "firefox") if found, or None.
-fn detect_cookie_browser() -> Option<&'static str> {
-    #[cfg(target_os = "macos")]
-    {
-        let browsers: &[(&str, &str)] = &[
-            ("chrome", "/Applications/Google Chrome.app"),
-            ("firefox", "/Applications/Firefox.app"),
-            ("brave", "/Applications/Brave Browser.app"),
-            ("edge", "/Applications/Microsoft Edge.app"),
-            ("chromium", "/Applications/Chromium.app"),
-        ];
-        for (name, path) in browsers {
-            if std::path::Path::new(path).exists() {
-                return Some(name);
-            }
+/// Classifies yt-dlp stderr errors into retryable vs non-retryable categories.
+#[derive(Debug, PartialEq)]
+enum YtdlpErrorKind {
+    /// Age-restricted or sign-in required — retryable with browser cookies
+    AuthRequired,
+    /// Private, deleted, or otherwise unavailable video
+    VideoNotAccessible,
+    /// Geo-restricted content
+    GeoRestricted,
+    /// Live streams are not supported
+    LiveStream,
+    /// Any other error
+    Other(String),
+}
+
+impl YtdlpErrorKind {
+    /// Classify yt-dlp stderr output into an error kind.
+    fn from_stderr(stderr: &str) -> Self {
+        if stderr.contains("Sign in to confirm your age")
+            || stderr.contains("sign in")
+            || stderr.contains("login required")
+        {
+            Self::AuthRequired
+        } else if stderr.contains("Video unavailable")
+            || stderr.contains("Private video")
+            || stderr.contains("This video has been removed")
+        {
+            Self::VideoNotAccessible
+        } else if stderr.contains("geo restriction")
+            || stderr.contains("available in your country")
+            || stderr.contains("blocked in your country")
+        {
+            Self::GeoRestricted
+        } else if stderr.contains("is a live event") || stderr.contains("live stream") {
+            Self::LiveStream
+        } else {
+            let last_line = stderr.lines().last().unwrap_or("Unknown error").to_string();
+            Self::Other(last_line)
         }
     }
+
+    /// User-facing error message for this error kind.
+    fn to_user_message(&self) -> String {
+        match self {
+            Self::AuthRequired => {
+                "This video is age-restricted. Please sign in to YouTube in your browser and try again.".to_string()
+            }
+            Self::VideoNotAccessible => {
+                "Video not accessible (private or deleted)".to_string()
+            }
+            Self::GeoRestricted => {
+                "Video not available in your region".to_string()
+            }
+            Self::LiveStream => "Live streams are not supported".to_string(),
+            Self::Other(msg) => format!("Failed to download: {}", msg),
+        }
+    }
+
+    /// Returns true only for errors that may succeed with browser cookies.
+    fn is_retryable_with_cookies(&self) -> bool {
+        matches!(self, Self::AuthRequired)
+    }
+}
+
+/// Detect installed browsers for yt-dlp cookie extraction.
+/// Returns a list of browser names ordered by preference (Firefox first, Chrome last).
+/// Browser names are deduplicated.
+fn detect_cookie_browsers() -> Vec<&'static str> {
+    let mut found: Vec<&'static str> = Vec::new();
+
+    // Browser paths ordered by preference: Firefox > Edge > Brave > Chromium > Chrome
+    // Chrome is last on all platforms due to DPAPI cookie encryption issues (Chrome v127+)
+    #[cfg(target_os = "macos")]
+    let browsers: &[(&str, &str)] = &[
+        ("firefox", "/Applications/Firefox.app"),
+        ("edge", "/Applications/Microsoft Edge.app"),
+        ("brave", "/Applications/Brave Browser.app"),
+        ("chromium", "/Applications/Chromium.app"),
+        ("chrome", "/Applications/Google Chrome.app"),
+    ];
 
     #[cfg(target_os = "windows")]
-    {
-        let browsers: &[(&str, &str)] = &[
-            (
-                "chrome",
-                r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-            ),
-            (
-                "chrome",
-                r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-            ),
-            ("firefox", r"C:\Program Files\Mozilla Firefox\firefox.exe"),
-            (
-                "firefox",
-                r"C:\Program Files (x86)\Mozilla Firefox\firefox.exe",
-            ),
-            (
-                "brave",
-                r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe",
-            ),
-            (
-                "edge",
-                r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
-            ),
-        ];
-        for (name, path) in browsers {
-            if std::path::Path::new(path).exists() {
-                return Some(name);
-            }
-        }
-    }
+    let browsers: &[(&str, &str)] = &[
+        ("firefox", r"C:\Program Files\Mozilla Firefox\firefox.exe"),
+        (
+            "firefox",
+            r"C:\Program Files (x86)\Mozilla Firefox\firefox.exe",
+        ),
+        (
+            "edge",
+            r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+        ),
+        (
+            "brave",
+            r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe",
+        ),
+        (
+            "chromium",
+            r"C:\Program Files\Chromium\Application\chrome.exe",
+        ),
+        (
+            "chrome",
+            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        ),
+        (
+            "chrome",
+            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        ),
+    ];
 
     #[cfg(target_os = "linux")]
-    {
-        let browsers: &[(&str, &str)] = &[
-            ("chrome", "/usr/bin/google-chrome"),
-            ("chrome", "/usr/bin/google-chrome-stable"),
-            ("chromium", "/usr/bin/chromium"),
-            ("chromium", "/usr/bin/chromium-browser"),
-            ("firefox", "/usr/bin/firefox"),
-            ("brave", "/usr/bin/brave-browser"),
-        ];
-        for (name, path) in browsers {
-            if std::path::Path::new(path).exists() {
-                return Some(name);
-            }
+    let browsers: &[(&str, &str)] = &[
+        ("firefox", "/usr/bin/firefox"),
+        ("brave", "/usr/bin/brave-browser"),
+        ("chromium", "/usr/bin/chromium"),
+        ("chromium", "/usr/bin/chromium-browser"),
+        ("chrome", "/usr/bin/google-chrome"),
+        ("chrome", "/usr/bin/google-chrome-stable"),
+    ];
+
+    for (name, path) in browsers {
+        if std::path::Path::new(path).exists() && !found.contains(name) {
+            found.push(name);
         }
     }
 
-    None
+    found
+}
+
+/// Fetch video metadata (title and duration) using yt-dlp.
+/// Returns `Ok((title, duration))` on success, or `Err(YtdlpErrorKind)` on failure.
+async fn fetch_ytdlp_metadata(
+    ytdlp_bin: &std::path::Path,
+    url: &str,
+    deno_runtime: &str,
+    cookie_browser: Option<&str>,
+) -> Result<(String, f64), YtdlpErrorKind> {
+    let mut args: Vec<String> = vec![
+        "--no-download".into(),
+        "--no-playlist".into(),
+        "--js-runtimes".into(),
+        deno_runtime.into(),
+        "-f".into(),
+        "bestaudio/best".into(),
+        "--print".into(),
+        "title".into(),
+        "--print".into(),
+        "duration".into(),
+    ];
+    if let Some(browser) = cookie_browser {
+        args.push("--cookies-from-browser".into());
+        args.push(browser.into());
+    }
+    args.push(url.into());
+
+    let output = hidden_command(ytdlp_bin)
+        .args(&args)
+        .output()
+        .await
+        .map_err(|e| YtdlpErrorKind::Other(format!("Failed to run yt-dlp metadata: {}", e)))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(YtdlpErrorKind::from_stderr(&stderr));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let lines: Vec<&str> = stdout.trim().lines().filter(|l| !l.is_empty()).collect();
+
+    let title = lines.first().unwrap_or(&"Unknown").to_string();
+    let duration: f64 = lines.get(1).and_then(|s| s.parse().ok()).unwrap_or(0.0);
+
+    Ok((title, duration))
 }
 
 /// Download audio from a YouTube URL using yt-dlp
@@ -2475,68 +2579,53 @@ pub async fn youtube_download(
         "Downloading YouTube audio"
     );
 
-    // Detect browser for cookie-based authentication (age-restricted videos)
-    let cookie_browser = detect_cookie_browser();
-    if let Some(browser) = cookie_browser {
-        tracing::info!(browser = %browser, "Using browser cookies for yt-dlp authentication");
-    }
-
-    // Step 1: Fetch metadata (title and duration) without downloading
-    let mut meta_args: Vec<String> = vec![
-        "--no-download".into(),
-        "--no-playlist".into(),
-        "--js-runtimes".into(),
-        deno_runtime.clone(),
-        "-f".into(),
-        "bestaudio/best".into(),
-        "--print".into(),
-        "title".into(),
-        "--print".into(),
-        "duration".into(),
-    ];
-    if let Some(browser) = cookie_browser {
-        meta_args.push("--cookies-from-browser".into());
-        meta_args.push(browser.into());
-    }
-    meta_args.push(url.clone());
-
-    let meta_output = hidden_command(&ytdlp_bin)
-        .args(&meta_args)
-        .output()
-        .await
-        .map_err(|e| format!("Failed to run yt-dlp metadata: {}", e))?;
-
-    if !meta_output.status.success() {
-        let stderr = String::from_utf8_lossy(&meta_output.stderr);
-        tracing::error!(stderr = %stderr, "yt-dlp metadata fetch failed");
-
-        if stderr.contains("Sign in to confirm your age") {
-            return Err(
-                "This video is age-restricted. Please sign in to YouTube in your browser and try again."
-                    .to_string(),
-            );
+    // Step 1: Fetch metadata with cascading fallback
+    // Try without cookies first (works for public videos), then fall back to browsers
+    let mut working_browser: Option<&str> = None;
+    let (title, duration) = match fetch_ytdlp_metadata(&ytdlp_bin, &url, &deno_runtime, None).await
+    {
+        Ok(meta) => {
+            tracing::info!("Metadata fetched without cookies");
+            meta
         }
+        Err(err) if err.is_retryable_with_cookies() => {
+            tracing::warn!(
+                "Metadata fetch failed without cookies (auth required), trying browsers"
+            );
+            let browsers = detect_cookie_browsers();
+            if browsers.is_empty() {
+                return Err(err.to_user_message());
+            }
 
-        return Err(format!(
-            "Failed to fetch video metadata: {}",
-            stderr.lines().last().unwrap_or("Unknown error")
-        ));
-    }
+            let mut last_err = err;
+            let mut found = None;
+            for browser in &browsers {
+                tracing::info!(browser = %browser, "Trying browser cookies for metadata");
+                match fetch_ytdlp_metadata(&ytdlp_bin, &url, &deno_runtime, Some(browser)).await {
+                    Ok(meta) => {
+                        tracing::info!(browser = %browser, "Metadata fetched with browser cookies");
+                        working_browser = Some(browser);
+                        found = Some(meta);
+                        break;
+                    }
+                    Err(e) => {
+                        tracing::warn!(browser = %browser, error = %e.to_user_message(), "Browser cookie attempt failed");
+                        last_err = e;
+                    }
+                }
+            }
+            match found {
+                Some(meta) => meta,
+                None => return Err(last_err.to_user_message()),
+            }
+        }
+        Err(err) => {
+            tracing::error!(error = %err.to_user_message(), "yt-dlp metadata fetch failed (not retryable)");
+            return Err(err.to_user_message());
+        }
+    };
 
-    let meta_stdout = String::from_utf8_lossy(&meta_output.stdout);
-    let meta_lines: Vec<&str> = meta_stdout
-        .trim()
-        .lines()
-        .filter(|l| !l.is_empty())
-        .collect();
-
-    let title = meta_lines.first().unwrap_or(&"Unknown").to_string();
-    let duration: f64 = meta_lines
-        .get(1)
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(0.0);
-
-    // Step 2: Download and convert to MP3
+    // Step 2: Download and convert to MP3 using the same browser that worked for metadata
     let mut dl_args: Vec<String> = vec![
         "-x".into(),
         "--audio-format".into(),
@@ -2551,7 +2640,7 @@ pub async fn youtube_download(
         "-o".into(),
         output_path.to_str().unwrap_or("output.mp3").to_string(),
     ];
-    if let Some(browser) = cookie_browser {
+    if let Some(browser) = working_browser {
         dl_args.push("--cookies-from-browser".into());
         dl_args.push(browser.into());
     }
@@ -2565,28 +2654,9 @@ pub async fn youtube_download(
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        tracing::error!("yt-dlp failed: {}", stderr);
-
-        if stderr.contains("Sign in to confirm your age") {
-            return Err(
-                "This video is age-restricted. Please sign in to YouTube in your browser and try again."
-                    .to_string(),
-            );
-        }
-        if stderr.contains("Video unavailable") || stderr.contains("Private video") {
-            return Err("Video not accessible (private or deleted)".to_string());
-        }
-        if stderr.contains("geo restriction") || stderr.contains("not available in your country") {
-            return Err("Video not available in your region".to_string());
-        }
-        if stderr.contains("is a live event") || stderr.contains("live stream") {
-            return Err("Live streams are not supported".to_string());
-        }
-
-        return Err(format!(
-            "Failed to download: {}",
-            stderr.lines().last().unwrap_or("Unknown error")
-        ));
+        tracing::error!("yt-dlp download failed: {}", stderr);
+        let err = YtdlpErrorKind::from_stderr(&stderr);
+        return Err(err.to_user_message());
     }
 
     // Verify the mp3 file was created
@@ -3134,5 +3204,117 @@ mod tests {
         assert_eq!(dto.input_device_id, deserialized.input_device_id);
         assert_eq!(dto.master_volume, deserialized.master_volume);
         assert_eq!(dto.mic_monitoring, deserialized.mic_monitoring);
+    }
+
+    // ==================== YtdlpErrorKind Tests ====================
+
+    #[test]
+    fn test_ytdlp_error_kind_from_stderr_auth_required() {
+        assert_eq!(
+            YtdlpErrorKind::from_stderr("ERROR: Sign in to confirm your age"),
+            YtdlpErrorKind::AuthRequired
+        );
+        assert_eq!(
+            YtdlpErrorKind::from_stderr("ERROR: sign in required"),
+            YtdlpErrorKind::AuthRequired
+        );
+        assert_eq!(
+            YtdlpErrorKind::from_stderr("ERROR: login required to view"),
+            YtdlpErrorKind::AuthRequired
+        );
+    }
+
+    #[test]
+    fn test_ytdlp_error_kind_from_stderr_video_not_accessible() {
+        assert_eq!(
+            YtdlpErrorKind::from_stderr("ERROR: Video unavailable"),
+            YtdlpErrorKind::VideoNotAccessible
+        );
+        assert_eq!(
+            YtdlpErrorKind::from_stderr(
+                "ERROR: Private video. Sign in if you've been granted access"
+            ),
+            YtdlpErrorKind::VideoNotAccessible
+        );
+        assert_eq!(
+            YtdlpErrorKind::from_stderr("ERROR: This video has been removed by the uploader"),
+            YtdlpErrorKind::VideoNotAccessible
+        );
+    }
+
+    #[test]
+    fn test_ytdlp_error_kind_from_stderr_geo_restricted() {
+        assert_eq!(
+            YtdlpErrorKind::from_stderr("ERROR: geo restriction applied"),
+            YtdlpErrorKind::GeoRestricted
+        );
+        assert_eq!(
+            YtdlpErrorKind::from_stderr(
+                "ERROR: The uploader has not made this video available in your country"
+            ),
+            YtdlpErrorKind::GeoRestricted
+        );
+        assert_eq!(
+            YtdlpErrorKind::from_stderr("ERROR: This content is blocked in your country"),
+            YtdlpErrorKind::GeoRestricted
+        );
+    }
+
+    #[test]
+    fn test_ytdlp_error_kind_from_stderr_live_stream() {
+        assert_eq!(
+            YtdlpErrorKind::from_stderr("ERROR: This is a live event"),
+            YtdlpErrorKind::LiveStream
+        );
+        assert_eq!(
+            YtdlpErrorKind::from_stderr("ERROR: This live stream recording is not available"),
+            YtdlpErrorKind::LiveStream
+        );
+    }
+
+    #[test]
+    fn test_ytdlp_error_kind_from_stderr_other() {
+        let err = YtdlpErrorKind::from_stderr("WARNING: something\nERROR: unexpected failure");
+        assert_eq!(
+            err,
+            YtdlpErrorKind::Other("ERROR: unexpected failure".to_string())
+        );
+    }
+
+    #[test]
+    fn test_ytdlp_error_kind_is_retryable_with_cookies() {
+        assert!(YtdlpErrorKind::AuthRequired.is_retryable_with_cookies());
+        assert!(!YtdlpErrorKind::VideoNotAccessible.is_retryable_with_cookies());
+        assert!(!YtdlpErrorKind::GeoRestricted.is_retryable_with_cookies());
+        assert!(!YtdlpErrorKind::LiveStream.is_retryable_with_cookies());
+        assert!(!YtdlpErrorKind::Other("error".to_string()).is_retryable_with_cookies());
+    }
+
+    #[test]
+    fn test_ytdlp_error_kind_to_user_message() {
+        assert!(YtdlpErrorKind::AuthRequired
+            .to_user_message()
+            .contains("age-restricted"));
+        assert!(YtdlpErrorKind::VideoNotAccessible
+            .to_user_message()
+            .contains("private or deleted"));
+        assert!(YtdlpErrorKind::GeoRestricted
+            .to_user_message()
+            .contains("region"));
+        assert!(YtdlpErrorKind::LiveStream
+            .to_user_message()
+            .contains("Live streams"));
+        assert!(YtdlpErrorKind::Other("some error".to_string())
+            .to_user_message()
+            .contains("some error"));
+    }
+
+    #[test]
+    fn test_detect_cookie_browsers_no_duplicates() {
+        let browsers = detect_cookie_browsers();
+        let mut seen = std::collections::HashSet::new();
+        for browser in &browsers {
+            assert!(seen.insert(browser), "Duplicate browser found: {}", browser);
+        }
     }
 }
