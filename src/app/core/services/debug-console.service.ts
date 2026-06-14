@@ -4,11 +4,23 @@ import { listen } from "@tauri-apps/api/event";
 import * as Sentry from "@sentry/angular";
 import { DemoService } from "./demo.service";
 
+export type LogSource = "rust" | "tauri" | "webview";
+
 export interface LogEntry {
   timestamp: Date;
   level: "debug" | "info" | "warn" | "error";
   message: string;
   context?: Record<string, unknown>;
+  source?: LogSource;
+}
+
+interface BackendLogPayload {
+  timestamp: number;
+  level: string;
+  source: string;
+  target: string;
+  message: string;
+  fields?: Record<string, unknown>;
 }
 
 @Injectable({ providedIn: "root" })
@@ -28,36 +40,27 @@ export class DebugConsoleService {
   }
 
   private async initialize() {
-    // In demo mode, enable debug console by default
+    // Always capture logs, independent of debug mode. Debug mode only controls
+    // whether the console toggle/panel is shown and the Sentry log volume.
+    await this.setupEventListeners();
+    await this.seedHistory();
+
     if (this.demoService.isDemoMode) {
       this._isEnabled.set(true);
-      this.log("info", "Debug console initialized (demo mode)");
       return;
     }
 
-    // Get initial debug mode from backend
+    // Get initial debug mode (controls UI visibility only)
     try {
-      const enabled = await invoke<boolean>("get_debug_mode");
-      this._isEnabled.set(enabled);
-
-      if (enabled) {
-        this.setupEventListeners();
-        this.log("info", "Debug console initialized");
-      }
-    } catch (e) {
-      console.error("Failed to get debug mode:", e);
+      this._isEnabled.set(await invoke<boolean>("get_debug_mode"));
+    } catch {
+      // Not running under Tauri (e.g. plain web dev) — leave the panel hidden.
     }
 
-    // Listen for debug mode changes from menu toggle
+    // Track debug mode changes from the menu toggle for UI visibility
     try {
       await listen<boolean>("debug-mode-changed", (event) => {
         this._isEnabled.set(event.payload);
-        if (event.payload) {
-          this.setupEventListeners();
-          this.log("info", "Debug mode enabled");
-        } else {
-          this.log("info", "Debug mode disabled");
-        }
       });
     } catch {
       // Event listener not available
@@ -65,20 +68,10 @@ export class DebugConsoleService {
   }
 
   private async setupEventListeners() {
-    // Listen for backend log events
+    // Unified backend log stream (rust + tauri framework), forwarded from tracing.
     try {
-      await listen<{
-        level: string;
-        message: string;
-        fields?: Record<string, unknown>;
-      }>("log-event", (event) => {
-        const level = this.parseLevel(event.payload.level);
-        this.addLog({
-          timestamp: new Date(),
-          level,
-          message: event.payload.message,
-          context: event.payload.fields,
-        });
+      await listen<BackendLogPayload>("app-log", (event) => {
+        this.addBackendLog(event.payload);
       });
     } catch {
       // Event listener not available
@@ -94,6 +87,7 @@ export class DebugConsoleService {
             timestamp: new Date(),
             level,
             message: `[AudioEngine] ${event.payload.message}`,
+            source: "rust",
           });
         },
       );
@@ -108,11 +102,34 @@ export class DebugConsoleService {
           timestamp: new Date(),
           level: "debug",
           message: `[Audio] ${event.payload}`,
+          source: "rust",
         });
       });
     } catch {
       // Event listener not available
     }
+  }
+
+  /** Seed the console with the backend's recent buffered logs (history before connect). */
+  private async seedHistory() {
+    try {
+      const logs = await invoke<BackendLogPayload[]>("get_recent_logs");
+      for (const payload of logs) {
+        this.addBackendLog(payload);
+      }
+    } catch {
+      // Not running under Tauri or command unavailable
+    }
+  }
+
+  private addBackendLog(payload: BackendLogPayload) {
+    this.addLog({
+      timestamp: new Date(payload.timestamp || Date.now()),
+      level: this.parseLevel(payload.level),
+      message: payload.message,
+      context: payload.fields,
+      source: this.parseSource(payload.source),
+    });
   }
 
   private parseLevel(level: string): LogEntry["level"] {
@@ -123,19 +140,29 @@ export class DebugConsoleService {
     return "info";
   }
 
+  private parseSource(source: string): LogSource {
+    if (source === "tauri") return "tauri";
+    if (source === "webview") return "webview";
+    return "rust";
+  }
+
+  /** Programmatic log from frontend code (always buffered, source = webview). */
   log(
     level: LogEntry["level"],
     message: string,
     context?: Record<string, unknown>,
   ) {
-    if (!this._isEnabled()) return;
+    this.record(level, message, "webview", context);
+  }
 
-    this.addLog({
-      timestamp: new Date(),
-      level,
-      message,
-      context,
-    });
+  /** Record a log entry from any source. Always buffered, regardless of debug mode. */
+  record(
+    level: LogEntry["level"],
+    message: string,
+    source: LogSource,
+    context?: Record<string, unknown>,
+  ) {
+    this.addLog({ timestamp: new Date(), level, message, context, source });
   }
 
   private addLog(entry: LogEntry) {
@@ -147,13 +174,16 @@ export class DebugConsoleService {
       return newLogs;
     });
 
-    // Send log as Sentry breadcrumb for error context
-    Sentry.addBreadcrumb({
-      category: "log",
-      message: entry.message,
-      level: this.toSentryLevel(entry.level),
-      data: entry.context,
-    });
+    // Add a Sentry breadcrumb for error context. Webview console logs are already
+    // captured by Sentry's console integration, so only breadcrumb backend logs here.
+    if (entry.source !== "webview") {
+      Sentry.addBreadcrumb({
+        category: "log",
+        message: entry.message,
+        level: this.toSentryLevel(entry.level),
+        data: entry.context,
+      });
+    }
   }
 
   private toSentryLevel(level: LogEntry["level"]): Sentry.SeverityLevel {

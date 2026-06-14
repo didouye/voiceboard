@@ -116,6 +116,11 @@ import { DebugConsoleService } from "../../services/debug-console.service";
             @for (log of debugConsole.logs(); track log.timestamp.getTime()) {
               <div class="log-entry" [class]="'log-' + log.level">
                 <span class="log-time">{{ formatTime(log.timestamp) }}</span>
+                @if (log.source) {
+                  <span class="log-source" [class]="'src-' + log.source">{{
+                    log.source
+                  }}</span>
+                }
                 <span class="log-level">{{ log.level.toUpperCase() }}</span>
                 <span class="log-message">{{ log.message }}</span>
                 @if (log.context) {
@@ -258,6 +263,27 @@ import { DebugConsoleService } from "../../services/debug-console.service";
       .log-time {
         color: #6b7280;
         flex-shrink: 0;
+      }
+
+      .log-source {
+        flex-shrink: 0;
+        width: 48px;
+        text-transform: uppercase;
+        font-size: 10px;
+        font-weight: 700;
+        opacity: 0.85;
+
+        &.src-rust {
+          color: #f59e0b;
+        }
+
+        &.src-tauri {
+          color: #a78bfa;
+        }
+
+        &.src-webview {
+          color: #34d399;
+        }
       }
 
       .log-level {

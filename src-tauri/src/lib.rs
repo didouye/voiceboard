@@ -50,6 +50,7 @@ use application::{
         get_noise_suppression,
         get_physical_output_devices,
         get_preview_state,
+        get_recent_logs,
         get_sentry_dsn,
         // Settings
         get_settings,
@@ -70,6 +71,7 @@ use application::{
         // Sound playback
         load_sound_file,
         load_soundboard,
+        log_from_webview,
         migrate_sound_to_normalized,
         open_log_dir,
         play_sound,
@@ -158,6 +160,9 @@ pub fn run() {
             {
                 infrastructure::set_install_id(install_id);
             }
+
+            // Forward tracing logs (rust + tauri) to the webview for the unified in-app console
+            infrastructure::start_forwarding(app.handle().clone());
 
             // Create application menu with Debug toggle
             let toggle_debug =
@@ -401,6 +406,8 @@ pub fn run() {
             get_sentry_dsn,
             get_app_environment,
             get_install_id,
+            get_recent_logs,
+            log_from_webview,
             open_log_dir,
             // Noise suppression
             get_noise_suppression,

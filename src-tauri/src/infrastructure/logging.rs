@@ -88,6 +88,7 @@ pub fn init_logging() {
         .with(filter)
         .with(tracing_subscriber::fmt::layer())
         .with(file_layer)
+        .with(super::log_bridge::WebviewLayer)
         .with(sentry_layer)
         .init();
 

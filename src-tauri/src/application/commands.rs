@@ -2056,6 +2056,27 @@ pub fn open_log_dir(app: tauri::AppHandle) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+/// Route a webview log line into the unified tracing pipeline under the `webview`
+/// target, so it is written to the rotating log file alongside the Rust/Tauri logs.
+/// It is intentionally excluded from the Rust Sentry layer (the JS SDK already sends
+/// it) and from the console echo (the frontend already displays it).
+#[tauri::command]
+pub fn log_from_webview(level: String, message: String) {
+    match level.as_str() {
+        "error" => tracing::error!(target: "webview", "{message}"),
+        "warn" => tracing::warn!(target: "webview", "{message}"),
+        "debug" => tracing::debug!(target: "webview", "{message}"),
+        "trace" => tracing::trace!(target: "webview", "{message}"),
+        _ => tracing::info!(target: "webview", "{message}"),
+    }
+}
+
+/// Return the most recent buffered log lines so the in-app console can seed its history.
+#[tauri::command]
+pub fn get_recent_logs() -> Vec<crate::infrastructure::LogPayload> {
+    crate::infrastructure::recent_logs()
+}
+
 // ============================================================================
 // VB-Cable Setup Commands
 // ============================================================================
