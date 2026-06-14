@@ -7,4 +7,4 @@ mod logging;
 mod sentry;
 
 pub use logging::*;
-pub use sentry::{init_sentry, DEBUG_MODE_ENABLED};
+pub use sentry::{init_sentry, resolve_environment, set_install_id, DEBUG_MODE_ENABLED};

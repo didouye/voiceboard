@@ -2008,6 +2008,41 @@ pub fn get_sentry_dsn() -> Option<String> {
         .or_else(|| std::env::var("SENTRY_DSN").ok().filter(|s| !s.is_empty()))
 }
 
+/// Get the Sentry `environment` (development / beta / production) for the running build.
+/// Exposed so the webview SDK tags events with the exact same value as the Rust SDK.
+#[tauri::command]
+pub fn get_app_environment() -> String {
+    crate::infrastructure::resolve_environment()
+}
+
+const INSTALL_STORE: &str = "install.json";
+const INSTALL_ID_KEY: &str = "install_id";
+
+/// Read the persistent per-install identifier, creating and persisting one on first run.
+/// Used to group all of a machine's Sentry events under a stable (non-PII) user id.
+pub fn get_or_create_install_id(app: &tauri::AppHandle) -> Option<String> {
+    let store = app.store(INSTALL_STORE).ok()?;
+
+    if let Some(value) = store.get(INSTALL_ID_KEY) {
+        if let Some(existing) = value.as_str() {
+            if !existing.is_empty() {
+                return Some(existing.to_string());
+            }
+        }
+    }
+
+    let id = uuid::Uuid::new_v4().to_string();
+    store.set(INSTALL_ID_KEY, serde_json::json!(id));
+    let _ = store.save();
+    Some(id)
+}
+
+/// Expose the install id to the webview so its Sentry SDK uses the same user id.
+#[tauri::command]
+pub fn get_install_id(app: tauri::AppHandle) -> Option<String> {
+    get_or_create_install_id(&app)
+}
+
 // ============================================================================
 // VB-Cable Setup Commands
 // ============================================================================

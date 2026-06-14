@@ -15,13 +15,18 @@ pub fn init_logging() {
             .is_some_and(|s| !s.is_empty());
 
     let sentry_layer = if has_dsn {
-        Some(
-            sentry_tracing::layer().event_filter(|md| match *md.level() {
+        Some(sentry_tracing::layer().event_filter(|md| {
+            // Webview logs reach Sentry through the JS SDK (with browser context and
+            // source maps); don't duplicate them from the Rust side.
+            if md.target() == "webview" {
+                return EventFilter::Ignore;
+            }
+            match *md.level() {
                 tracing::Level::ERROR => EventFilter::Event | EventFilter::Log,
                 tracing::Level::TRACE => EventFilter::Ignore,
                 _ => EventFilter::Breadcrumb | EventFilter::Log,
-            }),
-        )
+            }
+        }))
     } else {
         None
     };

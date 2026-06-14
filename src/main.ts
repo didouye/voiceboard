@@ -6,6 +6,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getVersion } from "@tauri-apps/api/app";
 import { AppComponent } from "./app/app.component";
 import { appConfig } from "./app/app.config";
+import { shouldSendLog } from "./app/core/logging/log-gating";
 
 // Debug mode state — read by Sentry beforeSendLog callback
 let debugModeEnabled = false;
@@ -25,28 +26,41 @@ function initDebugModeTracking(): void {
 // Initialize Sentry with DSN and version from backend
 async function initSentry(): Promise<void> {
   try {
-    const [dsn, version] = await Promise.all([
+    const [dsn, version, environment, installId] = await Promise.all([
       invoke<string | null>("get_sentry_dsn"),
       getVersion(),
+      invoke<string>("get_app_environment").catch(() => "production"),
+      invoke<string | null>("get_install_id").catch(() => null),
     ]);
 
     if (dsn) {
       Sentry.init({
         dsn,
         release: version,
-        environment: "production",
+        // Channel-aware environment resolved by the Rust backend (development / beta /
+        // production), so webview and Rust events share the exact same value.
+        environment,
         enableLogs: true,
+        // Tag every webview event so Sentry can be filtered by source, and group all of a
+        // machine's events under the same stable (non-PII) install id as the Rust SDK.
+        initialScope: {
+          tags: { source: "webview" },
+          user: installId ? { id: installId } : undefined,
+        },
         integrations: [
-        consoleLoggingIntegration({
-          levels: ["log", "info", "warn", "error", "debug"],
-        }),
-      ],
+          consoleLoggingIntegration({
+            levels: ["log", "info", "warn", "error", "debug"],
+          }),
+        ],
         beforeSendLog(log) {
-          return debugModeEnabled ? log : null;
+          // WARN+ by default; everything when debug mode is on.
+          return shouldSendLog(log.level, debugModeEnabled) ? log : null;
         },
         tracesSampleRate: 0,
       });
-      console.log(`Sentry initialized (release: ${version})`);
+      console.log(
+        `Sentry initialized (release: ${version}, environment: ${environment})`,
+      );
     }
   } catch (e) {
     console.warn("Failed to initialize Sentry:", e);

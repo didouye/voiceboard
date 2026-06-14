@@ -36,13 +36,15 @@ use application::{
         cleanup_orphaned_images,
         delete_pad_image,
         download_and_install_vb_cable,
+        // Debug
+        get_app_environment,
         // Device management
         get_audio_devices,
-        // Debug
         get_debug_mode,
         // Image management
         get_images_dir,
         get_input_devices,
+        get_install_id,
         // Mixer configuration
         get_mixer_config,
         get_noise_suppression,
@@ -148,6 +150,12 @@ pub fn run() {
                             .store(enabled, std::sync::atomic::Ordering::Relaxed);
                     }
                 }
+            }
+
+            // Tag Sentry events with a stable per-install id so a machine's events group together
+            if let Some(install_id) = application::commands::get_or_create_install_id(app.handle())
+            {
+                infrastructure::set_install_id(install_id);
             }
 
             // Create application menu with Debug toggle
@@ -390,6 +398,8 @@ pub fn run() {
             get_debug_mode,
             set_debug_mode,
             get_sentry_dsn,
+            get_app_environment,
+            get_install_id,
             // Noise suppression
             get_noise_suppression,
             set_noise_suppression,
