@@ -71,6 +71,7 @@ use application::{
         load_sound_file,
         load_soundboard,
         migrate_sound_to_normalized,
+        open_log_dir,
         play_sound,
         preview_sound,
         read_image_file,
@@ -400,6 +401,7 @@ pub fn run() {
             get_sentry_dsn,
             get_app_environment,
             get_install_id,
+            open_log_dir,
             // Noise suppression
             get_noise_suppression,
             set_noise_suppression,

@@ -60,6 +60,8 @@ xz2 = "0.1"
 # Logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
+dirs = "6"
 
 # Error tracking
 sentry = { version = "0.46", default-features = false, features = ["backtrace", "contexts", "panic", "reqwest", "rustls", "logs"] }

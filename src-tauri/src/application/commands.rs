@@ -2043,6 +2043,19 @@ pub fn get_install_id(app: tauri::AppHandle) -> Option<String> {
     get_or_create_install_id(&app)
 }
 
+/// Open the application log directory in the OS file manager.
+#[tauri::command]
+pub fn open_log_dir(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+
+    let dir = crate::infrastructure::log_dir().ok_or("Log directory unavailable")?;
+    // Ensure it exists so the first-run case (before any log file is written) still opens.
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    app.opener()
+        .open_path(dir.to_string_lossy().to_string(), None::<&str>)
+        .map_err(|e| e.to_string())
+}
+
 // ============================================================================
 // VB-Cable Setup Commands
 // ============================================================================

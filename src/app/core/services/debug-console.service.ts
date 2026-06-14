@@ -199,6 +199,18 @@ export class DebugConsoleService {
   }
 
   /**
+   * Open the local log directory in the OS file manager.
+   */
+  async openLogDir(): Promise<void> {
+    try {
+      await invoke("open_log_dir");
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      this.log("error", `Failed to open log folder: ${message}`);
+    }
+  }
+
+  /**
    * Send a test error to Sentry to verify integration
    */
   sendTestError(): void {
