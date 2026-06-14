@@ -133,6 +133,9 @@ jobs:
         run: npm run tauri build -- --target ${{ matrix.target }}
         env:
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          # Embedded via option_env! so both the Rust and webview SDKs tag events
+          # with the channel-aware environment (beta for develop, production for main).
+          SENTRY_ENVIRONMENT: ${{ needs.version.outputs.sentry_env }}
 
       - name: Rename artifacts (Windows)
         if: matrix.platform == 'windows'
