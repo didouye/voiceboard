@@ -3,10 +3,20 @@
 use sentry_tracing::EventFilter;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
+/// Default tracing filter used when `RUST_LOG` is not set.
+///
+/// Captures our own crate verbosely and the Tauri framework / plugins / audio
+/// stack at INFO and above. Those dependencies log through the `log` crate, which
+/// is bridged into `tracing` by the global `LogTracer` that `SubscriberInitExt::init`
+/// installs (the `tracing-log` feature is enabled by default). Override with
+/// `RUST_LOG` for deeper framework debugging (e.g. `RUST_LOG=voiceboard=trace,wry=debug`).
+const DEFAULT_FILTER: &str =
+    "voiceboard=debug,tauri=info,tauri_plugin_updater=info,wry=info,cpal=info,info";
+
 /// Initialize the logging system with optional Sentry integration
 pub fn init_logging() {
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("voiceboard=debug,info"));
+    let filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(DEFAULT_FILTER));
 
     // Enable Sentry tracing layer if DSN is available (compile-time or runtime)
     let has_dsn = option_env!("SENTRY_DSN").is_some_and(|s| !s.is_empty())
@@ -38,4 +48,15 @@ pub fn init_logging() {
         .init();
 
     tracing::info!("Logging initialized");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_filter_is_valid() {
+        // EnvFilter::new panics on malformed directives; try_new surfaces it as an error.
+        assert!(EnvFilter::try_new(DEFAULT_FILTER).is_ok());
+    }
 }
