@@ -1,9 +1,21 @@
 # Unified Logging & Sentry Error Reporting - Design
 
 > **Date:** 2026-06-14
-> **Status:** Ready for implementation
+> **Status:** Phases 1–4 implemented; Phase 5 (polish) pending.
 > **Supersedes:** parts of `2026-02-07-sentry-logs-design.md` (the debug-mode gate and
 > environment handling are revised here).
+
+## Implementation progress
+
+- [x] **Phase 1** — Sentry taxonomy & gating: `source` tags (rust/tauri/webview),
+      channel-aware `environment`, WARN+ default / all-in-debug gating, `install_id`.
+- [x] **Phase 2** — Capture completeness: confirmed `log→tracing` bridge, explicit
+      default `EnvFilter` for framework logs.
+- [x] **Phase 3** — Local rotating log file (`tracing-appender`) + `open_log_dir`.
+- [x] **Phase 4** — Unified in-app console: Rust `app-log` emit layer + ring buffer,
+      `LoggerService` console capture/forward, source badges.
+- [ ] **Phase 5** — Polish: console source/level filters & search, raise buffer,
+      optional `tracesSampleRate`. End-to-end runtime verification against live Sentry.
 
 ## Goal
 
