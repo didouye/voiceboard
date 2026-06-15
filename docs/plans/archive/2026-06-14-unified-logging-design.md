@@ -1,7 +1,7 @@
 # Unified Logging & Sentry Error Reporting - Design
 
 > **Date:** 2026-06-14
-> **Status:** Phases 1–4 implemented; Phase 5 (polish) pending.
+> **Status:** Implemented & verified (phases 1–5, 2026-06-15).
 > **Supersedes:** parts of `2026-02-07-sentry-logs-design.md` (the debug-mode gate and
 > environment handling are revised here).
 
@@ -22,11 +22,11 @@
     classification so they are tagged `rust` (commit `da7df59`).
   - scope tags don't propagate to Sentry Logs → set `source` as a log attribute on the
     frontend (commit `01c7969`).
-- [ ] **Phase 5** — Polish: console source/level filters & search, raise buffer, dedup
-      audio events vs `app-log`, debounce the webview→Rust forward, optional
-      `tracesSampleRate`. Also: call `LoggerService.install()` earlier than the
-      `AppComponent` constructor so the earliest bootstrap frontend logs also reach the
-      local file/console (they already reach Sentry via the earlier `Sentry.init`).
+- [x] **Phase 5** — Polish: console source/level filters & search + bigger buffer
+      (2000), audio events deduplicated through `app-log`, webview→Rust forward
+      debounced/batched (`log_batch_from_webview`), and `LoggerService` patched from
+      `provideAppInitializer` so the earliest bootstrap logs are captured locally too
+      (verified at runtime). `tracesSampleRate` left at 0 (perf tracing not requested).
 
 ## Goal
 
