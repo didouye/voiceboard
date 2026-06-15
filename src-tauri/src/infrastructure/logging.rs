@@ -18,8 +18,7 @@ const BUNDLE_ID: &str = "com.voiceboard.app";
 /// installs (the `tracing-log` feature is enabled by default). `webview` carries logs
 /// forwarded from the Angular frontend (captured fully so the unified file/console see
 /// everything). Override with `RUST_LOG` for deeper framework debugging.
-const DEFAULT_FILTER: &str =
-    "voiceboard=debug,tauri=info,tauri_plugin_updater=info,wry=info,cpal=info,webview=trace,info";
+const DEFAULT_FILTER: &str = "voiceboard=debug,voiceboard_lib=debug,tauri=info,tauri_plugin_updater=info,wry=info,cpal=info,webview=trace,info";
 
 /// Keeps the non-blocking file appender's worker thread alive for the whole process.
 static FILE_GUARD: OnceLock<WorkerGuard> = OnceLock::new();

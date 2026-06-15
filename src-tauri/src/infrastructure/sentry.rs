@@ -28,11 +28,23 @@ pub fn set_install_id(install_id: String) {
 pub fn source_for_target(target: &str) -> &'static str {
     if target == "webview" {
         "webview"
-    } else if target == "voiceboard" || target.starts_with("voiceboard::") {
+    } else if is_own_crate_target(target) {
         "rust"
     } else {
         "tauri"
     }
+}
+
+/// True when the tracing target belongs to our own crates: the `voiceboard` binary
+/// or the `voiceboard_lib` library (where almost all app code lives), as opposed to
+/// the Tauri framework / plugins / dependencies.
+fn is_own_crate_target(target: &str) -> bool {
+    ["voiceboard", "voiceboard_lib"].iter().any(|name| {
+        target == *name
+            || target
+                .strip_prefix(name)
+                .is_some_and(|rest| rest.starts_with("::"))
+    })
 }
 
 /// Pure environment resolution: a non-empty compile-time value wins, otherwise
@@ -145,18 +157,27 @@ mod tests {
     #[test]
     fn source_for_target_classifies_three_buckets() {
         assert_eq!(source_for_target("webview"), "webview");
-        // Our own crate
+        // Our own crates: the binary `voiceboard` and the library `voiceboard_lib`
+        // (the lib is where app code actually logs from).
         assert_eq!(source_for_target("voiceboard"), "rust");
         assert_eq!(
             source_for_target("voiceboard::application::commands"),
             "rust"
         );
+        assert_eq!(source_for_target("voiceboard_lib"), "rust");
+        assert_eq!(
+            source_for_target("voiceboard_lib::application::audio_engine"),
+            "rust"
+        );
         // Framework / plugins / dependencies
         assert_eq!(source_for_target("tauri::app"), "tauri");
+        assert_eq!(source_for_target("tauri_plugin_updater::updater"), "tauri");
         assert_eq!(source_for_target("wry"), "tauri");
         assert_eq!(source_for_target("tao::event_loop"), "tauri");
         assert_eq!(source_for_target("cpal::host::coreaudio"), "tauri");
         assert_eq!(source_for_target("hyper::client"), "tauri");
+        // A crate that merely starts with the same text is not ours.
+        assert_eq!(source_for_target("voiceboardx::foo"), "tauri");
         assert_eq!(source_for_target(""), "tauri");
     }
 
