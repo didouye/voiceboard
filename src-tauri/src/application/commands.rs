@@ -1213,7 +1213,7 @@ pub async fn migrate_sound_to_normalized(
 /// and optional speed (0.5-2.0, default 1.0)
 #[tauri::command]
 pub async fn play_sound(
-    app_handle: tauri::AppHandle,
+    _app_handle: tauri::AppHandle,
     state: State<'_, AppState>,
     id: String,
     path: String,
@@ -1315,18 +1315,14 @@ pub async fn play_sound(
         .iter()
         .fold((0.0f32, 0.0f32), |(min, max), &s| (min.min(s), max.max(s)));
 
-    // Send debug info via event so it shows in frontend debug console
-    use tauri::Emitter;
-    let _ = app_handle.emit(
-        "audio-debug",
-        format!(
-            "Sound: {}Hz->{}Hz, {}ch, peak={:.3}, resampled={}",
-            source_sample_rate,
-            target_sample_rate,
-            channels,
-            min_sample.abs().max(max_sample.abs()),
-            source_sample_rate != target_sample_rate
-        ),
+    // Reaches the in-app console via the unified `app-log` stream (and the log file).
+    tracing::debug!(
+        "[Audio] Sound: {}Hz->{}Hz, {}ch, peak={:.3}, resampled={}",
+        source_sample_rate,
+        target_sample_rate,
+        channels,
+        min_sample.abs().max(max_sample.abs()),
+        source_sample_rate != target_sample_rate
     );
 
     // Check if a StopAllSounds was called while we were decoding
@@ -2056,18 +2052,38 @@ pub fn open_log_dir(app: tauri::AppHandle) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
-/// Route a webview log line into the unified tracing pipeline under the `webview`
+/// Emit a single webview log line into the unified tracing pipeline under the `webview`
 /// target, so it is written to the rotating log file alongside the Rust/Tauri logs.
 /// It is intentionally excluded from the Rust Sentry layer (the JS SDK already sends
 /// it) and from the console echo (the frontend already displays it).
-#[tauri::command]
-pub fn log_from_webview(level: String, message: String) {
-    match level.as_str() {
+fn emit_webview_log(level: &str, message: &str) {
+    match level {
         "error" => tracing::error!(target: "webview", "{message}"),
         "warn" => tracing::warn!(target: "webview", "{message}"),
         "debug" => tracing::debug!(target: "webview", "{message}"),
         "trace" => tracing::trace!(target: "webview", "{message}"),
         _ => tracing::info!(target: "webview", "{message}"),
+    }
+}
+
+/// Route a single webview log line into the unified tracing pipeline.
+#[tauri::command]
+pub fn log_from_webview(level: String, message: String) {
+    emit_webview_log(&level, &message);
+}
+
+/// One webview log line in a batch forwarded from the frontend.
+#[derive(serde::Deserialize)]
+pub struct WebviewLogEntry {
+    pub level: String,
+    pub message: String,
+}
+
+/// Route a batch of webview log lines (the frontend debounces forwards to cut IPC chatter).
+#[tauri::command]
+pub fn log_batch_from_webview(entries: Vec<WebviewLogEntry>) {
+    for entry in entries {
+        emit_webview_log(&entry.level, &entry.message);
     }
 }
 

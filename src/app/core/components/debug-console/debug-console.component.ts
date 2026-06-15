@@ -1,6 +1,7 @@
-import { Component, inject } from "@angular/core";
+import { Component, computed, inject, signal } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { DebugConsoleService } from "../../services/debug-console.service";
+import { filterLogs } from "../../logging/log-filter";
 
 @Component({
   selector: "app-debug-console",
@@ -112,8 +113,41 @@ import { DebugConsoleService } from "../../services/debug-console.service";
               </button>
             </div>
           </div>
+          <div class="debug-filters">
+            <select
+              [value]="sourceFilter()"
+              (change)="sourceFilter.set($any($event.target).value)"
+              title="Filter by source"
+            >
+              <option value="all">all sources</option>
+              <option value="rust">rust</option>
+              <option value="tauri">tauri</option>
+              <option value="webview">webview</option>
+            </select>
+            <select
+              [value]="levelFilter()"
+              (change)="levelFilter.set($any($event.target).value)"
+              title="Minimum level"
+            >
+              <option value="all">all levels</option>
+              <option value="debug">debug+</option>
+              <option value="info">info+</option>
+              <option value="warn">warn+</option>
+              <option value="error">error</option>
+            </select>
+            <input
+              type="text"
+              class="debug-search"
+              placeholder="search messages…"
+              [value]="searchText()"
+              (input)="searchText.set($any($event.target).value)"
+            />
+            <span class="debug-count"
+              >{{ filteredLogs().length }}/{{ debugConsole.logs().length }}</span
+            >
+          </div>
           <div class="debug-content">
-            @for (log of debugConsole.logs(); track log.timestamp.getTime()) {
+            @for (log of filteredLogs(); track log.timestamp.getTime()) {
               <div class="log-entry" [class]="'log-' + log.level">
                 <span class="log-time">{{ formatTime(log.timestamp) }}</span>
                 @if (log.source) {
@@ -226,6 +260,35 @@ import { DebugConsoleService } from "../../services/debug-console.service";
         }
       }
 
+      .debug-filters {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        padding: 6px 12px;
+        border-bottom: 1px solid rgba(75, 85, 99, 0.5);
+
+        select,
+        .debug-search {
+          background: rgba(31, 41, 55, 0.9);
+          border: 1px solid rgba(75, 85, 99, 0.6);
+          color: #e5e7eb;
+          border-radius: 4px;
+          padding: 3px 6px;
+          font-size: 11px;
+        }
+
+        .debug-search {
+          flex: 1;
+          min-width: 60px;
+        }
+
+        .debug-count {
+          color: #6b7280;
+          font-size: 11px;
+          flex-shrink: 0;
+        }
+      }
+
       .debug-content {
         flex: 1;
         overflow-y: auto;
@@ -312,6 +375,20 @@ import { DebugConsoleService } from "../../services/debug-console.service";
 })
 export class DebugConsoleComponent {
   debugConsole = inject(DebugConsoleService);
+
+  readonly sourceFilter = signal<"all" | "rust" | "tauri" | "webview">("all");
+  readonly levelFilter = signal<"all" | "debug" | "info" | "warn" | "error">(
+    "all",
+  );
+  readonly searchText = signal("");
+
+  readonly filteredLogs = computed(() =>
+    filterLogs(this.debugConsole.logs(), {
+      level: this.levelFilter(),
+      source: this.sourceFilter(),
+      search: this.searchText(),
+    }),
+  );
 
   formatTime(date: Date): string {
     return date.toLocaleTimeString("en-US", {

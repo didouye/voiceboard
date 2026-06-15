@@ -26,6 +26,12 @@ export class LoggerService {
   private readonly debugConsole = inject(DebugConsoleService);
   private installed = false;
 
+  // Debounced forwarding to the backend to cut IPC chatter on chatty logging.
+  private readonly pending: { level: string; message: string }[] = [];
+  private flushTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly FLUSH_MS = 300;
+  private readonly MAX_BATCH = 100;
+
   /** Patch the console once. Safe to call multiple times. */
   install(): void {
     if (this.installed) {
@@ -45,12 +51,33 @@ export class LoggerService {
           // Buffer locally (never throws).
           this.debugConsole.record(level, message, "webview");
 
-          // Forward to the unified log file (fire-and-forget; swallow errors to
-          // avoid any recursion back into the patched console).
-          invoke("log_from_webview", { level, message }).catch(() => {});
+          // Forward to the unified log file, batched.
+          this.queueForward(level, message);
         };
       },
     );
+  }
+
+  private queueForward(level: string, message: string): void {
+    this.pending.push({ level, message });
+    if (this.pending.length >= this.MAX_BATCH) {
+      this.flush();
+      return;
+    }
+    this.flushTimer ??= setTimeout(() => this.flush(), this.FLUSH_MS);
+  }
+
+  private flush(): void {
+    if (this.flushTimer !== null) {
+      clearTimeout(this.flushTimer);
+      this.flushTimer = null;
+    }
+    if (this.pending.length === 0) {
+      return;
+    }
+    const entries = this.pending.splice(0, this.pending.length);
+    // Fire-and-forget; swallow errors to avoid recursion into the patched console.
+    invoke("log_batch_from_webview", { entries }).catch(() => {});
   }
 }
 

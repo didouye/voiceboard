@@ -7,7 +7,6 @@ import { DebugConsoleComponent } from "./core/components/debug-console/debug-con
 import { SetupWizardComponent } from "./core/components/setup-wizard/setup-wizard.component";
 import { ToastService } from "./core/services/toast.service";
 import { DebugConsoleService } from "./core/services/debug-console.service";
-import { LoggerService } from "./core/services/logger.service";
 import { SetupWizardService } from "./core/services/setup-wizard.service";
 import { TauriService } from "./core/services/tauri.service";
 import { BinaryManagerService } from "./core/services/binary-manager.service";
@@ -50,18 +49,11 @@ interface UpdateInfo {
 export class AppComponent implements OnInit {
   private toastService = inject(ToastService);
   private debugConsole = inject(DebugConsoleService);
-  private logger = inject(LoggerService);
   private setupWizard = inject(SetupWizardService);
   private tauri = inject(TauriService);
   private binaryManager = inject(BinaryManagerService);
 
   showSetupWizard = signal(false);
-
-  constructor() {
-    // Capture all console output into the in-app console + unified log file, as early
-    // as possible so subsequent startup logs are recorded.
-    this.logger.install();
-  }
 
   async ngOnInit() {
     // Log startup info

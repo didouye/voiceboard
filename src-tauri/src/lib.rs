@@ -71,6 +71,7 @@ use application::{
         // Sound playback
         load_sound_file,
         load_soundboard,
+        log_batch_from_webview,
         log_from_webview,
         migrate_sound_to_normalized,
         open_log_dir,
@@ -221,45 +222,20 @@ pub fn run() {
                                     }),
                                 );
                             }
+                            // These tracing events reach the in-app console via the
+                            // unified `app-log` stream (and the log file + Sentry), so no
+                            // separate `audio-engine-log` emit is needed.
                             AudioEngineEvent::Started => {
                                 tracing::info!("[AudioEngine] Engine started successfully");
-                                let _ = app_handle.emit(
-                                    "audio-engine-log",
-                                    serde_json::json!({
-                                        "level": "info",
-                                        "message": "Audio engine started successfully"
-                                    }),
-                                );
                             }
                             AudioEngineEvent::Stopped => {
                                 tracing::info!("[AudioEngine] Engine stopped");
-                                let _ = app_handle.emit(
-                                    "audio-engine-log",
-                                    serde_json::json!({
-                                        "level": "info",
-                                        "message": "Audio engine stopped"
-                                    }),
-                                );
                             }
                             AudioEngineEvent::Error(msg) => {
                                 tracing::error!("[AudioEngine] Error: {}", msg);
-                                let _ = app_handle.emit(
-                                    "audio-engine-log",
-                                    serde_json::json!({
-                                        "level": "error",
-                                        "message": format!("Audio engine error: {}", msg)
-                                    }),
-                                );
                             }
                             AudioEngineEvent::Info(msg) => {
                                 tracing::info!("[AudioEngine] {}", msg);
-                                let _ = app_handle.emit(
-                                    "audio-engine-log",
-                                    serde_json::json!({
-                                        "level": "info",
-                                        "message": msg
-                                    }),
-                                );
                             }
                             AudioEngineEvent::SoundFinished { id } => {
                                 tracing::debug!("[AudioEngine] Sound finished: {}", id);
@@ -408,6 +384,7 @@ pub fn run() {
             get_install_id,
             get_recent_logs,
             log_from_webview,
+            log_batch_from_webview,
             open_log_dir,
             // Noise suppression
             get_noise_suppression,

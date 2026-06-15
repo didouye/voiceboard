@@ -25,7 +25,7 @@ interface BackendLogPayload {
 
 @Injectable({ providedIn: "root" })
 export class DebugConsoleService {
-  private readonly MAX_LOGS = 500;
+  private readonly MAX_LOGS = 2000;
   private readonly _logs = signal<LogEntry[]>([]);
   private readonly _isOpen = signal(false);
   private readonly _isEnabled = signal(false);
@@ -69,41 +69,11 @@ export class DebugConsoleService {
 
   private async setupEventListeners() {
     // Unified backend log stream (rust + tauri framework), forwarded from tracing.
+    // Audio engine / audio-debug logs now arrive through this same stream, so no
+    // separate listeners are needed (avoids duplicate entries).
     try {
       await listen<BackendLogPayload>("app-log", (event) => {
         this.addBackendLog(event.payload);
-      });
-    } catch {
-      // Event listener not available
-    }
-
-    // Listen for audio engine log events
-    try {
-      await listen<{ level: string; message: string }>(
-        "audio-engine-log",
-        (event) => {
-          const level = this.parseLevel(event.payload.level);
-          this.addLog({
-            timestamp: new Date(),
-            level,
-            message: `[AudioEngine] ${event.payload.message}`,
-            source: "rust",
-          });
-        },
-      );
-    } catch {
-      // Event listener not available
-    }
-
-    // Listen for audio debug events (sound loading info)
-    try {
-      await listen<string>("audio-debug", (event) => {
-        this.addLog({
-          timestamp: new Date(),
-          level: "debug",
-          message: `[Audio] ${event.payload}`,
-          source: "rust",
-        });
       });
     } catch {
       // Event listener not available
