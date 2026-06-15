@@ -53,6 +53,9 @@ async function initSentry(): Promise<void> {
           }),
         ],
         beforeSendLog(log) {
+          // Tag with the source as a log attribute (scope tags don't propagate to
+          // Sentry Logs), mirroring the Rust side so logs are filterable by source.
+          log.attributes = { ...log.attributes, source: "webview" };
           // WARN+ by default; everything when debug mode is on.
           return shouldSendLog(log.level, debugModeEnabled) ? log : null;
         },
