@@ -14,8 +14,19 @@
 - [x] **Phase 3** — Local rotating log file (`tracing-appender`) + `open_log_dir`.
 - [x] **Phase 4** — Unified in-app console: Rust `app-log` emit layer + ring buffer,
       `LoggerService` console capture/forward, source badges.
-- [ ] **Phase 5** — Polish: console source/level filters & search, raise buffer,
-      optional `tracesSampleRate`. End-to-end runtime verification against live Sentry.
+- [x] **End-to-end verification** (2026-06-15, live Sentry org `appins` / project
+      `voiceboard`): confirmed issues tagged `source` = rust/tauri and logs tagged
+      `source` = rust/webview, all with `environment=development`, `release=26.1.0` and a
+      shared `install_id` user. Two bugs found and fixed during the run:
+  - the app's logs use the `voiceboard_lib` crate target (not `voiceboard`) → fixed
+    classification so they are tagged `rust` (commit `da7df59`).
+  - scope tags don't propagate to Sentry Logs → set `source` as a log attribute on the
+    frontend (commit `01c7969`).
+- [ ] **Phase 5** — Polish: console source/level filters & search, raise buffer, dedup
+      audio events vs `app-log`, debounce the webview→Rust forward, optional
+      `tracesSampleRate`. Also: call `LoggerService.install()` earlier than the
+      `AppComponent` constructor so the earliest bootstrap frontend logs also reach the
+      local file/console (they already reach Sentry via the earlier `Sentry.init`).
 
 ## Goal
 
